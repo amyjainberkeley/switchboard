@@ -1,0 +1,109 @@
+{
+  "about": "A made-up Claude Code history: 40 chats by an imaginary developer, written for the memory pack's search test. Folders, names and projects are invented. Each chat is a list of turns [prompt, reply]. 'noise' lines go where the index must NOT look (tool output, thinking, injected notices, helpers).",
+  "chats": [
+    {"id": "c01", "folder": "/Users/x/code/webshop", "start": "2026-08-03T09:12:00Z", "ai_title": "Login loops back to sign-in page", "turns": [
+      ["After the OAuth callback from Google the app sends me back to /login, then to Google again, forever. Cookies look set. What is going on?", "The session cookie is set with SameSite=Strict, so the browser drops it on the cross-site redirect from Google. The middleware sees no session and redirects to /login again, which starts the loop."],
+      ["ok switch it to Lax and only on the callback route?", "Lax for the session cookie is enough; it is sent on top-level navigations. I changed the cookie options in auth/session.ts and added a guard so /login never redirects when a callback is in flight."],
+      ["works now, thanks. add a test so the loop cannot come back", "Added an integration test that walks through the callback with a fake provider and asserts exactly one redirect to /account."]],
+     "noise": {"tool_output": "GET /login 302 -> /oauth/google 302 -> /callback 302 -> /login (repeated 40 times)", "thinking": "Maybe the stripe webhook secret is involved? No, that is unrelated."}},
+    {"id": "c02", "folder": "/Users/x/code/payments", "start": "2026-08-04T14:40:00Z", "custom_title": "payments: webhook 400s", "turns": [
+      ["Every Stripe webhook comes back 400 with No signatures found matching the expected signature for payload. Secret is right, I triple checked.", "The handler parses the body as JSON before calling constructEvent, so the bytes Stripe signed are gone. Signature checks need the raw request body exactly as it arrived."],
+      ["it's express with app.use(express.json()) at the top", "Mount express.raw({type: 'application/json'}) on the /webhooks/stripe route before the JSON parser, and pass req.body (a Buffer) to stripe.webhooks.constructEvent with the endpoint secret."],
+      ["now the CLI forwarding works but production still fails", "Production uses a different endpoint secret than the one the Stripe CLI prints. I read it from STRIPE_WEBHOOK_SECRET_PROD now and log which secret id was tried, never the value."]],
+     "noise": {"tool_output": "Error: No signatures found matching the expected signature for payload"}},
+    {"id": "c03", "folder": "/Users/x/code/payments", "start": "2026-08-06T10:05:00Z", "ai_title": "Partial refunds for orders", "turns": [
+      ["customers want to return one item out of three. how do partial refunds work with stripe payment intents?", "Create a Refund with the payment_intent and an amount in cents for just that item. Stripe allows several partial refunds until the captured amount is used up."],
+      ["store which line items were refunded", "Added a refunds table keyed by order line, with the Stripe refund id and amount, and the order page now shows refunded lines greyed out."]]},
+    {"id": "c04", "folder": "/Users/x/code/webshop", "start": "2026-08-07T16:20:00Z", "ai_title": "Slow orders list query", "turns": [
+      ["the admin orders page takes 9 seconds. EXPLAIN shows a seq scan on orders", "The query filters by created_at and sorts by it, with no index on that column. A btree index on orders(created_at DESC) turns the scan into an index range read."],
+      ["write the migration, the table is big so don't lock it", "The migration uses CREATE INDEX CONCURRENTLY outside a transaction. The page loads in 120 ms on a copy of production data."]]},
+    {"id": "c05", "folder": "/Users/x/code/api", "start": "2026-08-08T11:00:00Z", "ai_title": "Shrink the api container", "turns": [
+      ["our docker image is 1.2 GB and deploys take forever. can we cut it down?", "Most of the size is the build toolchain and dev dependencies. A multi-stage Dockerfile builds in a full node image and copies only dist/ and production node_modules into a slim runtime stage."],
+      ["do it, and use distroless if it works", "Done: build stage on node:22, runtime on distroless nodejs22. The final image is 180 MB, and I added a .dockerignore so the context stops shipping .git and test fixtures."]],
+     "noise": {"tool_output": "REPOSITORY  TAG  SIZE  api  latest  1.21GB"}},
+    {"id": "c06", "folder": "/Users/x/code/api", "start": "2026-08-10T09:30:00Z", "ai_title": "Faster CI with caching", "turns": [
+      ["GitHub Actions spends 4 minutes on npm ci every run. Can we cache?", "actions/setup-node has a cache input keyed on the lockfile. With cache: npm the install drops to about 40 seconds when the lockfile has not changed."],
+      ["also cache the playwright browsers", "Added an actions/cache step for ~/.cache/ms-playwright keyed on the Playwright version from package-lock.json."]]},
+    {"id": "c07", "folder": "/Users/x/code/tidy-cli", "start": "2026-08-11T13:10:00Z", "custom_title": "tidy README", "turns": [
+      ["write a README for tidy: install, three examples, flags table", "Wrote README.md with a one-line pitch, install via pipx, examples for folders, dry runs and config files, and a table of every flag with its default."],
+      ["shorter. nobody reads the long intro", "Cut the intro to two sentences and moved the config file section below the examples."]]},
+    {"id": "c08", "folder": "/Users/x/code/tidy-cli", "start": "2026-08-12T15:45:00Z", "ai_title": "Rename parser variables", "turns": [
+      ["parser.py uses names like t, tt, x2. rename them to something readable without changing behavior", "Renamed tokens, token_type and next_char across parser.py and the two tests that reach into it. The test suite passes unchanged."]]},
+    {"id": "c09", "folder": "/Users/x/code/scheduler", "start": "2026-08-13T08:55:00Z", "ai_title": "Flaky scheduler test", "turns": [
+      ["test_next_run fails maybe once a month in CI, never locally. here's the failure: expected 02:30 got 03:30", "The test builds the expected time with naive datetimes in the machine's local zone. On the night the clocks spring forward 02:30 does not exist, so the scheduler skips to 03:30 and the assertion fails."],
+      ["make it deterministic", "The test now freezes the clock and pins the zone to Europe/Berlin, with two cases on the spring-forward and fall-back nights. The scheduler itself was right; only the test was flaky."]]},
+    {"id": "c10", "folder": "/Users/x/code/webshop", "start": "2026-08-14T10:30:00Z", "ai_title": "Lint and format setup", "turns": [
+      ["set up eslint and prettier so they stop fighting", "Installed eslint-config-prettier so ESLint turns off its formatting rules, added a format script, and a pre-commit hook that runs both on staged files."]]},
+    {"id": "c11", "folder": "/Users/x/infra/cluster", "start": "2026-08-15T19:05:00Z", "ai_title": "Pods in a restart loop", "turns": [
+      ["the api pods keep restarting every few minutes. kubectl describe says Liveness probe failed: context deadline exceeded", "The liveness probe calls /healthz with a one second timeout, and that endpoint checks the database. When the database is slow the probe times out and the kubelet kills a healthy pod."],
+      ["so what should the probe hit", "Liveness should only say the process is alive, so /healthz now returns 200 without touching the database. The database check moved to the readiness probe, and the timeout is 3 seconds with failureThreshold 3."]]},
+    {"id": "c12", "folder": "/Users/x/code/billing", "start": "2026-08-17T12:00:00Z", "ai_title": "Invoice CSV accents", "turns": [
+      ["accountants open the invoices csv in excel and names like Muller with umlauts show up as garbage", "Excel guesses the encoding of a CSV and assumes the old Windows code page unless the file starts with a byte order mark. The export writes UTF-8 without one."],
+      ["add the bom", "The export now writes the UTF-8 BOM before the header row, and a test checks the first three bytes. Accented names open correctly in Excel and still parse in pandas."]]},
+    {"id": "c13", "folder": "/Users/x/code/api", "start": "2026-08-18T09:20:00Z", "ai_title": "Per-key request limits", "turns": [
+      ["some customers hammer the public api. i want each api key limited to 100 requests a minute, across all our servers", "Since there are several servers the counter has to live in one shared place. A token bucket in Redis per key works: a small Lua script refills tokens by elapsed time and takes one atomically."],
+      ["return proper headers", "Responses now carry RateLimit-Limit, RateLimit-Remaining and Retry-After when a key runs out, and the 429 body says when to try again."]]},
+    {"id": "c14", "folder": "/Users/x/code/webshop", "start": "2026-08-19T17:40:00Z", "ai_title": "Dark mode toggle", "turns": [
+      ["add a dark mode switch that remembers the choice", "Colors are now CSS custom properties with a dark set under [data-theme=dark]. The switch stores the choice in localStorage and falls back to prefers-color-scheme."]]},
+    {"id": "c15", "folder": "/Users/x/code/queue-worker", "start": "2026-08-20T08:10:00Z", "ai_title": "Worker heap growth", "turns": [
+      ["the background job worker in node grows from 200MB to 3GB over a day and then gets OOM killed", "Two heap snapshots an hour apart show retained closures from a listener added on every job: emitter.on('progress') is called per job and never removed, so each finished job stays reachable."],
+      ["fix it", "The listener is attached once and removed in a finally block, and I added a test that runs 10,000 jobs and checks the listener count stays at one. Memory stays flat at about 210 MB."]]},
+    {"id": "c16", "folder": "/Users/x/infra/backups", "start": "2026-08-21T22:30:00Z", "custom_title": "nightly db backups", "turns": [
+      ["set up a nightly backup of postgres to s3, keep 30 days", "A cron job at 02:00 runs pg_dump in custom format, uploads to the backups bucket with server side encryption, and a lifecycle rule expires objects after 30 days."],
+      ["how do i know it ran", "The job pings a heartbeat URL on success, so a missed night raises an alert."]]},
+    {"id": "c17", "folder": "/Users/x/code/mailer", "start": "2026-08-22T11:25:00Z", "ai_title": "Responsive email templates", "turns": [
+      ["our order confirmation emails look broken in outlook", "Outlook renders with Word's engine and ignores most CSS. I moved the templates to MJML, which compiles to table layouts that Outlook understands."]]},
+    {"id": "c18", "folder": "/Users/x/code/ios-app", "start": "2026-08-24T09:00:00Z", "ai_title": "App crashes at launch", "turns": [
+      ["the ios app crashes right after launch on a real device but works in the simulator", "The crash log says the app accessed the camera without NSCameraUsageDescription in Info.plist. The simulator path never touched the camera."],
+      ["add it with a sensible message", "Added NSCameraUsageDescription with a short reason, and the scan screen now asks for permission before opening the camera."]]},
+    {"id": "c19", "folder": "/Users/x/code/rustparse", "start": "2026-08-25T20:15:00Z", "ai_title": "Borrow checker in tokenizer", "turns": [
+      ["cannot borrow self.buf as mutable because it is also borrowed as immutable, in next_token", "next_token keeps a slice of self.buf alive while calling self.advance(). Copy the needed bytes into a small owned value first, or return indices instead of a slice."],
+      ["indices please", "next_token now returns a start and end index, and callers slice the buffer after advance returns. It compiles and the fuzz tests pass."]]},
+    {"id": "c20", "folder": "/Users/x/code/webshop", "start": "2026-08-26T14:00:00Z", "ai_title": "Spanish translation", "turns": [
+      ["translate the storefront into spanish", "Moved every visible string into locales/en.json, added locales/es.json, and the language follows the Accept-Language header with a switch in the footer."]]},
+    {"id": "c21", "folder": "/Users/x/infra/cluster", "start": "2026-08-27T10:10:00Z", "ai_title": "Terraform lock stuck", "turns": [
+      ["terraform plan says Error acquiring the state lock, ConditionalCheckFailedException", "A previous apply was killed and left its lock item in the DynamoDB table. After confirming nobody else is applying, terraform force-unlock with the lock id releases it."]]},
+    {"id": "c22", "folder": "/Users/x/code/api", "start": "2026-08-28T15:30:00Z", "ai_title": "Too many SQL queries in resolvers", "turns": [
+      ["the orders graphql query fires 400 sql queries for one page. why?", "Each order's customer field has its own resolver that loads one customer by id, so 200 orders make 200 extra lookups, the classic N+1 problem."],
+      ["batch them", "Added a DataLoader per request that collects customer ids and loads them with one WHERE id IN query. The page now runs 3 queries."]]},
+    {"id": "c23", "folder": "/Users/x/code/webshop", "start": "2026-08-30T09:45:00Z", "ai_title": "Typo tolerant product search", "turns": [
+      ["search for 'sneekers' returns nothing. can elasticsearch handle typos?", "A match query with fuzziness AUTO allows one or two edits depending on word length, so 'sneekers' finds 'sneakers'. I kept prefix_length 1 so results stay fast."]]},
+    {"id": "c24", "folder": "/Users/x/code/scheduler", "start": "2026-08-31T13:00:00Z", "ai_title": "Tests for date parsing", "turns": [
+      ["write unit tests for parse_human_date: today, tomorrow, next friday, 3 days ago", "Added parametrized tests with a fixed now, including month ends and leap years. One case found a bug: next friday on a friday returned today."]]},
+    {"id": "c25", "folder": "/Users/x/code/live-dashboard", "start": "2026-09-01T16:50:00Z", "ai_title": "Live feed drops connection", "turns": [
+      ["the live dashboard stops updating after the laptop sleeps. the socket closes and nothing reopens it", "The client never handles the close event. It now reconnects on close with exponential backoff starting at 500 ms, doubling to a 30 second ceiling, with jitter so clients do not all return at once."],
+      ["and resubscribe to the channels", "After reconnecting the client resends its channel subscriptions and asks for anything missed since the last message id."]]},
+    {"id": "c26", "folder": "/Users/x/data/sales", "start": "2026-09-02T10:00:00Z", "ai_title": "Duplicate rows after merge", "turns": [
+      ["after pd.merge my sales dataframe has twice as many rows", "The right table has several rows per customer id, so the merge multiplies matches. Drop duplicates on the key first or use validate='many_to_one' so pandas raises when it is not unique."]]},
+    {"id": "c27", "folder": "/Users/x/code/webshop", "start": "2026-09-03T12:15:00Z", "ai_title": "Thumbnails for uploads", "turns": [
+      ["make thumbnails when sellers upload product photos", "Uploads now go through Pillow: the image is rotated by its EXIF orientation, resized to 400 px and 1200 px versions, and saved as WebP next to the original."]]},
+    {"id": "c28", "folder": "/Users/x/code/api", "start": "2026-09-04T09:35:00Z", "ai_title": "Gradual feature rollout", "turns": [
+      ["roll out the new checkout to 10 percent of users first", "Each user id is hashed into a bucket from 0 to 99, and the flag is on when the bucket is below the rollout percentage, so a user keeps the same answer as the percentage grows."]]},
+    {"id": "c29", "folder": "/Users/x/code/webshop", "start": "2026-09-05T15:20:00Z", "ai_title": "Accessibility pass", "turns": [
+      ["run an accessibility check on the checkout", "Icon buttons had no labels and the grey hint text failed contrast. Added aria-labels, raised the hint color to pass AA, and made the error summary focusable."]]},
+    {"id": "c30", "folder": "/Users/x/scripts", "start": "2026-09-06T21:00:00Z", "custom_title": "photo renamer", "turns": [
+      ["bash script to rename my photos by the date they were taken", "The script reads DateTimeOriginal with exiftool and renames each file to YYYY-MM-DD_HHMMSS, adding a counter when two photos share a second."]],
+     "noise": {"tool_output": "renamed 412 files. stripe webhook signature failed redirect loop docker image too big liveness probe failed zanzibarquux"}},
+    {"id": "c31", "folder": "/Users/x/code/notes-app", "start": "2026-09-08T10:40:00Z", "ai_title": "Full text search for notes", "turns": [
+      ["add search to the notes app, it's sqlite", "Added an FTS5 virtual table kept in sync by triggers, and the search box ranks notes with bm25 and shows a highlighted snippet."]]},
+    {"id": "c32", "folder": "/Users/x/code/webshop", "start": "2026-09-09T14:25:00Z", "ai_title": "React 18 upgrade", "turns": [
+      ["upgrade react to 18", "Switched ReactDOM.render to createRoot, fixed two effects that ran twice under StrictMode, and updated the testing library."]]},
+    {"id": "c33", "folder": "/Users/x/code/notify", "start": "2026-09-10T11:30:00Z", "ai_title": "Retry Slack notifications", "turns": [
+      ["slack notifications get lost when slack returns 500", "The sender now retries failed webhook posts with exponential backoff, up to five times, and puts the message on a dead letter list after that."],
+      ["respect their rate limits too", "On a 429 the sender waits for the Retry-After seconds Slack gives before the next attempt."]]},
+    {"id": "c34", "folder": "/Users/x/code/webshop", "start": "2026-09-11T09:05:00Z", "ai_title": "Password reset links expire", "turns": [
+      ["password reset links should stop working after an hour and after one use", "Reset tokens are now stored hashed with an expiry and a used flag. The reset page checks both, and signing in after a reset clears every other token for that user."]]},
+    {"id": "c35", "folder": "/Users/x/code/tidy-cli", "start": "2026-09-12T16:00:00Z", "ai_title": "Slow CLI startup", "turns": [
+      ["tidy takes 900 ms just to print --help", "python -X importtime shows most of it is importing pandas at module level for one rarely used command. Importing it inside that command brings --help down to 80 ms."]]},
+    {"id": "c36", "folder": "/Users/x/code/monorepo", "start": "2026-09-13T10:20:00Z", "ai_title": "Move to pnpm workspaces", "turns": [
+      ["merge the three packages into one repo with pnpm", "Created pnpm-workspace.yaml, moved the packages under packages/, and replaced relative installs with workspace:* versions."]]},
+    {"id": "c37", "folder": "/Users/x/code/api", "start": "2026-09-14T18:45:00Z", "ai_title": "Rebase conflicts", "turns": [
+      ["my feature branch has conflicts with main in three files after rebasing", "Two conflicts were import order only. The third was a real clash in the pricing function; I kept main's rounding fix and reapplied your discount change on top, then ran the tests."]]},
+    {"id": "c38", "folder": "/Users/x/code/api", "start": "2026-09-15T09:10:00Z", "ai_title": "Structured logging", "turns": [
+      ["logs are impossible to search. make them json with a request id", "A middleware gives every request an id, the logger writes one JSON object per line with level, message and that id, and the id is returned in an X-Request-Id header."]]},
+    {"id": "c39", "folder": "/Users/x/code/calendar", "start": "2026-09-16T13:35:00Z", "ai_title": "Invites at the wrong hour", "turns": [
+      ["meeting invites show an hour off for people in other countries", "The ICS file writes local times without a zone. It now writes times in UTC with a trailing Z, so each calendar converts to its own zone."]]},
+    {"id": "c40", "folder": "/Users/x/finance", "start": "2026-09-17T20:00:00Z", "custom_title": "cloud bill sheet", "turns": [
+      ["help me with a spreadsheet formula that totals the cloud bill by service per month", "SUMIFS over the cost column with the service and month columns as criteria does it; I put the month in a helper column with TEXT(date, 'yyyy-mm')."]]}
+  ]
+}

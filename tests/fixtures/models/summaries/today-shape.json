@@ -1,0 +1,93 @@
+{
+ "inherited": {
+  "agents": 9,
+  "by_family": [
+   {
+    "family": "Opus",
+    "share": 0.38
+   },
+   {
+    "family": "Sonnet",
+    "share": 0.005
+   },
+   {
+    "family": "Haiku",
+    "share": 0.005
+   }
+  ],
+  "requests": 390,
+  "rule": "Helpers and workflow agents whose meta has no model (or \"inherit\") and whose requests ran on the same model family as their chat when they started.",
+  "share": 0.39,
+  "tokens": {},
+  "top_labels": [
+   {
+    "agents": 4,
+    "label": "lane:infra",
+    "share": 0.2
+   },
+   {
+    "agents": 2,
+    "label": "verify:beds",
+    "share": 0.06
+   },
+   {
+    "agents": 1,
+    "label": "research:soil",
+    "share": 0.04
+   },
+   {
+    "agents": 1,
+    "label": "double-check beds",
+    "share": 0.03
+   },
+   {
+    "agents": 1,
+    "label": "Find watering code",
+    "share": 0.02
+   }
+  ],
+  "unknown_share": 0.01,
+  "weight": 390.0
+ },
+ "totals": {
+  "requests": 1000,
+  "weight": 1000.0
+ },
+ "weighting": {
+  "formula": "input + 1.25 x cache write + 0.1 x cache read + 5 x output"
+ },
+ "window": {
+  "since": 1800000000,
+  "until": 1800604800
+ },
+ "workflows": [
+  {
+   "agents": 3,
+   "chat": "garden",
+   "id": "wf_garden-001",
+   "labels": [
+    "lane:infra",
+    "lane:beds",
+    "verify:beds"
+   ],
+   "models": [
+    {
+     "family": "Opus",
+     "share": 0.7222222222222223
+    },
+    {
+     "family": "Sonnet",
+     "share": 0.2777777777777778
+    }
+   ],
+   "name": "garden",
+   "phases": [
+    "Build",
+    "Verify"
+   ],
+   "requests": 360,
+   "share": 0.36,
+   "weight": 360.0
+  }
+ ]
+}

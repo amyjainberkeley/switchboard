@@ -1,0 +1,14 @@
+# What the menu bar runs on: PyObjC's core and its AppKit and Foundation bindings, for the engine's Python
+# (CPython 3.12, 3.13 or 3.14 on macOS). One version each; one hash per macOS universal2 wheel, taken from
+# https://pypi.org/pypi/NAME/13.0/json. The installer runs:
+#    pip install --require-hashes --only-binary :all: -r menubar-requirements.txt
+pyobjc-core==13.0 \
+    --hash=sha256:5818e3d8cc2677a1e767968ebfe3bc0cb7f80c1f7c19c653ee25ef1cc1b3e188 \
+    --hash=sha256:f29f7cdb3969268716017ada9516b94f6dd1c66c2e415274b5ac1169440da1a4 \
+    --hash=sha256:fe470bd7b8163b4b8d216b1ebe5b227f01c0fa1c4e0085d7ccade269dec02bb0
+    # cp312, cp313, cp314
+pyobjc-framework-cocoa==13.0 \
+    --hash=sha256:e1618d315939c9fae57cb858d4db496ec61f82495ce6a877398131ee494fc19d \
+    --hash=sha256:bb0bcba2e4e9d05af875306e0e055cfc2f152fd602d5f2f1a54490adebebcd34 \
+    --hash=sha256:88be6d452e7531f695ce6d41428aa74bcaade9ddbc50af592419b9f2fbb7c879
+    # cp312, cp313, cp314

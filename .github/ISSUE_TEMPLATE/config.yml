@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Troubleshooting
+    url: https://github.com/amyjainberkeley/switchboard/blob/main/docs/troubleshooting.md
+    about: Most problems have an answer here, and `switchboard doctor` says what to do.
+  - name: A security problem
+    url: https://github.com/amyjainberkeley/switchboard/security/advisories/new
+    about: Report it privately, not in an issue.

@@ -1,0 +1,57 @@
+{
+ "refreshed": "2026-11-14",
+ "note": "Each checksum was read from the project's own release (nodejs.org SHASUMS256.txt, oven-sh/bun SHASUMS256.txt, astral-sh/uv <file>.sha256, colbymchenry/codegraph SHA256SUMS, which matches GitHub's asset digests) on Nov 14 2026. claude-mem's npm integrity is npm's own record of 15.18.3 (registry.npmjs.org/claude-mem/15.18.3, dist.integrity, read again Nov 14); its package is downloaded from npm's tarball address and checked against it before npx runs it. bytes_max caps that download (npm records 32272607 bytes unpacked). disk_mb is the space each takes once installed (MiB), measured on Nov 14 2026 in a fresh home on an arm64 Mac right after a real install: claude-mem's is its npm and Bun package caches, its plugin, its launcher and its package; its search adds Chroma later, in uv's own folders.",
+ "node": {
+  "version": "22.23.5",
+  "min": [[20, 19], [22, 12]],
+  "url": "https://nodejs.org/dist/v{version}/node-v{version}-darwin-{arch}.tar.gz",
+  "arch": {"arm64": "arm64", "x86_64": "x64"},
+  "sha256": {"arm64": "e7131995759b61a0170b646010d2ad35a5d37b4cb0d471f3e8317eac6f742f3d",
+             "x86_64": "c53383238206b9ae4db23c5d8a63645e2e753bec8ab51a49cc81939aa64e9422"},
+  "bytes": {"arm64": 50004868, "x86_64": 51197448},
+  "strip": 1,
+  "disk_mb": 190
+ },
+ "bun": {
+  "version": "1.4.4",
+  "min": [[1, 4, 1]],
+  "url": "https://github.com/oven-sh/bun/releases/download/bun-v{version}/bun-darwin-{arch}.zip",
+  "arch": {"arm64": "aarch64", "x86_64": "x64"},
+  "sha256": {"arm64": "c240d7f0ccb90c263a849fcdb09b7ee62630d921348ed6aafda86b9d577bc510",
+             "x86_64": "50a3491f73abc2fe81673171a85762d3bc2cc1680ccecadd983de99adf77977e"},
+  "bytes": {"arm64": 40323673, "x86_64": 43442571},
+  "strip": 1,
+  "disk_mb": 85
+ },
+ "uv": {
+  "version": "0.13.8",
+  "min": [[0, 7]],
+  "url": "https://github.com/astral-sh/uv/releases/download/{version}/uv-{arch}-apple-darwin.tar.gz",
+  "arch": {"arm64": "aarch64", "x86_64": "x86_64"},
+  "sha256": {"arm64": "6b71028a6b904f2ae3340ef52e595512de807d06c0a20eaef2f692581b246558",
+             "x86_64": "a04c2ffeac28b2003a2c13caf538ab425fcd7def3e4a41571f4a8fb370a66af3"},
+  "bytes": {"arm64": 14375545, "x86_64": 17208261},
+  "strip": 1,
+  "disk_mb": 30
+ },
+ "codegraph": {
+  "version": "v1.6.2",
+  "url": "https://github.com/colbymchenry/codegraph/releases/download/{version}/codegraph-darwin-{arch}.tar.gz",
+  "arch": {"arm64": "arm64", "x86_64": "x64"},
+  "sha256": {"arm64": "d74d1bfb4060db63ec3c2b72c4e17f76c31978af3bad6ace4370d1501ac0662e",
+             "x86_64": "53d1a4d1a9af31d6cec11b346df2ae792087081e13f623f583e27783c1e7f9bc"},
+  "bytes": {"arm64": 58280485, "x86_64": 59393903},
+  "strip": 1,
+  "disk_mb": 285
+ },
+ "claude_mem": {
+  "version": "15.18.3",
+  "npm_integrity": "sha512-VqukmojTi9BLz1+zxH/VHNOJC3ohBHjFpcHFp9/5AnRm4FKCp8ceYD4fslki88p8xv/FmW3pcrCUwUMsXlJREg==",
+  "url": "https://registry.npmjs.org/claude-mem/-/claude-mem-{version}.tgz",
+  "bytes_max": 41943040,
+  "disk_mb": 1830
+ },
+ "graphify": {
+  "version": "0.9.108"
+ }
+}

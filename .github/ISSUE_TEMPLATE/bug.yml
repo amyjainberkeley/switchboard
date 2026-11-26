@@ -1,0 +1,54 @@
+name: Something doesn't work
+description: Switchboard did something wrong, or didn't do what it should.
+labels: [bug]
+body:
+  - type: textarea
+    id: happened
+    attributes:
+      label: What happened
+      description: What you did, and what you saw.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: input
+    id: macos
+    attributes:
+      label: macOS version
+      placeholder: "26.1"
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: switchboard --version
+      placeholder: switchboard 0.2.0 (1a2b3c4)
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: How you installed it
+      options:
+        - Homebrew
+        - The one-line installer
+        - From a clone
+    validations:
+      required: true
+  - type: input
+    id: claude
+    attributes:
+      label: claude --version
+      placeholder: 2.1.320 (Claude Code)
+  - type: textarea
+    id: doctor
+    attributes:
+      label: switchboard doctor
+      description: Paste what it prints. It shows no login or key, but it does show folder paths on your Mac and your accounts' email addresses, so read it first.
+      render: text
+    validations:
+      required: true

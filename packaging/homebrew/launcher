@@ -1,0 +1,17 @@
+#!/bin/sh
+# Homebrew links this file into its bin folder as `switchboard` (the cask's `binary` line). It runs the command the
+# installer made in ~/.switchboard/bin, so the program that runs is always the one `switchboard update` last put there,
+# for whoever types it. The installer may add its short name beside it, a link to that `switchboard` link, which
+# runs it as the same command. Under any other name it refuses: it is only that command.
+SHORT="sb"
+name="$(basename "$0")"
+if [ "$name" != switchboard ] && [ "$name" != "$SHORT" ]; then
+  echo "Switchboard: run this as switchboard." >&2
+  exit 2
+fi
+command="$HOME/.switchboard/bin/switchboard"
+if [ ! -x "$command" ]; then
+  echo "Switchboard is not set up for this user yet (no ~/.switchboard). To set it up: brew reinstall switchboard" >&2
+  exit 1
+fi
+exec "$command" "$@"

@@ -1,0 +1,2 @@
+# switchboard/build.txt holds the commit a `git archive` download was made from: "switchboard version" reads it.
+switchboard/build.txt export-subst

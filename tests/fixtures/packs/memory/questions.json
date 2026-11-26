@@ -1,0 +1,15 @@
+{
+  "about": "Ten questions a person might type to find an old chat in chats.json. Pass line: the expected chat is in the top 3 for at least 8 of the 10.",
+  "questions": [
+    {"q": "where did we fix the endless redirect after signing in with Google?", "expect": "c01"},
+    {"q": "stripe webhook signature kept failing", "expect": "c02"},
+    {"q": "making the docker image smaller", "expect": "c05"},
+    {"q": "the flaky test that broke around daylight saving time", "expect": "c09"},
+    {"q": "pods restarting because the health check timed out", "expect": "c11"},
+    {"q": "invoice export showed garbled characters in Excel", "expect": "c12"},
+    {"q": "limit how many requests each api key can make using redis", "expect": "c13"},
+    {"q": "the node worker whose memory kept growing", "expect": "c15"},
+    {"q": "graphql resolvers making too many database queries", "expect": "c22"},
+    {"q": "websocket dropping and reconnecting with backoff", "expect": "c25"}
+  ]
+}

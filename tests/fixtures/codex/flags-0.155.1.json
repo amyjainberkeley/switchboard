@@ -1,0 +1,931 @@
+{
+ "about": "Flags of Codex 0.155.1, made only from its own --help output (one file per command, named in \"source\"). A flag absent here is absent from that version's help.",
+ "commands": {
+  "": {
+   "options": [
+    {
+     "long": "--config",
+     "many": false,
+     "short": "-c",
+     "value": "key=value"
+    },
+    {
+     "long": "--enable",
+     "many": false,
+     "short": null,
+     "value": "FEATURE"
+    },
+    {
+     "long": "--disable",
+     "many": false,
+     "short": null,
+     "value": "FEATURE"
+    },
+    {
+     "long": "--remote",
+     "many": false,
+     "short": null,
+     "value": "ADDR"
+    },
+    {
+     "long": "--remote-auth-token-env",
+     "many": false,
+     "short": null,
+     "value": "ENV_VAR"
+    },
+    {
+     "long": "--strict-config",
+     "many": false,
+     "short": null,
+     "value": null
+    },
+    {
+     "long": "--image",
+     "many": true,
+     "short": "-i",
+     "value": "FILE"
+    },
+    {
+     "long": "--model",
+     "many": false,
+     "short": "-m",
+     "value": "MODEL"
+    },
+    {
+     "long": "--oss",
+     "many": false,
+     "short": null,
+     "value": null
+    },
+    {
+     "long": "--local-provider",
+     "many": false,
+     "short": null,
+     "value": "OSS_PROVIDER"
+    },
+    {
+     "long": "--profile",
+     "many": false,
+     "short": "-p",
+     "value": "CONFIG_PROFILE_V2"
+    },
+    {
+     "long": "--sandbox",
+     "many": false,
+     "short": "-s",
+     "value": "SANDBOX_MODE"
+    },
+    {
+     "long": "--approve-for-me",
+     "many": false,
+     "short": null,
+     "value": null
+    },
+    {
+     "long": "--dangerously-bypass-approvals-and-sandbox",
+     "many": false,
+     "short": null,
+     "value": null
+    },
+    {
+     "long": "--dangerously-bypass-hook-trust",
+     "many": false,
+     "short": null,
+     "value": null
+    },
+    {
+     "long": "--cd",
+     "many": false,
+     "short": "-C",
+     "value": "DIR"
+    },
+    {
+     "long": "--worktree",
+     "many": false,
+     "short": null,
+     "value": null
+    },
+    {
+     "long": "--add-dir",
+     "many": false,
+     "short": null,
+     "value": "DIR"
+    },
+    {
+     "long": "--ask-for-approval",
+     "many": false,
+     "short": "-a",
+     "value": "APPROVAL_POLICY"
+    },
+    {
+     "long": "--search",
+     "many": false,
+     "short": null,
+     "value": null
+    },
+    {
+     "long": "--no-alt-screen",
+     "many": false,
+     "short": null,
+     "value": null
+    },
+    {
+     "long": "--help",
+     "many": false,
+     "short": "-h",
+     "value": null
+    },
+    {
+     "long": "--version",
+     "many": false,
+     "short": "-V",
+     "value": null
+    }
+   ],
+   "positionals": [
+    "PROMPT"
+   ],
+   "sha256": "4abfbbaee583f6d8c3fa45fd751a138b2b8fdac68f651ac444aa36599629acb7",
+   "source": "help.txt",
+   "subcommands": [
+    "agents",
+    "exec",
+    "review",
+    "login",
+    "logout",
+    "mcp",
+    "plugin",
+    "app-server",
+    "remote-control",
+    "app",
+    "completion",
+    "update",
+    "doctor",
+    "sandbox",
+    "debug",
+    "apply",
+    "resume",
+    "queue",
+    "archive",
+    "delete",
+    "migrate-rollouts",
+    "unarchive",
+    "fork",
+    "cloud",
+    "exec-server",
+    "features"
+   ],
+   "usage": "codex [OPTIONS] [PROMPT]"
+  },
+  "app-server": {
+   "options": [
+    {
+     "long": "--config",
+     "many": false,
+     "short": "-c",
+     "value": "key=value"
+    },
+    {
+     "long": "--enable",
+     "many": false,
+     "short": null,
+     "value": "FEATURE"
+    },
+    {
+     "long": "--disable",
+     "many": false,
+     "short": null,
+     "value": "FEATURE"
+    },
+    {
+     "long": "--code-mode-host",
+     "many": false,
+     "short": null,
+     "value": "URL"
+    },
+    {
+     "long": "--strict-config",
+     "many": false,
+     "short": null,
+     "value": null
+    },
+    {
+     "long": "--listen",
+     "many": false,
+     "short": null,
+     "value": "URL"
+    },
+    {
+     "long": "--stdio",
+     "many": false,
+     "short": null,
+     "value": null
+    },
+    {
+     "long": "--analytics-default-enabled",
+     "many": false,
+     "short": null,
+     "value": null
+    },
+    {
+     "long": "--ws-auth",
+     "many": false,
+     "short": null,
+     "value": "MODE"
+    },
+    {
+     "long": "--ws-token-file",
+     "many": false,
+     "short": null,
+     "value": "PATH"
+    },
+    {
+     "long": "--ws-token-sha256",
+     "many": false,
+     "short": null,
+     "value": "HEX"
+    },
+    {
+     "long": "--ws-shared-secret-file",
+     "many": false,
+     "short": null,
+     "value": "PATH"
+    },
+    {
+     "long": "--ws-issuer",
+     "many": false,
+     "short": null,
+     "value": "ISSUER"
+    },
+    {
+     "long": "--ws-audience",
+     "many": false,
+     "short": null,
+     "value": "AUDIENCE"
+    },
+    {
+     "long": "--ws-max-clock-skew-seconds",
+     "many": false,
+     "short": null,
+     "value": "SECONDS"
+    },
+    {
+     "long": "--help",
+     "many": false,
+     "short": "-h",
+     "value": null
+    }
+   ],
+   "positionals": [],
+   "sha256": "95d290035d274e91e6f85b9af63e9a3fd2cf70a2295d9eedbfc23a2ee82d4383",
+   "source": "help-app-server.txt",
+   "subcommands": [
+    "daemon",
+    "proxy",
+    "generate-ts",
+    "generate-json-schema"
+   ],
+   "usage": "codex app-server [OPTIONS] [COMMAND]"
+  },
+  "exec": {
+   "options": [
+    {
+     "long": "--config",
+     "many": false,
+     "short": "-c",
+     "value": "key=value"
+    },
+    {
+     "long": "--enable",
+     "many": false,
+     "short": null,
+     "value": "FEATURE"
+    },
+    {
+     "long": "--disable",
+     "many": false,
+     "short": null,
+     "value": "FEATURE"
+    },
+    {
+     "long": "--strict-config",
+     "many": false,
+     "short": null,
+     "value": null
+    },
+    {
+     "long": "--image",
+     "many": true,
+     "short": "-i",
+     "value": "FILE"
+    },
+    {
+     "long": "--model",
+     "many": false,
+     "short": "-m",
+     "value": "MODEL"
+    },
+    {
+     "long": "--oss",
+     "many": false,
+     "short": null,
+     "value": null
+    },
+    {
+     "long": "--local-provider",
+     "many": false,
+     "short": null,
+     "value": "OSS_PROVIDER"
+    },
+    {
+     "long": "--profile",
+     "many": false,
+     "short": "-p",
+     "value": "CONFIG_PROFILE_V2"
+    },
+    {
+     "long": "--sandbox",
+     "many": false,
+     "short": "-s",
+     "value": "SANDBOX_MODE"
+    },
+    {
+     "long": "--approve-for-me",
+     "many": false,
+     "short": null,
+     "value": null
+    },
+    {
+     "long": "--dangerously-bypass-approvals-and-sandbox",
+     "many": false,
+     "short": null,
+     "value": null
+    },
+    {
+     "long": "--dangerously-bypass-hook-trust",
+     "many": false,
+     "short": null,
+     "value": null
+    },
+    {
+     "long": "--cd",
+     "many": false,
+     "short": "-C",
+     "value": "DIR"
+    },
+    {
+     "long": "--worktree",
+     "many": false,
+     "short": null,
+     "value": null
+    },
+    {
+     "long": "--add-dir",
+     "many": false,
+     "short": null,
+     "value": "DIR"
+    },
+    {
+     "long": "--thread-source",
+     "many": false,
+     "short": null,
+     "value": "SOURCE"
+    },
+    {
+     "long": "--skip-git-repo-check",
+     "many": false,
+     "short": null,
+     "value": null
+    },
+    {
+     "long": "--ephemeral",
+     "many": false,
+     "short": null,
+     "value": null
+    },
+    {
+     "long": "--ignore-user-config",
+     "many": false,
+     "short": null,
+     "value": null
+    },
+    {
+     "long": "--ignore-rules",
+     "many": false,
+     "short": null,
+     "value": null
+    },
+    {
+     "long": "--output-schema",
+     "many": false,
+     "short": null,
+     "value": "FILE"
+    },
+    {
+     "long": "--color",
+     "many": false,
+     "short": null,
+     "value": "COLOR"
+    },
+    {
+     "long": "--json",
+     "many": false,
+     "short": null,
+     "value": null
+    },
+    {
+     "long": "--output-last-message",
+     "many": false,
+     "short": "-o",
+     "value": "FILE"
+    },
+    {
+     "long": "--help",
+     "many": false,
+     "short": "-h",
+     "value": null
+    },
+    {
+     "long": "--version",
+     "many": false,
+     "short": "-V",
+     "value": null
+    }
+   ],
+   "positionals": [
+    "PROMPT"
+   ],
+   "sha256": "0e82cfde0122715250e93dc65866caa956b2ac5b9d0b20ec4ad4f9e81486509e",
+   "source": "help-exec.txt",
+   "subcommands": [
+    "resume",
+    "fork",
+    "review"
+   ],
+   "usage": "codex exec [OPTIONS] [PROMPT]"
+  },
+  "exec resume": {
+   "options": [
+    {
+     "long": "--config",
+     "many": false,
+     "short": "-c",
+     "value": "key=value"
+    },
+    {
+     "long": "--last",
+     "many": false,
+     "short": null,
+     "value": null
+    },
+    {
+     "long": "--all",
+     "many": false,
+     "short": null,
+     "value": null
+    },
+    {
+     "long": "--enable",
+     "many": false,
+     "short": null,
+     "value": "FEATURE"
+    },
+    {
+     "long": "--disable",
+     "many": false,
+     "short": null,
+     "value": "FEATURE"
+    },
+    {
+     "long": "--image",
+     "many": false,
+     "short": "-i",
+     "value": "FILE"
+    },
+    {
+     "long": "--strict-config",
+     "many": false,
+     "short": null,
+     "value": null
+    },
+    {
+     "long": "--model",
+     "many": false,
+     "short": "-m",
+     "value": "MODEL"
+    },
+    {
+     "long": "--dangerously-bypass-approvals-and-sandbox",
+     "many": false,
+     "short": null,
+     "value": null
+    },
+    {
+     "long": "--dangerously-bypass-hook-trust",
+     "many": false,
+     "short": null,
+     "value": null
+    },
+    {
+     "long": "--worktree",
+     "many": false,
+     "short": null,
+     "value": null
+    },
+    {
+     "long": "--thread-source",
+     "many": false,
+     "short": null,
+     "value": "SOURCE"
+    },
+    {
+     "long": "--skip-git-repo-check",
+     "many": false,
+     "short": null,
+     "value": null
+    },
+    {
+     "long": "--ephemeral",
+     "many": false,
+     "short": null,
+     "value": null
+    },
+    {
+     "long": "--ignore-user-config",
+     "many": false,
+     "short": null,
+     "value": null
+    },
+    {
+     "long": "--ignore-rules",
+     "many": false,
+     "short": null,
+     "value": null
+    },
+    {
+     "long": "--output-schema",
+     "many": false,
+     "short": null,
+     "value": "FILE"
+    },
+    {
+     "long": "--json",
+     "many": false,
+     "short": null,
+     "value": null
+    },
+    {
+     "long": "--output-last-message",
+     "many": false,
+     "short": "-o",
+     "value": "FILE"
+    },
+    {
+     "long": "--help",
+     "many": false,
+     "short": "-h",
+     "value": null
+    }
+   ],
+   "positionals": [
+    "SESSION_ID",
+    "PROMPT"
+   ],
+   "sha256": "3246e30965c8127b80e2dad49b1433e4a842699c7607d38bc241319553c6cbd0",
+   "source": "help-exec-resume.txt",
+   "subcommands": [],
+   "usage": "codex exec resume [OPTIONS] [SESSION_ID] [PROMPT]"
+  },
+  "fork": {
+   "options": [
+    {
+     "long": "--config",
+     "many": false,
+     "short": "-c",
+     "value": "key=value"
+    },
+    {
+     "long": "--last",
+     "many": false,
+     "short": null,
+     "value": null
+    },
+    {
+     "long": "--all",
+     "many": false,
+     "short": null,
+     "value": null
+    },
+    {
+     "long": "--enable",
+     "many": false,
+     "short": null,
+     "value": "FEATURE"
+    },
+    {
+     "long": "--disable",
+     "many": false,
+     "short": null,
+     "value": "FEATURE"
+    },
+    {
+     "long": "--remote",
+     "many": false,
+     "short": null,
+     "value": "ADDR"
+    },
+    {
+     "long": "--remote-auth-token-env",
+     "many": false,
+     "short": null,
+     "value": "ENV_VAR"
+    },
+    {
+     "long": "--strict-config",
+     "many": false,
+     "short": null,
+     "value": null
+    },
+    {
+     "long": "--image",
+     "many": true,
+     "short": "-i",
+     "value": "FILE"
+    },
+    {
+     "long": "--model",
+     "many": false,
+     "short": "-m",
+     "value": "MODEL"
+    },
+    {
+     "long": "--oss",
+     "many": false,
+     "short": null,
+     "value": null
+    },
+    {
+     "long": "--local-provider",
+     "many": false,
+     "short": null,
+     "value": "OSS_PROVIDER"
+    },
+    {
+     "long": "--profile",
+     "many": false,
+     "short": "-p",
+     "value": "CONFIG_PROFILE_V2"
+    },
+    {
+     "long": "--sandbox",
+     "many": false,
+     "short": "-s",
+     "value": "SANDBOX_MODE"
+    },
+    {
+     "long": "--approve-for-me",
+     "many": false,
+     "short": null,
+     "value": null
+    },
+    {
+     "long": "--dangerously-bypass-approvals-and-sandbox",
+     "many": false,
+     "short": null,
+     "value": null
+    },
+    {
+     "long": "--dangerously-bypass-hook-trust",
+     "many": false,
+     "short": null,
+     "value": null
+    },
+    {
+     "long": "--cd",
+     "many": false,
+     "short": "-C",
+     "value": "DIR"
+    },
+    {
+     "long": "--worktree",
+     "many": false,
+     "short": null,
+     "value": null
+    },
+    {
+     "long": "--add-dir",
+     "many": false,
+     "short": null,
+     "value": "DIR"
+    },
+    {
+     "long": "--ask-for-approval",
+     "many": false,
+     "short": "-a",
+     "value": "APPROVAL_POLICY"
+    },
+    {
+     "long": "--search",
+     "many": false,
+     "short": null,
+     "value": null
+    },
+    {
+     "long": "--no-alt-screen",
+     "many": false,
+     "short": null,
+     "value": null
+    },
+    {
+     "long": "--help",
+     "many": false,
+     "short": "-h",
+     "value": null
+    },
+    {
+     "long": "--version",
+     "many": false,
+     "short": "-V",
+     "value": null
+    }
+   ],
+   "positionals": [
+    "SESSION_ID",
+    "PROMPT"
+   ],
+   "sha256": "c7b8991268b7f25bdf5545b5ba5ce51cca9d49ad9d094d76a3fd0f77a01a7764",
+   "source": "help-fork.txt",
+   "subcommands": [],
+   "usage": "codex fork [OPTIONS] [SESSION_ID] [PROMPT]"
+  },
+  "resume": {
+   "options": [
+    {
+     "long": "--config",
+     "many": false,
+     "short": "-c",
+     "value": "key=value"
+    },
+    {
+     "long": "--last",
+     "many": false,
+     "short": null,
+     "value": null
+    },
+    {
+     "long": "--all",
+     "many": false,
+     "short": null,
+     "value": null
+    },
+    {
+     "long": "--enable",
+     "many": false,
+     "short": null,
+     "value": "FEATURE"
+    },
+    {
+     "long": "--disable",
+     "many": false,
+     "short": null,
+     "value": "FEATURE"
+    },
+    {
+     "long": "--include-non-interactive",
+     "many": false,
+     "short": null,
+     "value": null
+    },
+    {
+     "long": "--remote",
+     "many": false,
+     "short": null,
+     "value": "ADDR"
+    },
+    {
+     "long": "--remote-auth-token-env",
+     "many": false,
+     "short": null,
+     "value": "ENV_VAR"
+    },
+    {
+     "long": "--strict-config",
+     "many": false,
+     "short": null,
+     "value": null
+    },
+    {
+     "long": "--image",
+     "many": true,
+     "short": "-i",
+     "value": "FILE"
+    },
+    {
+     "long": "--model",
+     "many": false,
+     "short": "-m",
+     "value": "MODEL"
+    },
+    {
+     "long": "--oss",
+     "many": false,
+     "short": null,
+     "value": null
+    },
+    {
+     "long": "--local-provider",
+     "many": false,
+     "short": null,
+     "value": "OSS_PROVIDER"
+    },
+    {
+     "long": "--profile",
+     "many": false,
+     "short": "-p",
+     "value": "CONFIG_PROFILE_V2"
+    },
+    {
+     "long": "--sandbox",
+     "many": false,
+     "short": "-s",
+     "value": "SANDBOX_MODE"
+    },
+    {
+     "long": "--approve-for-me",
+     "many": false,
+     "short": null,
+     "value": null
+    },
+    {
+     "long": "--dangerously-bypass-approvals-and-sandbox",
+     "many": false,
+     "short": null,
+     "value": null
+    },
+    {
+     "long": "--dangerously-bypass-hook-trust",
+     "many": false,
+     "short": null,
+     "value": null
+    },
+    {
+     "long": "--cd",
+     "many": false,
+     "short": "-C",
+     "value": "DIR"
+    },
+    {
+     "long": "--worktree",
+     "many": false,
+     "short": null,
+     "value": null
+    },
+    {
+     "long": "--add-dir",
+     "many": false,
+     "short": null,
+     "value": "DIR"
+    },
+    {
+     "long": "--ask-for-approval",
+     "many": false,
+     "short": "-a",
+     "value": "APPROVAL_POLICY"
+    },
+    {
+     "long": "--search",
+     "many": false,
+     "short": null,
+     "value": null
+    },
+    {
+     "long": "--no-alt-screen",
+     "many": false,
+     "short": null,
+     "value": null
+    },
+    {
+     "long": "--help",
+     "many": false,
+     "short": "-h",
+     "value": null
+    },
+    {
+     "long": "--version",
+     "many": false,
+     "short": "-V",
+     "value": null
+    }
+   ],
+   "positionals": [
+    "SESSION_ID",
+    "PROMPT"
+   ],
+   "sha256": "47edbbf1ed9891ba489fc0dbf3b9811b8f90fc1f6852484e7c065398f9bc0797",
+   "source": "help-resume.txt",
+   "subcommands": [],
+   "usage": "codex resume [OPTIONS] [SESSION_ID] [PROMPT]"
+  }
+ },
+ "version": "0.155.1"
+}

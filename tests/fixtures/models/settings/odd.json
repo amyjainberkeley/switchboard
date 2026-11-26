@@ -1,0 +1,8 @@
+{
+	"theme":"light",
+	"env":{"FOO":"b\u00e4r é","X":"1"},
+	"n": 1.5e3,
+	"list": [1, 2,
+		3],
+	"nested": {"a": {"b": [true, false, null]}}
+}

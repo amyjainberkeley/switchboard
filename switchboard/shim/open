@@ -1,0 +1,8 @@
+#!/bin/sh
+# Stand-in for /usr/bin/open while Claude Code signs in: hand the sign-in link
+# to Switchboard, which opens it in the browser profile chosen for that account.
+for a in "$@"; do last="$a"; done
+case "$last" in
+  http*) printf '%s\n' "$last" > "${SWITCHBOARD_URL_FILE:-/dev/null}"; exit 0 ;;
+esac
+exec /usr/bin/open "$@"
