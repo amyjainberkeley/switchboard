@@ -75,13 +75,14 @@ class JustNow(unittest.TestCase):
         self.assertEqual(term.age_words({'usage_at': now - 7200, 'checked_at': now - 5}, now), 'checked just now')
         self.assertEqual(term.age_words({'usage_at': now - 5, 'live': True, 'active': True}, now), 'now')
 
-    def test_in_the_menu_bar(self):
+    def test_not_in_the_menu_bar(self):
+        # The menu bar's row is its email, one word and its bars: when it was checked is the page's and the terminal's.
         s = test_menubar.view()
         a = test_menubar.find(s, 'ana@lab.example')
         a.update(usage_at=test_menubar.NOW - 7200, checked_at=test_menubar.NOW - 10)
         r = test_menubar.row_of(s, 'ana@lab.example')
-        self.assertEqual(r['marks'][0], ('just now', 'next'))
-        self.assertIn('checked just now', menubar.row_label(r))
+        self.assertEqual(r['marks'], [('Next', 'next')])
+        self.assertNotIn('checked', menubar.row_label(r))
 
     def test_in_the_terminal(self):
         view = json.loads(json.dumps(test_term.VIEW))

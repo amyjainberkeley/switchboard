@@ -33,6 +33,9 @@ ESC="$(printf '\033')"
 # colour codes. Then its last line that is not blank.
 plain_log() { tr -d '\r\010' < "$1" | sed -e 's/^\^D//' -e "s/$ESC\[[0-9;]*m//g"; }
 last_line() { plain_log "$1" | grep -v '^[[:space:]]*$' | tail -n 1; }
+# The installer's own lines: those before the block of facts it ends with (`switchboard about`, whose first line is
+# "Switchboard <version>").
+own_lines() { plain_log "$1" | sed '/^Switchboard [0-9]/,$d'; }
 LINKS_ID="io.github.amyjainberkeley.switchboard.links"
 MENUBAR_ID="io.github.amyjainberkeley.switchboard.menubar"
 # The installer's one line for its own Python (whatever needs it), and the reason it gives when it can't be fetched.
@@ -57,11 +60,14 @@ fresh_home() {
   printf '%s' "$T"
 }
 
-# run HOME COMMAND...: the command with nothing of this shell's environment but what is named here
+# run HOME COMMAND...: the command with nothing of this shell's environment but what is named here.
+# SWITCHBOARD_BUILD_LINKS=1: a release tree carries the link app prebuilt (router/prebuilt); these cases show the
+# build on the Mac (tests/test_link_app_release.py checks the prebuilt one).
 run() {
   h="$1"; shift
   env -i HOME="$h" CFFIXED_USER_HOME="$h" PATH="$h/.local/bin:/usr/bin:/bin:/usr/sbin:/sbin" LANG=en_US.UTF-8 \
-    TMPDIR="$(dirname "$h")/tmp/" SWITCHBOARD_APPLICATIONS="$(dirname "$h")/Applications" ${EXTRA_ENV:-} "$@"
+    TMPDIR="$(dirname "$h")/tmp/" SWITCHBOARD_APPLICATIONS="$(dirname "$h")/Applications" SWITCHBOARD_BUILD_LINKS=1 \
+    ${EXTRA_ENV:-} "$@"
 }
 
 # A copy of the program as the installer takes it: no tests, no docs, and no menubar-requirements.txt.
@@ -71,8 +77,8 @@ clone_tree() {
   cp "$HERE/install.sh" "$HERE/uninstall.sh" "$1/"
 }
 
-doctor_ok() {      # doctor_ok LOG EXIT: doctor ended well: "All good.", or with no account kept, the setup step
-  [ "$2" = 0 ] && tail -1 "$1" | grep -q -e "All good." -e "switchboard setup\.$"
+doctor_ok() {      # doctor_ok LOG EXIT: doctor ended well: "All good.", or with no account kept, the first step
+  [ "$2" = 0 ] && tail -1 "$1" | grep -q -e "All good." -e "then run switchboard\.$"
 }
 accounts_file() {  # accounts_file HOME EMAIL...: an accounts file the engine keeps (only the emails matter here)
   h="$1"; shift
@@ -95,9 +101,9 @@ run "$H" sh "$HERE/install.sh" --no-agent --no-open --no-link-app --no-menu-app 
 rc=$?; t1="$(now)"
 cat "$T/install-1.log" | sed 's/^/    /'
 check '[ $rc = 0 ]' "install exits 0 ($(echo "$t1 - $t0" | bc) s)"
-check '[ "$(wc -l < "$T/install-1.log")" -le 7 ] && ! grep -q "$ESC" "$T/install-1.log"' \
-  "it says it in $(wc -l < "$T/install-1.log" | tr -d ' ') plain lines (no colour into a file)"
-check 'last_line "$T/install-1.log" | grep -q "^Done in [0-9][0-9]* s\. Type sb setup to add your accounts\.$"' \
+check '[ "$(own_lines "$T/install-1.log" | wc -l)" -le 6 ] && [ "$(wc -l < "$T/install-1.log")" -le 21 ] && grep -q "^  Program     [0-9]* files, unchanged since install" "$T/install-1.log" && ! grep -q "$ESC" "$T/install-1.log"' \
+  "it says it in $(own_lines "$T/install-1.log" | wc -l | tr -d ' ') plain lines, then the block of facts, $(wc -l < "$T/install-1.log" | tr -d ' ') in all (no colour into a file)"
+check 'last_line "$T/install-1.log" | grep -q "^Done in [0-9][0-9]* s\. Next: sb$"' \
   "it times itself, and its last line is the one next step (no terminal, so no first run)"
 check '[ "$(cat "$H/.switchboard/app/source")" = "$HERE" ] && [ "$(wc -l < "$H/.switchboard/app/source")" -eq 1 ]' \
   "app/source is one line: the folder it ran from"
@@ -186,7 +192,7 @@ rc=$?; t1="$(now)"
 sed 's/^/    /' "$T/install-bad.log"
 check '[ $rc = 0 ] && grep -q "^Adding the menu bar item… a download did not match its checksum, so it was left out\. Everything else works without it\.$" "$T/install-bad.log"' \
   "a menu bar package that fails its checksum: one line, and the install goes on ($(echo "$t1 - $t0" | bc) s)"
-check '[ ! -e "$H/.switchboard/bin/switchboard-menubar" ] && ! grep -q "Start the menu bar item" "$T/install-bad.log" && last_line "$T/install-bad.log" | grep -q "^Done in [0-9][0-9]* s\. Type sb setup"' \
+check '[ ! -e "$H/.switchboard/bin/switchboard-menubar" ] && ! grep -q "Start the menu bar item" "$T/install-bad.log" && last_line "$T/install-bad.log" | grep -q "^Done in [0-9][0-9]* s\. Next: sb$"' \
   "no launcher for a menu bar that can't run, and the same last line"
 menubar_pins > "$C/menubar-requirements.txt"
 t0="$(now)"
@@ -200,7 +206,7 @@ EPY_NOW="$(/usr/bin/python3 -I -B -c 'import json, sys; print(json.load(open(sys
 check '[ -n "$EPY_NOW" ] && "$EPY_NOW" -I -B -c "import sys; sys.exit(1 if getattr(sys, \"_framework\", \"\") else 0)"' \
   "the menu bar's Python is not a framework build (${EPY_NOW:-none})"
 took="$(sed -n 's/^Adding the menu bar item… \([0-9][0-9]*\) s$/\1/p' "$T/install-1.log")"
-check '[ -n "$took" ] && [ "$(grep -c "menu bar" "$T/install-1.log")" = 2 ]' \
+check '[ -n "$took" ] && [ "$(own_lines "$T/install-1.log" | grep -c "menu bar")" = 2 ]' \
   "the menu bar item's packages were added (${took:-?} s), in one line, and one more says how to start it"
 check 'run "$H" "$H/.switchboard/runtime/env/bin/python" -I -c "import objc, AppKit, Foundation"' \
   "PyObjC imports in the menu bar's environment (checked against the pins: --require-hashes, wheels only)"
@@ -245,7 +251,7 @@ mkdir -p "$H/Library/LaunchAgents" "$H/.switchboard/menubar/Switchboard.app/Cont
 printf '<plist/>\n' > "$H/Library/LaunchAgents/$MENUBAR_ID.plist"
 run "$H" sh "$C/install.sh" --no-agent --no-open --no-menu-app --port "$PORT" > "$T/install-3.log" 2>&1; rc=$?
 sed 's/^/    /' "$T/install-3.log"
-check '[ $rc = 0 ] && grep -q "^Removed the menu bar item\.$" "$T/install-3.log" && [ "$(grep -c "menu bar" "$T/install-3.log")" = 1 ]' \
+check '[ $rc = 0 ] && grep -q "^Removed the menu bar item\.$" "$T/install-3.log" && [ "$(own_lines "$T/install-3.log" | grep -c "menu bar")" = 1 ]' \
   "--no-menu-app later: one line says the menu bar item was removed"
 check '[ ! -e "$H/.switchboard/bin/switchboard-menubar" ] && [ ! -e "$H/Library/LaunchAgents/$MENUBAR_ID.plist" ] && [ ! -e "$H/.switchboard/menubar" ] && [ "$(cat "$H/.switchboard/app/choices")" = "--no-agent --no-menu-app" ]' \
   "its launcher, its job and its app are gone, and app/choices keeps it out for switchboard update"
@@ -255,9 +261,9 @@ check '[ $rc = 0 ] && [ -x "$H/.switchboard/bin/switchboard-menubar" ] && ! grep
 rm -f "$C/menubar-requirements.txt"
 run "$H" sh "$C/install.sh" --no-agent --no-open --port "$PORT" > "$T/install-4.log" 2>&1; rc=$?
 sed 's/^/    /' "$T/install-4.log"
-check '[ $rc = 0 ] && grep -q "^No menu bar item: this copy of Switchboard does not have it\. Everything else works without it\.$" "$T/install-4.log" && [ "$(grep -c "menu bar" "$T/install-4.log")" = 1 ]' \
+check '[ $rc = 0 ] && grep -q "^No menu bar item: this copy of Switchboard does not have it\. Everything else works without it\.$" "$T/install-4.log" && [ "$(own_lines "$T/install-4.log" | grep -c "menu bar")" = 1 ]' \
   "a copy of Switchboard without menubar-requirements.txt: one line says there is no menu bar item, and it goes on"
-check '[ ! -e "$H/.switchboard/bin/switchboard-menubar" ] && last_line "$T/install-4.log" | grep -q "^Done in [0-9][0-9]* s\. Type sb setup"' \
+check '[ ! -e "$H/.switchboard/bin/switchboard-menubar" ] && last_line "$T/install-4.log" | grep -q "^Done in [0-9][0-9]* s\. Next: sb$"' \
   "and the launcher it can't run is gone"
 run "$H" sh "$HERE/uninstall.sh" --no-agent > "$T/uninstall.log" 2>&1; urc=$?
 check '[ $urc = 0 ] && [ ! -e "$H/.switchboard/runtime" ] && [ ! -e "$H/.switchboard/bin" ] && [ ! -e "$H/.switchboard/menubar-install.log" ]' \
@@ -392,7 +398,7 @@ t0="$(now)"
 run "$H" sh "$HERE/install.sh" --no-agent --no-open --no-link-app --no-menu-app --port "$PORT" > "$T/install-1.log" 2>&1
 rc=$?; t1="$(now)"
 sed 's/^/    /' "$T/install-1.log"
-check '[ $rc = 0 ] && ! grep -qi -e "link app" -e "Switchboard.app" -e "menu bar" "$T/install-1.log"' \
+check '[ $rc = 0 ] && ! own_lines "$T/install-1.log" | grep -qi -e "link app" -e "Switchboard.app" -e "menu bar"' \
   "--no-link-app: the older link app stays, and nothing is said about it ($(echo "$t1 - $t0" | bc) s)"
 check '[ "$(cksum < "$OLD/Contents/Info.plist")" = "$sum_before" ] && [ -x "$OLD/Contents/MacOS/Switchboard" ] && [ ! -e "$NEW" ] && [ ! -e "$T/ran-Switchboard" ]' \
   "the older link app is untouched and was never run; nothing at Switchboard Links.app"
@@ -407,7 +413,7 @@ rm -f "$T/ran-Switchboard"
 rm -rf "$OLD"; fake_app "$OLD" com.example.someone-else Switchboard
 printf '#!/bin/sh\ntouch "%s/ran-foreign"\n' "$T" > "$OLD/Contents/MacOS/Switchboard"; chmod +x "$OLD/Contents/MacOS/Switchboard"
 run "$H" sh "$HERE/install.sh" --no-agent --no-open --no-link-app --no-menu-app --port "$PORT" > "$T/install-2.log" 2>&1; rc=$?
-check '[ $rc = 0 ] && ! grep -qi "Switchboard.app" "$T/install-2.log" && [ -d "$OLD" ]' "another app at ~/Applications/Switchboard.app is left alone"
+check '[ $rc = 0 ] && ! own_lines "$T/install-2.log" | grep -qiF "Switchboard.app" && [ -d "$OLD" ]' "another app at ~/Applications/Switchboard.app is left alone"
 run "$H" sh "$HERE/uninstall.sh" --no-agent > "$T/uninstall-1.log" 2>&1; urc=$?
 check '[ $urc = 0 ] && [ -d "$OLD" ] && [ ! -e "$T/ran-foreign" ] && ! grep -q "Removed the link app\|menu bar" "$T/uninstall-1.log"' \
   "uninstall leaves it there and never runs it"
@@ -511,8 +517,8 @@ t1="$(now)"
 plain_log "$T/tty.log" | sed 's/^/    /'
 check '[ $rc = 0 ] && [ "$(last_line "$T/tty.log")" = "(stand-in) switchboard setup, input from the terminal" ]' \
   "at a terminal it ends with switchboard setup, reading from the terminal ($(echo "$t1 - $t0" | bc) s)"
-check 'plain_log "$T/tty.log" | grep -B 1 "^(stand-in)" | head -n 1 | grep -q "^Done in [0-9][0-9]* s\.$"' \
-  "the line before it is the time the install took"
+check 'plain_log "$T/tty.log" | grep -B 1 "^(stand-in) switchboard setup" | head -n 1 | grep -q "^(stand-in) switchboard about --done [0-9][0-9]* --setup-now, input from elsewhere$"' \
+  "the line before it is the block of facts, with the time the install took (switchboard about --done N --setup-now), reading nothing from the terminal"
 check 'grep -q "$ESC\[2m" "$T/tty.log"' "at a terminal the routine lines are dim"
 check '[ "$(cat "$H/.switchboard/app/source")" = "$C" ] && [ "$(cat "$H/.switchboard/app/choices")" = "--no-agent --no-menu-app --no-link-app" ]' \
   "app/source is the folder it ran from; app/choices has --no-agent, --no-menu-app and --no-link-app"
@@ -521,17 +527,17 @@ EXTRA_ENV="NO_COLOR=1"
 run "$H" script -q /dev/null sh "$C/install.sh" $FLAGS --no-setup < /dev/null > "$T/tty-nosetup.log" 2>&1; rc=$?
 EXTRA_ENV=""
 plain_log "$T/tty-nosetup.log" | sed 's/^/    /'
-check '[ $rc = 0 ] && ! grep -q "stand-in" "$T/tty-nosetup.log" && last_line "$T/tty-nosetup.log" | grep -q "^Done in [0-9][0-9]* s\. Type sb setup to add your accounts\.$"' \
-  "--no-setup at a terminal: no first run, and the last line says to type sb setup"
+check '[ $rc = 0 ] && ! grep -q "stand-in) switchboard setup" "$T/tty-nosetup.log" && last_line "$T/tty-nosetup.log" | grep -q "^(stand-in) switchboard about --done [0-9][0-9]* --as sb --update, input from elsewhere$"' \
+  "--no-setup at a terminal: no first run, and it ends with the block of facts, which says to type sb (the short form over an install already here)"
 check '! grep -q "$ESC" "$T/tty-nosetup.log"' "NO_COLOR: no colour, even at a terminal"
 
 # Without a terminal, and without --no-menu-app: this copy has no menubar-requirements.txt, so one line says there is
 # no menu bar item, and the rest is as before.
 run "$H" sh "$C/install.sh" --no-agent --no-open --no-link-app --port "$PORT" > "$T/plain.log" 2>&1; rc=$?
 sed 's/^/    /' "$T/plain.log"
-check '[ $rc = 0 ] && ! grep -q "stand-in" "$T/plain.log" && last_line "$T/plain.log" | grep -q "^Done in [0-9][0-9]* s\. Type sb setup to add your accounts\.$"' \
-  "without a terminal: no first run, the same last line"
-check 'grep -q "^No menu bar item: this copy of Switchboard does not have it\. Everything else works without it\.$" "$T/plain.log" && [ "$(grep -c "menu bar" "$T/plain.log")" = 1 ] && [ ! -e "$H/.switchboard/bin/switchboard-menubar" ]' \
+check '[ $rc = 0 ] && ! grep -q "stand-in) switchboard setup" "$T/plain.log" && last_line "$T/plain.log" | grep -q "^(stand-in) switchboard about --done [0-9][0-9]* --as sb --update, input from elsewhere$"' \
+  "without a terminal: no first run, the same block of facts last"
+check 'grep -q "^No menu bar item: this copy of Switchboard does not have it\. Everything else works without it\.$" "$T/plain.log" && [ "$(own_lines "$T/plain.log" | grep -c "menu bar")" = 1 ] && [ ! -e "$H/.switchboard/bin/switchboard-menubar" ]' \
   "no menubar-requirements.txt: one line says so, and no launcher"
 
 # curl | sh, at a terminal: the program comes from an archive (a local file standing in for GitHub's), and the
@@ -558,8 +564,8 @@ check '[ $rc = 0 ] && [ -L "$H/.local/bin/switchboard" ] && [ "$(last_line "$T/n
 
 accounts_file "$H" maya@northwind.example
 run "$H" sh "$C/install.sh" $FLAGS > "$T/again.log" 2>&1; rc=$?
-check '[ $rc = 0 ] && last_line "$T/again.log" | grep -q "^Done in [0-9][0-9]* s\. Type sb to see your accounts\.$" && grep -q "^Installing Switchboard [0-9.]* again in ~/.switchboard$" "$T/again.log"' \
-  "with accounts in the engine, the next step is sb itself (and it says it is installing again)"
+check '[ $rc = 0 ] && last_line "$T/again.log" | grep -q "^(stand-in) switchboard about --done [0-9][0-9]* --as sb --update, input from elsewhere$" && grep -q "^Installing Switchboard [0-9.]* again in ~/.switchboard$" "$T/again.log"' \
+  "a second run ends with the short block of facts (and it says it is installing again); case 22 sees sb as the next step with accounts"
 check 'run "$H" sh "$C/install.sh" --help | grep -q -- "--no-setup" && run "$H" sh "$C/install.sh" --help | grep -q -- "--no-link-app"' \
   "--help names --no-setup and --no-link-app"
 
@@ -611,8 +617,8 @@ job_plist MENUBAR_PLIST > "$T/menubar.plist" && job_plist PLIST > "$T/page.plist
 check 'plutil -lint -s "$T/menubar.plist" && plutil -lint -s "$T/page.plist"' "both are well-formed plists"
 check '[ "$(key "$T/menubar.plist" Label)" = "$MENUBAR_ID" ] && [ "$(key "$T/menubar.plist" ProgramArguments.0)" = "/Users/a&b<c>/.switchboard/bin/switchboard-menubar" ] && [ "$(plutil -extract ProgramArguments raw -o - "$T/menubar.plist")" = 1 ]' \
   "the menu bar item's job ($MENUBAR_ID) runs its launcher alone"
-check '[ "$(key "$T/menubar.plist" RunAtLoad)" = true ] && [ "$(key "$T/menubar.plist" KeepAlive.SuccessfulExit)" = false ] && [ "$(key "$T/menubar.plist" ProcessType)" = Interactive ]' \
-  "it starts at login, comes back after a crash but not after Quit, and runs as an app"
+check '[ "$(key "$T/menubar.plist" RunAtLoad)" = true ] && [ "$(key "$T/menubar.plist" KeepAlive)" = true ] && [ "$(key "$T/menubar.plist" ProcessType)" = Interactive ]' \
+  "it starts at login, comes back after any exit, and runs as an app"
 check '[ "$(key "$T/menubar.plist" StandardErrorPath)" = "/Users/a&b<c>/.switchboard/menubar.log" ] && [ "$(key "$T/page.plist" Label)" = io.github.amyjainberkeley.switchboard ]' \
   "its log is ~/.switchboard/menubar.log"
 check '[ "$(key "$T/page.plist" ProgramArguments.0)" = "/Users/a&b<c>/.switchboard/bin/switchboard-page" ] && [ "$(plutil -extract ProgramArguments raw -o - "$T/page.plist")" = 1 ] && [ "$(key "$T/page.plist" KeepAlive)" = true ] && ! plutil -extract EnvironmentVariables.PYTHONPATH raw -o - "$T/page.plist" >/dev/null 2>&1' \
@@ -818,7 +824,7 @@ else
   EPY_NOW="$(/usr/bin/python3 -I -B -c 'import json, sys; r = json.load(open(sys.argv[1])); print(r["python"] if r["python_source"] == "found" else "")' "$H/.switchboard/runtime/python.json" 2>/dev/null)"
   check '[ -n "$EPY_NOW" ] && run "$H" "$H/.switchboard/bin/switchboard" --version | grep -q "^switchboard [0-9]"' \
     "the program (with its engine) runs on the Python found here (${EPY_NOW:-none})"
-  check '[ ! -e "$H/.switchboard/bin/switchboard-menubar" ] && [ ! -e "$H/.switchboard/runtime/python" ] && [ "$(cat "$H/.switchboard/app/choices")" = "--no-agent --no-link-app" ] && last_line "$T/fallback.log" | grep -q "^Done in [0-9][0-9]* s\. Type sb setup"' \
+  check '[ ! -e "$H/.switchboard/bin/switchboard-menubar" ] && [ ! -e "$H/.switchboard/runtime/python" ] && [ "$(cat "$H/.switchboard/app/choices")" = "--no-agent --no-link-app" ] && last_line "$T/fallback.log" | grep -q "^Done in [0-9][0-9]* s\. Next: sb$"' \
     "no menu bar launcher, no half-downloaded Python, and app/choices still wants the menu bar, so switchboard update adds it"
   rm -rf "$T"
 fi
@@ -1449,8 +1455,8 @@ check '[ $rc = 0 ] && [ -L "$H/.local/bin/sb" ] && [ "$(readlink "$H/.local/bin/
 v1="$(run "$H" "$H/.local/bin/switchboard" version 2>&1)"; v2="$(run "$H" sb version 2>&1)"
 run "$H" sb no-such-command > /dev/null 2>&1; s=$?; run "$H" switchboard no-such-command > /dev/null 2>&1; f=$?
 check '[ -n "$v1" ] && [ "$v1" = "$v2" ] && [ $s = 2 ] && [ $f = 2 ]' "sb runs: sb version says what switchboard version says ($v2), and the exit codes are the same"
-check 'last_line "$T/install.log" | grep -q "^Done in [0-9][0-9]* s\. Type sb setup to add your accounts\.$" && ! grep -q "$TAKEN_LINE" "$T/install.log"' \
-  "the last line says to type sb setup"
+check 'last_line "$T/install.log" | grep -q "^Done in [0-9][0-9]* s\. Next: sb$" && ! grep -q "$TAKEN_LINE" "$T/install.log"' \
+  "the last line says the next step is sb"
 accounts_file "$H" maya@northwind.example
 run "$H" sh "$HERE/install.sh" $FLAGS > "$T/again.log" 2>&1; rc=$?
 check '[ $rc = 0 ] && last_line "$T/again.log" | grep -q "^Done in [0-9][0-9]* s\. Type sb to see your accounts\.$" && [ "$(readlink "$H/.local/bin/sb")" = "$H/.switchboard/bin/switchboard" ]' \
@@ -1477,8 +1483,8 @@ check '[ $rc = 0 ] && [ ! -e "$H/.local/bin/sb" ] && [ ! -L "$H/.local/bin/sb" ]
   "another sb on the PATH: no sb is added, switchboard is, and the install exits 0"
 check '[ "$(grep -c "$TAKEN_LINE" "$T/install.log")" = 1 ] && grep -qx "sb already means something else on this Mac ($T/other/sb), so the command is switchboard\." "$T/install.log"' \
   "one plain line says sb is another program, so the command is switchboard"
-check 'last_line "$T/install.log" | grep -q "^Done in [0-9][0-9]* s\. Type switchboard setup to add your accounts\.$" && [ "$(run "$H" sb)" = other ]' \
-  "the last line says switchboard setup, and sb is still the other program"
+check 'last_line "$T/install.log" | grep -q "^Done in [0-9][0-9]* s\. Next: switchboard$" && [ "$(run "$H" sb)" = other ]' \
+  "the last line says the next step is switchboard, and sb is still the other program"
 run "$H" "$H/.switchboard/bin/switchboard" doctor > "$T/doctor.log" 2>&1; drc=$?
 check 'grep -q "^ ok  sb already means something else on this Mac (/.*/other/sb), so the command is switchboard$" "$T/doctor.log" && doctor_ok "$T/doctor.log" $drc' \
   "doctor says sb is another program's, and that is no problem (all good)"
@@ -1501,7 +1507,7 @@ for what in "a file" "a link" "an alias" "a function" "a fish function"; do
   before="$(ls -l "$H/.local/bin/sb" 2>/dev/null; cat "$H/.local/bin/sb" 2>/dev/null)"
   EXTRA_ENV="$OFFLINE"
   run "$H" sh "$HERE/install.sh" $FLAGS > "$T/install.log" 2>&1; rc=$?
-  check '[ $rc = 0 ] && [ "$(ls -l "$H/.local/bin/sb" 2>/dev/null; cat "$H/.local/bin/sb" 2>/dev/null)" = "$before" ] && grep -qx "sb already means something else on this Mac ($where), so the command is switchboard\." "$T/install.log" && last_line "$T/install.log" | grep -q "Type switchboard setup"' \
+  check '[ $rc = 0 ] && [ "$(ls -l "$H/.local/bin/sb" 2>/dev/null; cat "$H/.local/bin/sb" 2>/dev/null)" = "$before" ] && grep -qx "sb already means something else on this Mac ($where), so the command is switchboard\." "$T/install.log" && last_line "$T/install.log" | grep -q "Next: switchboard$"' \
     "$what named sb ($where): left as it was, one line, exit 0, and the last line says switchboard"
   if [ "$what" = "a file" ]; then
     run "$H" sh "$H/.switchboard/app/uninstall.sh" --no-agent > "$T/uninstall.log" 2>&1; urc=$?
@@ -1526,7 +1532,7 @@ sed 's/^/    /' "$T/brew.log"
 check '[ $rc = 0 ] && [ -L "$P/bin/sb" ] && [ "$(readlink "$P/bin/sb")" = switchboard ] && [ ! -e "$H/.local/bin/sb" ]' \
   "--homebrew: sb is a link to switchboard in Homebrew's bin folder, beside it, and nothing goes in ~/.local/bin"
 v1="$(run "$H" switchboard version 2>&1)"; v2="$(run "$H" sb version 2>&1)"
-check '[ -n "$v2" ] && [ "$v1" = "$v2" ] && last_line "$T/brew.log" | grep -q "Type sb setup to add your accounts\.$"' \
+check '[ -n "$v2" ] && [ "$v1" = "$v2" ] && last_line "$T/brew.log" | grep -q "Next: sb$"' \
   "sb runs through Homebrew's launcher ($v2), and the last line says sb"
 S="$T/stand"; mkdir -p "$S"
 run "$H" env SWITCHBOARD_BREW_ARGS="upgrade switchboard" sh "$C/packaging/homebrew/uninstall.sh" > /dev/null 2>&1; urc=$?
@@ -1538,14 +1544,14 @@ check '[ $urc = 0 ] && [ ! -e "$P/bin/sb" ] && [ ! -L "$P/bin/sb" ] && [ ! -e "$
 # A foreign sb in Homebrew's bin folder (another formula's), then a bin folder it may not write to: exit 0 each time.
 printf '#!/bin/sh\necho theirs\n' > "$P/bin/sb"; chmod +x "$P/bin/sb"
 run "$H" sh "$C/install.sh" --homebrew > "$T/brew-2.log" 2>&1; rc=$?
-check '[ $rc = 0 ] && [ "$(cat "$P/bin/sb")" = "$(printf "#!/bin/sh\necho theirs")" ] && grep -qx "sb already means something else on this Mac ($P/bin/sb), so the command is switchboard\." "$T/brew-2.log" && last_line "$T/brew-2.log" | grep -q "Type switchboard setup"' \
+check '[ $rc = 0 ] && [ "$(cat "$P/bin/sb")" = "$(printf "#!/bin/sh\necho theirs")" ] && grep -qx "sb already means something else on this Mac ($P/bin/sb), so the command is switchboard\." "$T/brew-2.log" && last_line "$T/brew-2.log" | grep -q "Next: switchboard$"' \
   "another sb in Homebrew's bin folder: left alone, one line, exit 0"
 run "$H" env SWITCHBOARD_BREW_ARGS="uninstall switchboard" sh "$C/packaging/homebrew/uninstall.sh" > /dev/null 2>&1; urc=$?
 check '[ $urc = 0 ] && [ "$(cat "$P/bin/sb")" = "$(printf "#!/bin/sh\necho theirs")" ]' "brew uninstall leaves that sb where it is"
 rm -f "$P/bin/sb"; chmod 555 "$P/bin"
 run "$H" sh "$C/install.sh" --homebrew > "$T/brew-3.log" 2>&1; rc=$?
 chmod 755 "$P/bin"
-check '[ $rc = 0 ] && [ ! -e "$P/bin/sb" ] && last_line "$T/brew-3.log" | grep -q "Type switchboard setup"' \
+check '[ $rc = 0 ] && [ ! -e "$P/bin/sb" ] && last_line "$T/brew-3.log" | grep -q "Next: switchboard$"' \
   "a Homebrew bin folder it can't write to: no sb, exit 0, and the words say switchboard"
 # Homebrew's prefix from HOMEBREW_PREFIX, for a copy that does not sit under a Caskroom (and brew upgrade's rerun).
 rm -rf "$H/.switchboard"
@@ -1579,7 +1585,7 @@ done
 EXTRA_ENV="$OFFLINE SWITCHBOARD_PAGE_PYTHON=$PAGE_PY SWITCHBOARD_REPO=example/switchboard SWITCHBOARD_ARCHIVE=file://$T/main.tar.gz"
 run "$H" sh -s -- --no-agent --no-open --no-link-app --no-menu-app --port "$PORT" < "$HERE/install.sh" > "$T/whole.log" 2>&1; rc=$?
 EXTRA_ENV=""
-check '[ $rc = 0 ] && [ -x "$H/.switchboard/bin/switchboard" ] && [ -L "$H/.local/bin/switchboard" ] && last_line "$T/whole.log" | grep -q "^Done in [0-9][0-9]* s\. Type sb setup to add your accounts\.$"' \
+check '[ $rc = 0 ] && [ -x "$H/.switchboard/bin/switchboard" ] && [ -L "$H/.local/bin/switchboard" ] && last_line "$T/whole.log" | grep -q "^Done in [0-9][0-9]* s\. Next: sb$"' \
   "the whole file, the same way: it installs, and its last line is the next step"
 rm -rf "$T"
 fi
@@ -1695,13 +1701,15 @@ seed_keychain() {
   printf '%s\n' '[["Switchboard login", "acct-maya"], ["Switchboard login", "acct-lost"],' \
     '["Switchboard login (previous)", "acct-maya"], ["Switchboard recovery", "safety:0123456789abcdef"],' \
     '["Switchboard recovery", "successor:acct-lost"], ["switchboard-gateway", "work"],' \
+    '["Switchboard token", "bearer-1"], ["Switchboard API key", "bearer-2"],' \
     '["Claude Code-credentials", "me"], ["Some other app", "someone"]]' > "$KC/store.json"
   rm -f "$KC/calls.log" "$KC/locked"
 }
 left() { /usr/bin/python3 -I -B -c 'import json, sys; print(" + ".join(s for s, a in json.load(open(sys.argv[1]))))' "$KC/store.json"; }
-only_ours() {              # every Keychain call was a delete of one of Switchboard's four services, by service alone
+only_ours() {              # every Keychain call was a delete of one of Switchboard's six services, by service alone
   ! grep -v -x -e "delete-generic-password -s Switchboard login" -e "delete-generic-password -s Switchboard login (previous)" \
-    -e "delete-generic-password -s Switchboard recovery" -e "delete-generic-password -s switchboard-gateway" "$KC/calls.log"
+    -e "delete-generic-password -s Switchboard recovery" -e "delete-generic-password -s switchboard-gateway" \
+    -e "delete-generic-password -s Switchboard token" -e "delete-generic-password -s Switchboard API key" "$KC/calls.log"
 }
 installed() {              # installed [launcher text]: settings, an account, a gateway key, the program, its folder
   mkdir -p "$H/.switchboard/bin" "$H/.switchboard/app/switchboard"
@@ -1727,8 +1735,8 @@ sh ~/.switchboard/uninstall.sh --all" ]' "a plain uninstall: its last line is th
   sed 's/^/    /' "$T/all.log"
   check '[ $urc = 0 ] && [ ! -e "$H/.switchboard" ] && [ "$(tail -n 2 "$T/all.log")" = "Removed ~/.switchboard with your settings, accounts and keys. Nothing of Switchboard is left.
 The login Claude Code is using was not touched." ]' "that command, with no program folder: it works, and ~/.switchboard is gone"
-  check '[ "$(left)" = "Claude Code-credentials + Some other app" ] && only_ours && [ "$(grep -c . "$KC/calls.log")" = 10 ]' \
-    "every item of Switchboard's four services left the Keychain, one call each, then one not-found per service; Claude Code's and another program's stay"
+  check '[ "$(left)" = "Claude Code-credentials + Some other app" ] && only_ours && [ "$(grep -c . "$KC/calls.log")" = 14 ]' \
+    "every item of Switchboard's six services left the Keychain, one call each, then one not-found per service; Claude Code's and another program's stay"
   # Nothing to keep: the copy is not left either.
   mkdir -p "$H/.switchboard/app" "$H/.switchboard/bin"
   run "$H" sh "$T/u/uninstall.sh" --no-agent > "$T/empty.log" 2>&1; urc=$?

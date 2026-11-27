@@ -205,11 +205,12 @@ stop_loop() {
 stop_loop || exit 1
 
 # Before the program goes: put back what Switchboard changed in Claude Code (the status line, its notification hooks,
-# the Models setting, house rules, the code map, claude-mem's settings), take out claude-mem and codegraph when
-# Switchboard installed them, and clear a sign-in that was cut short. With --all, every account (its saved login
-# leaves your Keychain), then every other login of Switchboard's still there (earlier ones, recovery copies: only the
-# program's records find them), and the keys for the gateway go too. When anything could not be put back or removed
-# (tidy names it), the program and ~/.switchboard, with the records the undo needs, stay, so this can run again.
+# the Models setting, house rules, the code map, claude-mem's settings), take out its own copies of Switchboard's
+# skill, take out claude-mem and codegraph when Switchboard installed them, and clear a sign-in that was cut short.
+# With --all, every account (its saved login leaves your Keychain), then every other login of Switchboard's still
+# there (earlier ones, recovery copies: only the program's records find them), and the keys for the gateway go too.
+# When anything could not be put back or removed (tidy names it), the program and ~/.switchboard, with the records
+# the undo needs, stay, so this can run again.
 # A program that can't start names nothing (its Python is gone: 126 or 127; or its folder is): then one line says
 # what was not put back, and the rest goes on, so a broken install can still be removed.
 TIDY_RAN=0
@@ -226,10 +227,12 @@ if [ -x "$DATA/bin/switchboard" ]; then
   esac
 fi
 # --all when no program ran tidy (none is left, or it could not start): what is still in the Keychain under
-# Switchboard's own four services goes, in plain shell, one item at a time until none is found (exit 44). Never any
-# other service. (When tidy ran, the program did this itself.)
+# Switchboard's own six services (saved logins, earlier logins, recovery copies, the gateway's keys, one-year tokens,
+# API keys) goes, in plain shell, one item at a time until none is found (exit 44). Never any other service. (When
+# tidy ran, the program did this itself.)
 if [ "$ALL" = 1 ] && [ "$TIDY_RAN" = 0 ]; then
-  for service in "Switchboard login" "Switchboard login (previous)" "Switchboard recovery" "switchboard-gateway"; do
+  for service in "Switchboard login" "Switchboard login (previous)" "Switchboard recovery" "switchboard-gateway" \
+                 "Switchboard token" "Switchboard API key"; do
     n=0; rc=0
     while [ $n -lt 500 ]; do
       "$SECURITY" delete-generic-password -s "$service" >/dev/null 2>&1 || { rc=$?; break; }
@@ -238,6 +241,26 @@ if [ "$ALL" = 1 ] && [ "$TIDY_RAN" = 0 ]; then
     if [ "$rc" != 44 ]; then
       echo "Not every login of Switchboard's could be taken out of your Keychain (is it locked?), so ~/.switchboard was kept. Run this again once it is unlocked." >&2
       exit 1
+    fi
+  done
+fi
+# Switchboard's skill for coding agents, when no program ran tidy (tidy takes it out itself): only a copy that holds
+# Switchboard's marker, and in it only SKILL.md, the files in reference/ its marker names and the marker (switchboard/
+# skillfile.py: NAME, MARK and AGENTS_SKILLS; the marker lists one file a line). A folder that is a link, and anything
+# else in the folder, is left.
+if [ "$TIDY_RAN" = 0 ]; then
+  for d in "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/switchboard" "$HOME/.agents/skills/switchboard"; do
+    mark="$d/.switchboard-skill.json"
+    if [ ! -L "$d" ] && [ -f "$mark" ] && [ ! -L "$mark" ] && grep -q '"by": "switchboard"' "$mark"; then
+      if [ ! -L "$d/reference" ]; then
+        for f in $(sed -n 's|^ *"\(reference/[A-Za-z0-9_-][A-Za-z0-9_.-]*\)",\{0,1\}$|\1|p' "$mark"); do
+          rm -f "$d/$f"
+        done
+      fi
+      rm -f "$d/SKILL.md" "$mark"
+      rmdir "$d/reference" 2>/dev/null || true
+      rmdir "$d" 2>/dev/null || true
+      echo "Removed Switchboard's skill ($(short "$d"))."
     fi
   done
 fi

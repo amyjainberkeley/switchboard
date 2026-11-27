@@ -38,12 +38,12 @@ class DoctorNotSetUp(unittest.TestCase):
         with mock.patch.object(connect, 'claude_bin', lambda: None):
             first_screen = cli._closing({}, {'accounts': [], 'head': {'email': None}})[0]
         self.assertEqual(last, first_screen)
-        self.assertEqual(last, 'Install Claude Code first (https://claude.com/claude-code), then run switchboard setup.')
+        self.assertEqual(last, 'Install Claude Code first (https://claude.com/claude-code), then run switchboard.')
 
     def test_the_line_follows_what_the_first_screen_would_say(self):
         with mock.patch.object(connect, 'claude_bin', lambda: '/made/up/claude'):
             with mock.patch.object(cli, 'identity', lambda: None):
-                self.assertEqual(cli.not_set_up(), 'Sign in to Claude Code first, then run switchboard setup.')
+                self.assertEqual(cli.not_set_up(), 'Sign in to Claude Code first, then run switchboard.')
             with mock.patch.object(cli, 'identity', lambda: ('ana@work.example', 'org')):
                 self.assertEqual(cli.not_set_up(), 'Add it with switchboard setup.')
 

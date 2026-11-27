@@ -618,24 +618,9 @@ def _accounts(n):
     return _plural(n, 'account')
 
 
-def found_login(email, kept=False):
-    """'Found Claude Code signed in as maya@northwind.example. Kept.'"""
-    return 'Found Claude Code signed in as %s.%s' % (email, ' Kept.' if kept else '')
-
-
-def sign_in_others(by_itself=True):
-    """The first run's last line: how to add the other accounts. `by_itself`: something keeps each login as it
-    comes (the page, which the background job runs); without it, typing switchboard does."""
-    if by_itself:
-        return 'Sign in to your other accounts with /login in Claude Code. Each one is kept as you sign in.'
-    return 'Sign in to your other accounts with /login in Claude Code, then type switchboard to keep each one.'
-
-
-def another_account(by_itself=True):
+def another_account(colour=False):
     """Under the view, with one account: how to add the next one."""
-    if by_itself:
-        return 'Sign in to another account with /login in Claude Code: it is kept by itself.'
-    return 'Sign in to another account with /login in Claude Code, then type switchboard to keep it.'
+    return run_this('Add another account with', 'switchboard add', colour)
 
 
 def kept(email):
@@ -692,8 +677,6 @@ def auto_line(auto, yours=False, reading=None):
 LINKS_ASKING = {True: 'macOS is asking. Choose “Use Switchboard Links”.',
                 False: 'macOS is asking. Choose your usual browser. Switchboard won’t offer it again; '
                        'switchboard links on turns it back on.'}
-LINKS_FIRST_RUN = ('So that artifacts open as their owner, macOS asks to make Switchboard Links your default browser: '
-                   'choose “Use Switchboard Links”.')
 LINKS_NEEDS = "Add the link app with: switchboard update --link-app (it needs Apple's command line tools)."
 
 
@@ -746,18 +729,6 @@ def on_words(auto=False, notify=False, statusline=False):
         return ''
     said = on[0] if len(on) == 1 else '%s and %s' % (', '.join(on[:-1]), on[-1])
     return ' %s%s %s on.' % (said[0].upper(), said[1:], 'are' if len(on) > 1 or on == ['notifications'] else 'is')
-
-
-def counted(n, auto=False, notify=False, statusline=False):
-    """'✓ 3 accounts. Auto-switch, notifications and the status line are on.'"""
-    return '%s %s.%s' % (CHECK, _accounts(n), on_words(auto, notify, statusline))
-
-
-def done(n, colour=False, auto=False, notify=False, statusline=False):
-    """'✓ 5 accounts. Type switchboard to see them.', or with auto-switch, notifications and the status line on:
-    '✓ 5 accounts. Auto-switch, notifications and the status line are on. Type switchboard to see them.'"""
-    return paint([(counted(n, auto, notify, statusline) + ' Type ', None), ('switchboard', BOLD),
-                  (' to see %s.' % ('it' if n == 1 else 'them'), None)], colour)
 
 
 def saved(email):

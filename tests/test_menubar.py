@@ -1,7 +1,8 @@
 import _isolate  # noqa: F401  (first: it gives switchboard a throwaway data folder)
 # The menu bar (switchboard/menubar.py and its wrapper app, menubar_wrap.py), without AppKit: the state as the item
 # and the menu rows, their words, the bars' geometry, the red rule, the refresh timing, the page's own POSTs, starting
-# the page, one menu bar at a time, the wrapper app, the command and doctor's lines.
+# the page, one menu bar at a time, the wrapper app, the command and doctor's lines. The S and the clean menu have
+# their own file (test_menubar_s_and_menu.py), and so do on, off and staying on (test_menubar_off_on.py).
 #
 # Made-up accounts only. Nothing here draws, opens a menu, puts an item in the menu bar or runs launchctl; a running
 # page is a stand-in on a free port, or the real server in demo mode on a free port.
@@ -150,9 +151,9 @@ class Rows(unittest.TestCase):
 
     def test_in_use_next_and_use(self):
         marks = dict((r['email'], r['marks']) for r in menubar.rows(view(), TZ))
-        self.assertEqual(marks['ana@mail.example'], [('1 min ago', 'next'), ('In use', 'in-use')])   # each row's own
-        self.assertEqual(marks['ana@lab.example'], [('1 min ago', 'next'), ('Next', 'next'), ('Use', 'use')])   # age
-        self.assertEqual(marks['ana@northwind.example'], [('1 min ago', 'next'), ('Use', 'use')])
+        self.assertEqual(marks['ana@mail.example'], [('In use', 'in-use')])
+        self.assertEqual(marks['ana@lab.example'], [('Next', 'next')])           # one word; a click still uses it
+        self.assertEqual(marks['ana@northwind.example'], [('Use', 'use')])
         rows = dict((r['email'], r) for r in menubar.rows(view(), TZ))
         self.assertIsNone(rows['ana@mail.example']['action'])          # the account in use is not a button
         self.assertEqual(rows['ana@lab.example']['action'], 'use')
@@ -175,50 +176,22 @@ class Rows(unittest.TestCase):
         find(s, 'ana@harbor.example')['needs_login'] = True
         find(s, 'ana@northwind.example')['unmanaged'] = True
         harbor, north = row_of(s, 'ana@harbor.example'), row_of(s, 'ana@northwind.example')
-        self.assertEqual((harbor['marks'], harbor['action']), ([('1 min ago', 'next'), ('Sign in again', 'use')], 'signin'))
-        self.assertEqual((north['marks'], north['action']), ([('1 min ago', 'next')], None))
+        self.assertEqual((harbor['marks'], harbor['action']), ([('Sign in again', 'use')], 'signin'))
+        self.assertEqual((north['marks'], north['action']), ([], None))
         self.assertIsNone(menubar.click(harbor))
         self.assertIsNone(menubar.click(north))
         self.assertEqual(menubar.click(row_of(s, 'ana@lab.example')), ('/api/switch', {'email': 'ana@lab.example'}))
 
-    def test_two_limits_with_their_percent_and_a_models_week(self):
+    def test_two_limits_with_their_percent_and_no_models_week(self):
         harbor = row_of(view(), 'ana@harbor.example')
         self.assertEqual((harbor['five']['label'], menubar.pct_text(harbor['five'])), ('5-hour', '0%'))
         self.assertEqual((harbor['week']['label'], menubar.pct_text(harbor['week'])), ('Weekly', '17%'))
         lab = row_of(view(), 'ana@lab.example')
         self.assertIsNone(lab['five'])                  # no 5-hour window (Ultra): no 5-hour limit, no 5-hour row
         self.assertEqual((lab['week']['label'], menubar.pct_text(lab['week'])), ('Weekly', '65%'))
-        self.assertEqual([(m['label'], menubar.pct_text(m), m['over']) for m in lab['models']], [('Fable', '90%', True)])
-        self.assertEqual(row_of(view(), 'ana@northwind.example')['models'], [])
-
-    def test_the_reset_line(self):
-        rows = dict((r['email'], r['foot']) for r in menubar.rows(view(), TZ))
-        self.assertEqual(rows['ana@mail.example'], 'Resets Sat 12:00 PM \u00b7 in 20 hours')
-        self.assertEqual(rows['ana@lab.example'], 'Resets Sun 2:00 PM \u00b7 in 2 days')
-        self.assertEqual(rows['ana@northwind.example'], 'Resets Thu 5:00 PM \u00b7 in 6 days')
-        lim = menubar.limits(find(view(), 'ana@harbor.example'), view()['auto'])[0]
-        self.assertEqual(menubar.reset_line(lim, NOW, TZ), 'Not started')   # 0% and no reset: Anthropic's not started
-        s = view()
-        find(s, 'ana@harbor.example')['usage']['session'] = w(31)
-        lim = menubar.limits(find(s, 'ana@harbor.example'), s['auto'])[0]
-        self.assertEqual(menubar.reset_line(lim, NOW, TZ), 'Started')       # used, its reset time not known yet
+        self.assertNotIn('Fable', repr(menubar.row_ops(lab)))      # a model's week at its line is the page's to say
         self.assertEqual([l['kind'] for l in menubar.limits(find(view(), 'ana@northwind.example'), view()['auto'])],
                          ['week'])                                          # no 5-hour window: no 5-hour limit
-        passed = view()
-        find(passed, 'ana@lab.example')['usage']['weekly']['resets'] = at(13, 15)
-        self.assertEqual(row_of(passed, 'ana@lab.example')['foot'], 'Not started')
-
-    def test_the_panel_reset_rule_while_a_5_hour_window_runs(self):
-        s = view()
-        find(s, 'ana@lab.example')['usage']['session'] = w(31, at(13, 17, 40))
-        self.assertEqual(row_of(s, 'ana@lab.example')['foot'], '5-hour resets 5:40 PM \u00b7 weekly Sun 2:00 PM')
-        find(s, 'ana@lab.example')['usage']['weekly']['resets'] = at(13, 15)          # the week's reset has passed
-        self.assertEqual(row_of(s, 'ana@lab.example')['foot'], '5-hour resets 5:40 PM')
-        find(s, 'ana@lab.example')['usage']['session'] = w(31)                         # used, its reset not known
-        self.assertEqual(row_of(s, 'ana@lab.example')['foot'], 'Not started')
-        find(s, 'ana@lab.example')['usage']['session'] = w(0, at(13, 17, 40))          # nothing used yet
-        find(s, 'ana@lab.example')['usage']['weekly']['resets'] = at(15, 14)
-        self.assertEqual(row_of(s, 'ana@lab.example')['foot'], 'Resets Sun 2:00 PM \u00b7 in 2 days')
 
     def test_a_reading_not_known_is_a_dash_and_a_bare_track_with_no_reset_line(self):
         s = view()
@@ -229,10 +202,10 @@ class Rows(unittest.TestCase):
         for email in ('ana@fernhill.example', 'ana@northwind.example'):
             r = row_of(s, email)
             self.assertEqual((r['five'], menubar.pct_text(r['week'])), (None, '\u2014'))
-            self.assertEqual((r['foot'], r['models'], menubar.row_height(r)), ('', [], 54.0))
+            self.assertEqual(menubar.row_height(r), 54.0)
             self.assertFalse([op for op in menubar.row_ops(r) if op[0] == 'box' and op[-1] in ('fill', 'accent', 'red')])
         self.assertEqual(menubar.pct_text(row_of(s, 'ana@harbor.example')['week']), '\u2014')
-        self.assertEqual(menubar.row_height(row_of(s, 'ana@lab.example')), 70.0)      # known, with no 5-hour row
+        self.assertEqual(menubar.row_height(row_of(s, 'ana@lab.example')), 54.0)      # known, with no 5-hour row
 
     def test_the_same_numbers_and_next_as_the_terminal(self):
         s = view()
@@ -244,8 +217,6 @@ class Rows(unittest.TestCase):
             bars = [(x['pct'], x['over']) for x in (r['five'], r['week']) if x is not None]
             self.assertEqual(r['five'] is None, a['limits'][0]['label'] != '5-hour')     # the same 5-hour row or none
             self.assertEqual(bars, [(l['pct'], l['over']) for l in a['limits'][:len(bars)]])
-            note = a['limits'][-1]['note']                   # a model week: only the note, in both
-            self.assertEqual([m['pct'] for m in r['models']], [note['pct']] if note else [])
             self.assertEqual((r['next'], r['in_use']), (a['next'], a['active']))
 
 
@@ -285,69 +256,55 @@ class RedRule(unittest.TestCase):
         pcts = [op[5][0] for op in menubar.row_ops(r) if op[0] == 'text' and op[6] == 'right']
         self.assertEqual(pcts, [('92%', 12.0, 500, 'red'), ('27%', 12.0, 500, 'ink')])
         it = menubar.reading(s)
-        self.assertTrue(it['red'])
-        self.assertEqual([op[-1] for op in menubar.item_ops(it)], ['ink30', 'sysred', 'ink30', 'ink'])
+        self.assertEqual(it['dot'], 'orange')                 # the item's S gets its orange dot
+        self.assertEqual([op[-1] for op in menubar.item_ops(it) if op[0] == 'dot'], ['ink', 'orange'])
 
-    def test_a_models_week_at_its_line_is_red_at_the_right_of_the_reset_line(self):
-        ops = menubar.row_ops(row_of(view(), 'ana@lab.example'))
-        foot = [op for op in ops if op[0] == 'pair' and op[2] == 46.0][0]          # no 5-hour row: under the weekly
-        self.assertEqual(foot[5], [(('Resets Sun 2:00 PM \u00b7 in 2 days'), 11.0, 400, 'ink2')])
-        self.assertEqual(foot[6], [[('Fable ', 11.0, 400, 'ink2'), ('90%', 11.0, 400, 'red')]])
-        self.assertFalse(menubar.reading(view())['red'])       # a model's week never turns the item red
+    def test_a_models_week_never_puts_a_dot_on_the_item(self):
+        self.assertIsNone(menubar.reading(view())['dot'])      # ana@lab.example's Fable week is at its line
 
 
 # ---------- the item ----------
 
 class Item(unittest.TestCase):
-    def test_the_geometry_of_spec_section_8(self):
-        self.assertEqual((menubar.BAR_W, menubar.BAR_H, menubar.GAP), (18.0, 4.0, 2.0))
-        self.assertEqual((menubar.IMAGE_W, menubar.IMAGE_H, menubar.ITEM_W), (18.0, 10.0, 34.0))
-        self.assertEqual(menubar.TRACK, 0.3)
-        ops = menubar.item_ops({'five': {'used': 62, 'over': False}, 'week': {'used': 70, 'over': False}, 'red': False})
-        self.assertEqual(ops, [('box', 0.0, 0.0, 18.0, 4.0, 2.0, 'ink30'), ('box', 0.0, 0.0, 18 * 0.62, 4.0, 2.0, 'ink'),
-                               ('box', 0.0, 6.0, 18.0, 4.0, 2.0, 'ink30'), ('box', 0.0, 6.0, 18 * 0.70, 4.0, 2.0, 'ink')])
-
     def test_the_fill(self):
-        self.assertEqual(menubar.fill_width(0), 0.0)
-        self.assertEqual(menubar.fill_width(None), 0.0)
-        self.assertEqual(menubar.fill_width(1), 4.0)            # at least one round end when anything is used
-        self.assertEqual(menubar.fill_width(0.4), 4.0)
-        self.assertEqual(menubar.fill_width(50), 9.0)
-        self.assertEqual(menubar.fill_width(100), 18.0)
-        self.assertEqual(menubar.fill_width(150), 18.0)
-        self.assertEqual(menubar.fill_width(True), 0.0)
+        self.assertEqual(menubar.fill_width(0, 18.0, 4.0), 0.0)
+        self.assertEqual(menubar.fill_width(None, 18.0, 4.0), 0.0)
+        self.assertEqual(menubar.fill_width(1, 18.0, 4.0), 4.0)      # at least one round end when anything is used
+        self.assertEqual(menubar.fill_width(0.4, 18.0, 4.0), 4.0)
+        self.assertEqual(menubar.fill_width(50, 18.0, 4.0), 9.0)
+        self.assertEqual(menubar.fill_width(100, 18.0, 4.0), 18.0)
+        self.assertEqual(menubar.fill_width(150, 18.0, 4.0), 18.0)
+        self.assertEqual(menubar.fill_width(True, 18.0, 4.0), 0.0)
 
     def test_the_account_in_use_and_its_words(self):
         r = menubar.reading(view())
         self.assertEqual(r['label'], 'Switchboard: ana@mail.example, weekly 27%')     # no 5-hour limit: no 5-hour word
-        self.assertEqual((r['five'], r['week']['pct'], r['red']), (None, 27, False))
-        self.assertEqual(len(menubar.item_ops(r)), 2)          # its weekly bar alone
+        self.assertEqual((r['email'], r['dot'], r['dim']), ('ana@mail.example', None, False))
         r = menubar.reading(view(active='ana@harbor.example'))
         self.assertEqual(r['label'], 'Switchboard: ana@harbor.example, 5-hour 0%, weekly 17%')
-        self.assertEqual(len(menubar.item_ops(r)), 3)          # 0% has no fill
 
-    def test_bare_tracks_when_not_known_with_no_account_and_with_no_page(self):
+    def test_not_known_with_no_account_and_with_no_page(self):
         s = view()
         find(s, 'ana@mail.example')['trusted'] = False
         r = menubar.reading(s)
-        # a reading not known has no 5-hour number to show: its weekly track alone, in the middle
         self.assertEqual(r['label'], 'Switchboard: ana@mail.example, weekly \u2014')
-        self.assertEqual(menubar.item_ops(r), [('box', 0.0, 3.0, 18.0, 4.0, 2.0, 'ink30')])
-        bare = [('box', 0.0, 0.0, 18.0, 4.0, 2.0, 'ink30'), ('box', 0.0, 6.0, 18.0, 4.0, 2.0, 'ink30')]
-        for state, words in ((None, "Switchboard isn't running"), (view(accounts=[]), 'Switchboard: no accounts yet'),
-                             (view(active='someone@else.example'), 'Switchboard: no account in use')):
-            r = menubar.reading(state)
-            self.assertEqual((r['label'], menubar.item_ops(r)), (words, bare))
+        self.assertEqual((r['dot'], r['dim']), (None, True))          # not known: the S dimmed
+        down = {'kind': 'down', 'stale': False, 'line': "Switchboard isn't running"}       # Watch: refused twice
+        for state, status, words in ((None, down, "Switchboard isn't running"),
+                                     (view(accounts=[]), None, 'Switchboard: no accounts yet'),
+                                     (view(active='someone@else.example'), None, 'Switchboard: no account in use')):
+            r = menubar.reading(state, status)
+            self.assertEqual((r['label'], r['dot']), (words, 'red'))
 
 
 # ---------- the menu ----------
 
 class Menu(unittest.TestCase):
-    def test_rows_then_auto_switch_open_switchboard_and_quit(self):
+    def test_rows_then_auto_switch_add_account_and_open_switchboard(self):
         items = menubar.menu(view(), tz=TZ)
         self.assertEqual([x[1]['slot'] for x in items if x[0] == 'row'], [1, 2, 3, 4, 5])
         self.assertEqual(items[5:], [('separator',), ('auto', True, 'at 90% 5-hour \u00b7 95% weekly', True),
-                                     ('separator',), ('do', 'Open Switchboard', 'open'), ('do', 'Quit', 'quit')])
+                                     ('separator',), ('do', 'Add account', 'add'), ('do', 'Open Switchboard', 'open')])
 
     def test_auto_switch_words_and_state(self):
         s = view()
@@ -357,14 +314,13 @@ class Menu(unittest.TestCase):
         self.assertIn(('auto', False, 'at 92.5% 5-hour \u00b7 97% weekly', False), menubar.menu(s))
 
     def test_when_the_page_is_not_running(self):
-        self.assertEqual(menubar.menu(None), [('line', "Switchboard isn't running"), ('do', 'Start', 'start'),
-                                              ('separator',), ('do', 'Quit', 'quit')])
+        self.assertEqual(menubar.menu(None), [('line', "Switchboard isn't running"), ('do', 'Start', 'start')])
 
     def test_before_there_is_an_account(self):
         first = view(accounts=[acct(None, 'new@mail.example', unmanaged=True, active=True)],
                      setup={'engine': True, 'accounts': False})
         self.assertEqual(menubar.menu(first), [('line', 'Claude Code is on new@mail.example'), ('separator',),
-                                               ('do', 'Open Switchboard', 'open'), ('do', 'Quit', 'quit')])
+                                               ('do', 'Add account', 'add'), ('do', 'Open Switchboard', 'open')])
         self.assertEqual(menubar.menu(view(accounts=[]))[0], ('line', 'Add your first account'))
         self.assertEqual(menubar.menu(view(setup={'engine': False}))[0], ('line', 'Finish installing Switchboard'))
 
@@ -378,7 +334,7 @@ class Menu(unittest.TestCase):
         a, b = view(), view()
         find(b, 'ana@lab.example')['usage']['weekly']['pct'] = 66
         self.assertEqual(menubar.shape(menubar.menu(a)), menubar.shape(menubar.menu(b)))
-        find(b, 'ana@lab.example')['trusted'] = False                  # a row grows or shrinks: made again
+        find(b, 'ana@harbor.example')['trusted'] = False               # a row grows or shrinks: made again
         self.assertNotEqual(menubar.shape(menubar.menu(a)), menubar.shape(menubar.menu(b)))
         self.assertNotEqual(menubar.shape(menubar.menu(a)), menubar.shape(menubar.menu(view(accounts=view()['accounts'][:4]))))
 
@@ -387,10 +343,9 @@ class Menu(unittest.TestCase):
         find(s, 'ana@lab.example')['usage']['session'] = w(0)          # a 5-hour window, so both bar rows
         r = row_of(s, 'ana@lab.example')
         ops = menubar.row_ops(r, hover=True)
-        self.assertEqual(ops[0], ('box', 6.0, 0.0, 348.0, 88.0, 8.0, 'hover'))
+        self.assertEqual(ops[0], ('box', 6.0, 0.0, 348.0, 72.0, 8.0, 'hover'))
         self.assertEqual(ops[1], ('pair', 16.0, 8.0, 328.0, 20.0, [('ana@lab.example', 13.0, 500, 'ink')],
-                                  [[('1 min ago', 12.0, 400, 'ink2')], [('Next', 12.0, 400, 'ink2')],
-                                   [('Use', 12.0, 500, 'accent')]], 8.0))      # its own age first
+                                  [[('Next', 12.0, 400, 'ink2')]], 8.0))
         labels = [op for op in ops if op[0] == 'text' and op[6] == 'left']
         self.assertEqual([(op[1], op[2], op[3], op[4], op[5][0][0]) for op in labels],
                          [(16.0, 28.0, 48.0, 18.0, '5-hour'), (16.0, 46.0, 48.0, 18.0, 'Weekly')])
@@ -399,7 +354,7 @@ class Menu(unittest.TestCase):
         pcts = [op for op in ops if op[0] == 'text' and op[6] == 'right']
         self.assertEqual([op[1:5] for op in pcts], [(312.0, 28.0, 32.0, 18.0), (312.0, 46.0, 32.0, 18.0)])
         self.assertNotIn('hover', [op[-1] for op in menubar.row_ops(row_of(view(), 'ana@mail.example'), hover=True)])
-        self.assertEqual(menubar.row_label(r), 'Use ana@lab.example, next, checked 1 min ago, 5-hour 0%, weekly 65%')
+        self.assertEqual(menubar.row_label(r), 'Use ana@lab.example, next, 5-hour 0%, weekly 65%')
 
 
 # ---------- when to read ----------
@@ -537,7 +492,7 @@ class TheRealServer(Sandbox):
         after = menubar.get_state()
         self.assertEqual(after['active'], other)
         self.assertEqual([x[1]['marks'] for x in menubar.menu(after) if x[0] == 'row' and x[1]['email'] == other],
-                         [[('just now', 'next'), ('In use', 'in-use')]])       # the demo's readings are 40 s old
+                         [[('In use', 'in-use')]])
         self.assertTrue(menubar.post('/api/auto', {'enabled': False})[0])
         # the lines the rows show, as the page's switch line says them: no model week (Settings says that one)
         self.assertIn(('auto', False, 'at 90% 5-hour \u00b7 95% weekly', True),
@@ -647,10 +602,10 @@ class Command(Sandbox):
         return code, out.getvalue()
 
     def test_the_help_names_it(self):
-        self.assertIn('switchboard menubar [--applications]', cli.__doc__)
+        self.assertIn('switchboard menubar [on | off | --applications]', cli.__doc__)
 
     def test_words_it_does_not_know(self):
-        self.assertEqual(self.run_cli('--nope'), (2, 'switchboard menubar [--applications]\n'))
+        self.assertEqual(self.run_cli('--nope'), (2, 'switchboard menubar [on | off | --applications]\n'))
 
     def test_without_pyobjc_it_goes_to_the_menu_bars_launcher(self):
         launcher = menubar.launcher()
@@ -673,8 +628,8 @@ class Command(Sandbox):
             self.assertEqual(self.run_cli()[0], 1)
         self.assertEqual(ran, [])
 
-    def test_under_its_job_without_pyobjc_it_exits_0_so_launchd_leaves_it_down(self):
-        # the job comes back only after a failure (KeepAlive SuccessfulExit false), every 20 s: 1 would loop for good
+    def test_without_a_terminal_and_without_pyobjc_it_exits_0(self):
+        # under its job it first waits (test_menubar_off_on.WhenItCannotRun): launchd starts it again on any exit
         with mock.patch.object(menubar, 'appkit_here', lambda: False), mock.patch.object(menubar, 'terminal', lambda: False):
             self.assertEqual(self.run_cli(), (0, menubar.NOT_HERE + '\n'))
 
@@ -850,7 +805,7 @@ class Doctor(Sandbox):
             got = self.lines()
         self.assertEqual([g[:2] for g in got], [
             (True, 'Menu bar on Python 3.12.13, PyObjC 13.0 (%s)' % menubar.launcher()),
-            (None, 'Menu bar job (starts it at login)'), (None, 'Menu bar running'),
+            (None, 'Menu bar job (starts it at login)'), (None, 'Menu bar item: installed, not running'),
             (None, 'Menu bar app: not made yet')])
         self.assertEqual(got[3][2], 'Put it in Applications with: switchboard menubar --applications')
         self.assertFalse([c for c in ran if c and c[0] == 'launchctl'])        # no job added: launchd is not asked
@@ -878,7 +833,7 @@ class Doctor(Sandbox):
         menubar_wrap.make(self.apps, executable=exe, prefix=os.path.join(self.tmp, 'env'))   # where the installer puts it
         child = hold(self)
         got = self.lines()
-        self.assertEqual(got[2][:2], (True, 'Menu bar running (pid %d)' % child.pid))
+        self.assertEqual(got[2][:2], (True, 'Menu bar item: on (pid %d)' % child.pid))
         self.assertEqual(got[3][:2], (True, 'Menu bar app (%s)' % os.path.join(self.apps, 'Switchboard.app')))
         child.stdin.close()
 

@@ -88,7 +88,7 @@ def kept_said(r):
     give_up = 'To give this copy up for good: switchboard leftovers clear %s --only-copy.' % i
     if r['need'] == 'only_login':
         return 'Kept %s: it is %s. %s' % (i, what_to_do(r)[len('needed: '):], (
-            'To free it, sign in to %s again: in Claude Code, run /login as it.' % r['needed_by'] if r['needed_by']
+            'To free it, sign in to %s again: switchboard add %s' % (r['needed_by'], r['needed_by']) if r['needed_by']
             else 'Run switchboard doctor.'))
     if r['need'] == 'only_copy':
         if r.get('unsure'):
@@ -97,10 +97,10 @@ def kept_said(r):
         if r.get('token'):
             return 'Kept %s: it is %s. %s' % (i, _only_copy(r), give_up)
         if r['needed_by']:
-            return ('Kept %s: it is %s. To free it, sign in to %s again: in Claude Code, run /login as it, then run '
-                    'switchboard add. %s' % (i, _only_copy(r), r['needed_by'], give_up))
+            return ('Kept %s: it is %s. To free it, sign in to %s again: switchboard add %s. %s'
+                    % (i, _only_copy(r), r['needed_by'], r['needed_by'], give_up))
         return ('Kept %s: it is the only copy of a login that was in use, and its account is not known. To keep that '
-                'account, sign in to it with /login in Claude Code, then run switchboard add. %s' % (i, give_up))
+                'account, add it with switchboard add. %s' % (i, give_up))
     if r['need'] == 'switch':
         return ('Kept %s: a switch that was cut off may still put it back in Claude Code. It is free once Switchboard '
                 'settles that switch, at its next start or switch.' % i)

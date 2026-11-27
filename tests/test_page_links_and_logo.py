@@ -24,7 +24,7 @@ ROOT = os.path.abspath(os.path.join(HERE, '..'))
 sys.path.insert(0, ROOT)
 
 from switchboard import __main__ as cli
-from switchboard import core, demo, keep, linkapp, server, term
+from switchboard import core, demo, firstrun, keep, linkapp, server, term
 from test_app import CHROME, ChromePage
 import test_keep  # its sandbox: a throwaway home, the account engine's fake, the command line
 
@@ -609,40 +609,59 @@ class LinksCommand(test_keep.Sandbox):
         self.assertNotIn('| `--link-app` |', ref)                            # the default now: nothing to ask for
 
 
-class FirstRunAsksOnce(test_keep.Sandbox):
-    """At a terminal the first run asks macOS once to make the link app the default browser (macOS asks the person)."""
+class FirstRunAsksAfterEnter(test_keep.Sandbox):
+    """At a terminal the first run says what the link app does, then asks macOS only after Enter, and never twice."""
 
     def setUp(self):
         super().setUp()
         stand_in_link_app(self)
+        self.asked = []
 
-    def test_the_first_run_asks_and_says_so_before_its_last_line(self):
+        class Answered(object):             # the link app's --make-default, once macOS has its yes
+            returncode = 0
+
+            def poll(self):
+                return 0
+
+        def make_default():
+            self.asked.append(True)
+            self.state.update(on=True)
+            return Answered()
+        p = mock.patch.object(firstrun, 'make_default', make_default)
+        p.start()
+        self.addCleanup(p.stop)
+
+    def test_explained_first_asked_after_enter_then_left_out(self):
         self.job()
         self.signed_in(test_keep.A)
-        code, out = self.run_cli('setup', tty=test_keep.FakeTty([]))
+        code, out = self.run_cli('setup', tty=test_keep.FakeTty(['']))     # the page is not running here: step 2 asks nothing
         self.assertEqual(code, 0)
-        lines = out.splitlines()
-        self.assertEqual(lines[-2], term.LINKS_FIRST_RUN)
-        self.assertTrue(lines[-1].startswith('Sign in to your other accounts'), lines)
-        self.assertEqual(self.turned, [True])
+        flat = ' '.join(out.split())
+        self.assertLess(flat.index('choose "Use Switchboard Links"'), flat.index("Turn this on? Enter shows macOS's"))
+        self.assertIn('Every other link opens in Google Chrome exactly as it does now.', flat)
+        self.assertIn('Done. claude.ai links open as their owner. Everything else still opens in Google Chrome.', flat)
+        self.assertEqual(self.asked, [True])
+        self.assertEqual(self.turned, [])                                    # never through keep.links_by_itself
         self.assertTrue(core.settings().get('links_by_itself'))
-        code, out = self.run_cli('setup', tty=test_keep.FakeTty([]))         # once: never again by itself
-        self.assertNotIn(term.LINKS_FIRST_RUN, out)
-        self.assertEqual(self.turned, [True])
+        code, out = self.run_cli('setup', tty=test_keep.FakeTty(['s']))     # on now: the step is left out
+        self.assertNotIn('Links that open in the right account', out)
+        self.assertEqual(self.asked, [True])
 
     def test_never_without_a_terminal_and_never_over_a_choice(self):
         self.job()
         self.signed_in(test_keep.A)
         code, out = self.run_cli('setup')                                    # no terminal: nothing is asked
-        self.assertNotIn(term.LINKS_FIRST_RUN, out)
+        self.assertNotIn('macOS', out)
         core.set_setting(server.LINKS_WANTED, False)                         # turned off on purpose
+        code, out = self.run_cli('setup', tty=test_keep.FakeTty(['s']))
+        self.assertNotIn('Links that open in the right account', out)
         self.assertFalse(keep.links_by_itself())
         core.set_setting(server.LINKS_WANTED, None)
         self.state.update(on=True)                                           # the default already
         self.assertFalse(keep.links_by_itself())
         self.state.update(on=False, installed=False)                         # no link app
         self.assertFalse(keep.links_by_itself())
-        self.assertEqual(self.turned, [])
+        self.assertEqual((self.turned, self.asked), ([], []))
 
 
 class NewInstalls(unittest.TestCase):
@@ -775,7 +794,7 @@ class TheLogo(unittest.TestCase):
 
 class TheMenuBarsApp(unittest.TestCase):
     """Switchboard.app (the menu bar's app in Applications) carries the mark too. The menu bar item itself draws the
-    account's two bars, a template image in one colour: no logo there, so nothing to change."""
+    mark's S as shapes (menubar.item_ops), a template image in one colour."""
 
     def test_its_icon_is_the_mark(self):
         from switchboard import menubar_wrap
@@ -797,7 +816,7 @@ class TheMenuBarsApp(unittest.TestCase):
                 open(os.path.join(ROOT, 'router', 'SwitchboardLinks.icns'), 'rb') as b:
             self.assertEqual(a.read(), b.read())
         menu = read('switchboard', 'menubar.py')
-        self.assertIn('image.setTemplate_(not red)', menu)                    # the item: bars, one colour
+        self.assertIn('image.setTemplate_(not dot)', menu)                    # the item: the S, one colour
 
 
 LOCKUP = r"""

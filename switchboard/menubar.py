@@ -1,34 +1,29 @@
-"""The menu bar: two small bars for the account Claude Code is on, and a menu with every account.
+"""The menu bar: Switchboard's S next to the clock, and a menu with every account.
 
 `switchboard menubar` runs it, on the menu bar's Python (3.12 to 3.14, ~/.switchboard/runtime/env), where the
 installer puts PyObjC (menubar-requirements.txt). It has one brain, the page's: it reads the running page's GET /api/state, the same
 numbers the page and the terminal show, Next included, and changes accounts and settings only through the page's own
 POSTs (/api/switch, /api/auto, /api/signins), sent the way `switchboard` sends them. It runs no switching loop and asks
-Anthropic nothing. Two things it does by itself (watch.py): when the page has refused every connection for minutes and
-was not stopped on purpose, it starts the page's background job again through launchd; and Quit leaves a mark so that
-neither launchd nor the page starts it again.
+Anthropic nothing. One thing it does by itself (watch.py): when the page has refused every connection for minutes and
+was not stopped on purpose, it starts the page's background job again through launchd.
 
-The item: two 18 x 4 pt bars, 2 pt apart, 5-hour over weekly, for the account in use, with no
-words; with no 5-hour number to show (an account with no 5-hour limit, Ultra, or a reading not known) its weekly bar
-alone, in the middle. A template image, so macOS tints it for a light or dark menu bar; when a bar is at or over its
-switch line, a colour image of the same shape with that bar's fill in the system red. A weekly limit not known is a
-bare track; with no account in use, or no page, there are two bare tracks.
+The item: the S of Switchboard's mark (docs/logo.svg; router/icon.swift draws the same), 16 x 16 pt, as a template
+image, so macOS tints it for a light or dark menu bar. Nothing else is on it: no bars, no number, no words. A small dot
+at its top right, in a colour image of the same shape, only when the person should look: orange while the account in
+use is at or over a switch line; red when something needs them (the page is not running, a sign-in has ended, no
+account has room, no account in use, no account yet). Numbers that are not current draw the S dimmed, never coloured.
 
-The menu: a row per account in slot order (its email; how long ago it was checked, "just now", "3 min ago", or Now for
-the account in use while its numbers are Claude Code's own from the last minute; when its sign-in ends, a week ahead,
-or ended, "Sign-in ends" or "ended" and a day; In use, Next and Use, or Sign in again; its 5-hour and weekly limits with
-their %, no 5-hour one for an account that has none; the grey reset line; a model's week at the right), with "Sign in
-again as …" under a row whose sign-in is about to end, and "Sign in to all" once under the rows (the page's queue),
-then a line for each other assistant added (the page's board), then Auto-switch, with a line under it only when
-something is off ("Auto-switch last decided 14 minutes ago.", a page that keeps restarting), Open Switchboard and Quit.
-While another program holds the page's port, a line at the top says which port and what to do. While the page is not
-running: one line, "Switchboard isn't running", and Start.
+The menu: a row per account in slot order (its whole email; In use, Next or Use, or Sign in again; when its sign-in
+ends, a week ahead, or ended, its short words; its 5-hour and weekly limits with their %, no 5-hour one for an account
+that has none), with "Sign in again as …" under a row whose sign-in is about to end, and "Sign in to all" once under the
+rows (the page's queue), then a line for each other assistant added (the page's board), then Auto-switch, with a line
+under it only when something is off ("Auto-switch last decided 14 minutes ago.", a page that keeps restarting), Add
+account (the page, at its Add form) and Open Switchboard. When it was checked, the reset times and a model's own week
+are the page's. While another program holds the page's port, a line at the top says which port and what to do. While
+the page is not running: one line, "Switchboard isn't running", and Start. No menu has Quit: the item is turned off in
+the terminal, `switchboard menubar off` (menubar_keep.py), and anything else that stops it is started again.
 
 It reads the state every 15 s while the menu is closed and every 2 s while it is open, never more often.
-
-A row has at most two bar rows, as the page: 5-hour only when there is a 5-hour number to show, weekly always. A
-model's own week has no row; the one auto-switch counts, when it is at or over its line, is said in red at the right
-of the reset line ("Fable 97%"), and nothing else is. The Auto-switch item names only the lines the rows show.
 
 Everything above the AppKit part is plain Python that imports on 3.9 with no PyObjC: the page, the terminal and
 the tests never need PyObjC. The drawing is worked out here too, as lists of shapes and words in points (item_ops,
@@ -48,8 +43,7 @@ import traceback
 import urllib.error
 import urllib.request
 
-from . import core, spend, term
-from .core import parse_iso
+from . import core, menubar_keep, spend, term
 
 AGENT = 'io.github.amyjainberkeley.switchboard.menubar'     # the menu bar's LaunchAgent (the installer adds it)
 PAGE_AGENT = 'io.github.amyjainberkeley.switchboard'         # the page's
@@ -58,6 +52,7 @@ EVERY_OPEN = 2.0        # and while it is open; never more often than this
 STARTING = 20.0         # after Start, the page is looked for this long at the open pace
 NOTE_FOR = 60.0         # a failed click's line stays at the top of the menu this long
 LOCK_WAIT = 2.0         # a menu bar starting waits this long for the lock (doctor's look holds it for an instant)
+FOREVER = 365 * 86400.0     # and one under its job this long: it waits for the lock another one holds
 MODEL_LINE = term.MODEL_LINE        # a model's own week (Fable) is red from 90%
 DEFAULT_LINE = 90.0                 # the 5-hour switch line when the state names none
 DEFAULT_WEEKLY = 95.0               # the weekly one
@@ -66,17 +61,17 @@ UNREADABLE = "the page's answer could not be read"     # cut off, or another pro
 NOT_HERE = 'The menu bar is not set up here. Add it with: switchboard update --menu-app'
 HOPPED = 'SWITCHBOARD_MENUBAR_HOPPED'   # set before handing over to the menu bar's launcher, so it never loops
 
-# The item, in points: two bars, 5-hour on top, fully round, the track at 30% of the ink.
-BAR_W, BAR_H, GAP = 18.0, 4.0, 2.0
-IMAGE_W, IMAGE_H = BAR_W, 2 * BAR_H + GAP           # 18 x 10
-ITEM_W = BAR_W + 2 * 8                              # 34: 8 on each side, the image centred
-TRACK = 0.3
+# The item, in points: the mark's S on its 24-unit grid (docs/logo.svg), the part from 3 to 21 of it drawn 16 pt wide,
+# in an item 28 pt wide.
+MARK_VIEW = (3.0, 21.0)
+IMAGE_W = IMAGE_H = 16.0
+ITEM_W = 28.0
+DOT_R, DOT_CLEAR = 3.0, 3.9         # a state's dot, and the gap cut round it, in grid units (the S's own end: 2.3)
 
 # A row in the menu's panel, in points: 360 wide; the hover fill inset 6 from the sides with
 # radius 8; content 16 in. From the top: 8, the email line 20, the 5-hour bar row 18 (none with no 5-hour number to
-# show), the weekly bar row 18, the reset line 16, 8. A bar row: label 48, 8, the bar (4 high, the rest of the
-# width), 8, the % in 32.
-ROW_W, ROW_H = 360.0, 88.0
+# show), the weekly bar row 18, 8. A bar row: label 48, 8, the bar (4 high, the rest of the width), 8, the % in 32.
+ROW_W, ROW_H = 360.0, 72.0
 INSET, PAD, HOVER_R = 6.0, 16.0, 8.0
 LABEL_W, PCT_W, SPACE = 48.0, 32.0, 8.0
 ROW_BAR_H, BAR_ROW = 4.0, 18.0
@@ -147,30 +142,6 @@ def pct_text(lim):
     return '—' if lim['unknown'] else '%d%%' % lim['pct']
 
 
-def reset_line(lim, now, tz=None):
-    """'Not started', 'Started' or 'Resets Sat 12:00 PM · in 20 hours'; '' when the reading is not known."""
-    if lim['unknown']:
-        return ''
-    if not lim['started']:
-        return 'Not started'
-    t = parse_iso(lim['resets'])
-    if t is None:
-        return 'Started'
-    if t <= now:
-        return 'Not started'
-    return 'Resets %s%s%s' % (term.clock(t, now, tz), term.SEP, term.until(t, now))
-
-
-def foot(five, week, now, tz=None):
-    """The reset line under a row's bars: while a 5-hour window runs (used, its reset known), both resets,
-    '5-hour resets 6:10 PM · weekly Sat 12:00 PM'; otherwise the weekly reset line."""
-    t5, tw = parse_iso((five or {}).get('resets')), parse_iso(week['resets'])
-    if five and not five['unknown'] and five['used'] > 0 and t5 is not None and t5 > now:
-        weekly = '%sweekly %s' % (term.SEP, term.clock(tw, now, tz)) if tw is not None and tw > now else ''
-        return '5-hour resets %s%s' % (term.clock(t5, now, tz), weekly)
-    return reset_line(week, now, tz)
-
-
 def needs_setup(state):
     """Nothing to show yet: no accounts, no engine, or no account Switchboard holds (the page's first run)."""
     s = state.get('setup') or {}
@@ -197,31 +168,25 @@ def by_slot(state):
 
 
 def rows(state, tz=None):
-    """Every account as a menu row, in slot order: {slot, email, in_use, live, age, next, action ('use', 'signin' or
-    None), marks [(words, style)], five, week, models, foot, signin, again}. live: the account in use is on Claude
-    Code's own numbers from the last minute (the page's "now", server.live_now). age: how long ago it was checked
-    ('just now', '3 min ago': term.age of term.checked_at), shown first among its marks, or Now while live. signin:
-    when its sign-in ends or ended, in the page's words (term.signin_words), its short words a mark after the age
-    ('Sign-in ends' or 'ended', and a day). An account's rule in auto-switch is no mark here: the row would cut its
-    email short to make room, and an email is always shown whole. again: signing in again is offered beside the row's
-    own action, as on the page: a sign-in that ends within the week (it still works), and the account in use's
-    whenever it has words: it signs in again from the page like any other. pace: 'At this pace, full by Sat 4:23 PM'
-    when the weekly limit would be full before it refills (term.pace_words), drawn at the right of the reset line,
-    which then leaves out how far off its reset is; else ''."""
+    """Every account as a menu row, in slot order: {slot, email, in_use, next, action ('use', 'signin' or None),
+    marks [(words, style)], five, week, spend, signin, again}. A row shows only what a person acts on: its whole email,
+    one word (In use, Next, Use, or Sign in again), and its bars with their %. signin: when its sign-in ends or ended,
+    in the page's words (term.signin_words), its short words a mark before that word ('Sign-in ends by Sun', 'ended by
+    today'). An account's rule in auto-switch is no mark here: the row would cut its email short to make room, and an
+    email is always shown whole. again: signing in again is offered under the row, as on the page: a sign-in that ends
+    within the week (it still works), and the account in use's whenever it has words: it signs in again from the page
+    like any other. When it was checked, its reset times, its pace and a model's own week are the page's."""
     now, auto, nx = _now(state), state.get('auto') or {}, next_email(state)
     out = []
     for a in by_slot(state):
         email = a.get('email') or ''
-        five, week, models = split(limits(a, auto))
+        five, week, _ = split(limits(a, auto))
         cost = spend_row(a, five)
         five = None if cost else five       # two bar rows at most: the spend limit stands in for the 5-hour one
         on = email == state.get('active')
-        live = on and a.get('live') is True
-        age = term.age(term.checked_at(a), now)
-        when = [('Now', 'next')] if live else [(age, 'next')] if age else []
         ends, need = a.get('signin_ends_at'), bool(a.get('needs_login'))
         signin = '' if a.get('unmanaged') else term.signin_words(ends, now, need, tz)
-        when += [(term.signin_words(ends, now, need, tz, short=True), 'next')] if signin else []
+        when = [(term.signin_words(ends, now, need, tz, short=True), 'next')] if signin else []
         if on:
             marks, action = when + [('In use', 'in-use')], None
         elif a.get('unmanaged'):
@@ -229,34 +194,22 @@ def rows(state, tz=None):
         elif need:
             marks, action = when + [('Sign in again', 'use')], 'signin'
         else:
-            marks, action = when + ([('Next', 'next')] if email == nx else []) + [('Use', 'use')], 'use'
-        out.append({'slot': a.get('slot'), 'email': email, 'in_use': on, 'live': live, 'age': age,
-                    'next': email == nx and not on, 'action': action, 'marks': marks, 'five': five, 'week': week,
-                    'models': models, 'foot': foot(five, week, now, tz), 'signin': signin,
-                    'again': bool(signin) and (on or not need), 'pace': pace_words(a, now, tz),
-                    'spend': cost})
-        if out[-1]['pace'] and out[-1]['foot'].startswith('Resets '):     # room for the pace words: no "in 3 days"
-            out[-1]['foot'] = out[-1]['foot'].split(term.SEP)[0]
+            marks, action = when + [('Next', 'next') if email == nx else ('Use', 'use')], 'use'
+        out.append({'slot': a.get('slot'), 'email': email, 'in_use': on, 'next': email == nx and not on,
+                    'action': action, 'marks': marks, 'five': five, 'week': week, 'spend': cost, 'signin': signin,
+                    'again': bool(signin) and (on or not need)})
     return out
 
 
 def spend_row(a, five):
     """The spend limit as a bar row under the weekly one (spend.shown: it has a number, and more of it is used than of
-    the 5-hour limit), with its amounts ('$412 of $1,000') for the right of the reset line; None otherwise. It has no
-    switch line: never red, no mark."""
+    the 5-hour limit); None otherwise. It has no switch line: never red, no mark. Its amounts are the page's."""
     u = a.get('usage') if a.get('trusted') is not False and isinstance(a.get('usage'), dict) else None
     s = spend.shown(u, five['used'] if five and not five['unknown'] else None) if u else None
     if s is None:
         return None
     return dict(_limit('spend', 'Spend', {'used': s['pct'], 'started': True, 'resets': s['resets']}, 101.0),
-                line=None, amounts=spend.amounts(s))
-
-
-def pace_words(a, now, tz=None):
-    """'At this pace, full by Sat 4:23 PM' (term.pace_words, the one rule, with its capital: it starts its own words
-    at the right of the reset line); '' when the week lasts or too little is known."""
-    words = term.pace_words(a, now, tz)
-    return words[:1].upper() + words[1:]
+                line=None)
 
 
 def number(v):
@@ -281,22 +234,34 @@ def first_line(state):
     return 'Claude Code is on %s' % cur['email'] if cur and cur.get('email') else 'Add your first account'
 
 
+FIRST_MENU = [('do', 'Open Switchboard', 'open')]      # the menu for the moment before the first reading
+ADD = ('do', 'Add account', 'add')
+OPEN = ('do', 'Open Switchboard', 'open')
+
+
+def add_url():
+    """Add account: the page, at its Add form, which asks for the email and starts the browser sign-in (a menu can't
+    ask for words, and the menu bar opens no window of its own). A page from before that address opens at its
+    accounts, where the Add button is."""
+    return 'http://127.0.0.1:%d/#accounts/add' % core.port()
+
+
 def menu(state, note=None, tz=None, status=None):
     """The menu, top to bottom: ('note', words), ('line', words), ('row', row), ('separator',),
     ('auto', on, words, can), ('do', title, what). state None: the page is not running. status: Watch.status(), when
     the page has not answered lately: its line goes first; rows drawn from an old state are grey; Start when it is not
-    running."""
+    running. No menu has Quit: the item is turned off with `switchboard menubar off`, a deliberate act."""
     out = [('note', note)] if note else []
     if state is None:
         if status and status.get('kind') == 'busy':
-            return out + [('line', status['line']), ('separator',), ('do', 'Quit', 'quit')]
-        return out + [('line', NOT_RUNNING), ('do', 'Start', 'start'), ('separator',), ('do', 'Quit', 'quit')]
+            return out + [('line', status['line']), ('separator',), OPEN]
+        return out + [('line', NOT_RUNNING), ('do', 'Start', 'start')]
     if status:
         out.append(('line', status['line']))
     start = [('do', 'Start', 'start')] if status and status.get('kind') == 'down' else []
+    add = [ADD] if (state.get('setup') or {}).get('engine') else []       # no engine: nothing can be added yet
     if needs_setup(state):
-        return out + start + [('line', first_line(state)), ('separator',), ('do', 'Open Switchboard', 'open'),
-                              ('do', 'Quit', 'quit')]
+        return out + start + [('line', first_line(state)), ('separator',)] + add + [OPEN]
     auto = state.get('auto') or {}
     can = auto.get('available', True) is not False         # no engine: Auto-switch can't be changed
     grey = bool(status and status.get('stale'))
@@ -310,8 +275,7 @@ def menu(state, note=None, tz=None, status=None):
     out += provider_items(state.get('providers'), _now(state))
     said = auto_note(auto)
     return out + [('separator',), ('auto', bool(auto.get('enabled')), switch_words(state), can)] + \
-        ([('line', said)] if said else []) + watch_lines(auto) + \
-        [('separator',), ('do', 'Open Switchboard', 'open'), ('do', 'Quit', 'quit')]
+        ([('line', said)] if said else []) + watch_lines(auto) + [('separator',)] + add + [OPEN]
 
 
 def signin_items(state, rs):
@@ -471,27 +435,89 @@ def shape(items):
 
 # ---------- the item ----------
 
+def ended_signins(state):
+    """The accounts Switchboard holds whose sign-in has ended: the page's own list (signins.due, the state's
+    `signins.ended`), and any that needs a fresh sign-in for another reason."""
+    q = state.get('signins') or {}
+    out = [e for e in q.get('ended') or [] if isinstance(e, str)] if isinstance(q.get('ended'), list) else []
+    return out + [a.get('email') for a in state.get('accounts') or []
+                  if a.get('needs_login') and not a.get('unmanaged') and a.get('email') not in out]
+
+
+def no_room(state):
+    """Every account Switchboard holds is at or over a switch line, or needs a sign-in (the page's allOut): auto-switch
+    has nowhere to go. A model's own week does not count, as on the page."""
+    auto = state.get('auto') or {}
+    held = [a for a in state.get('accounts') or [] if not a.get('unmanaged')]
+    return bool(held) and all(a.get('needs_login') or any(lim['over'] for lim in limits(a, auto)
+                                                          if lim['kind'] != 'model') for a in held)
+
+
 def reading(state, status=None):
-    """What the item shows: {email, five, week, red, label, stale}. five and week are None for two bare tracks; five
-    alone is None with no 5-hour number to show (its weekly bar alone). status (Watch.status): numbers that are
-    not current are drawn grey, never red, and the label says so."""
-    if state is None:
-        words = status['line'] if status and status.get('kind') == 'busy' else NOT_RUNNING
-        return {'email': None, 'five': None, 'week': None, 'red': False, 'label': words, 'stale': False}
-    a = None if needs_setup(state) else \
-        next((x for x in state.get('accounts') or [] if x.get('email') and x.get('email') == state.get('active')), None)
+    """What the item shows: {email, dot, dim, label}. dot: None; 'orange' while the account in use is at or over a
+    switch line; 'red' when something needs the person (the page is not running, a sign-in has ended, no account has
+    room, no account in use, no account yet). dim: the numbers are not current (no reading yet, the page is busy or
+    answers with old ones, or the reading of the account in use is not known): the S is drawn dimmed and never coloured, as numbers
+    that may be wrong never turn anything red. label: what VoiceOver and the tooltip say."""
+    down = bool(status and status.get('kind') == 'down')
+    if state is None:                   # red only once the watch says down (DOWN_AFTER refusals): not at a login's start
+        busy = bool(status and status.get('kind') == 'busy')
+        return {'email': None, 'dot': 'red' if down else None, 'dim': not down,
+                'label': status['line'] if busy else NOT_RUNNING}
+    if needs_setup(state):
+        return {'email': None, 'dot': 'red', 'dim': False, 'label': 'Switchboard: no accounts yet'}
+    a = next((x for x in state.get('accounts') or [] if x.get('email') and x.get('email') == state.get('active')), None)
     if a is None:
-        words = 'Switchboard: no accounts yet' if needs_setup(state) else 'Switchboard: no account in use'
-        return {'email': None, 'five': None, 'week': None, 'red': False, 'label': words, 'stale': False}
+        return {'email': None, 'dot': 'red', 'dim': False, 'label': 'Switchboard: no account in use'}
     five, week, _ = split(limits(a, state.get('auto') or {}))
-    said = ('5-hour %s, ' % pct_text(five) if five else '') + 'weekly %s' % pct_text(week)
+    said = 'Switchboard: %s, ' % a['email'] + ('5-hour %s, ' % pct_text(five) if five else '') + \
+        'weekly %s' % pct_text(week)
     stale = bool(status and status.get('stale'))
-    return {'email': a['email'], 'five': five, 'week': week,
-            'red': not stale and (bool(five and five['over']) or week['over']), 'stale': stale,
-            'label': 'Switchboard: %s, %s%s' % (a['email'], said, (' · %s' % status['line']) if stale else '')}
+    if down or stale:
+        return {'email': a['email'], 'dot': 'red' if down else None, 'dim': not down,
+                'label': '%s \u00b7 %s' % (said, status['line'])}
+    why = ['a sign-in has ended'] if ended_signins(state) else []
+    why += ['no account has room'] if no_room(state) else []
+    over = bool(five and five['over']) or week['over']
+    dot = 'red' if why else 'orange' if over else None
+    why = why or (['at its switch line'] if over else [])
+    return {'email': a['email'], 'dot': dot, 'dim': week['unknown'] and not dot,
+            'label': ', '.join([said] + why)}
 
 
-def fill_width(used, width=BAR_W, height=BAR_H):
+def _grid(v):
+    """A length or a coordinate on the mark's 24-unit grid, in the item image's points."""
+    return (v - MARK_VIEW[0]) * IMAGE_W / (MARK_VIEW[1] - MARK_VIEW[0])
+
+
+def _size(v):
+    return v * IMAGE_W / (MARK_VIEW[1] - MARK_VIEW[0])
+
+
+def item_ops(r):
+    """The item's image, IMAGE_W x IMAGE_H pt, top-left origin, as the shapes of the mark's S (docs/logo.svg):
+      ('stroke', [('M', x, y), ('L', x, y), ('A', cx, cy, radius, from, to, decreasing)], width, colour)
+          a path stroked with round ends; an arc's angles in degrees, y down (90 is straight down), drawn from its
+          start angle to its end one, the angle decreasing or increasing (AppKit's clockwise in a flipped image)
+      ('dot', cx, cy, radius, colour)
+      ('clear', cx, cy, radius)       nothing drawn there: the gap that keeps a state's dot clear of the S
+    The S runs from its top-right end along the top, round the left, along the middle, round the right and along the
+    bottom, each end a round dot. A state's dot takes the place of the top-right one, bigger, in its colour. Colours:
+    'ink' (the menu bar's own, in the template image), 'ink50' (dimmed), 'orange' and 'red' (the system's)."""
+    ink = 'ink50' if r.get('dim') else 'ink'
+    path = [('M', _grid(16.3), _grid(7.0)), ('L', _grid(10.05), _grid(7.0)),
+            ('A', _grid(10.05), _grid(9.5), _size(2.5), 270.0, 90.0, True),
+            ('L', _grid(14.3), _grid(12.0)),
+            ('A', _grid(14.3), _grid(14.5), _size(2.5), 270.0, 450.0, False),
+            ('L', _grid(7.55), _grid(17.0))]
+    ops = [('stroke', path, _size(2.2), ink), ('dot', _grid(7.55), _grid(17.0), _size(2.2), ink)]
+    if r.get('dot'):
+        return ops + [('clear', _grid(16.3), _grid(7.0), _size(DOT_CLEAR)),
+                      ('dot', _grid(16.3), _grid(7.0), _size(DOT_R), r['dot'])]
+    return ops + [('dot', _grid(16.3), _grid(7.0), _size(2.3), ink)]
+
+
+def fill_width(used, width, height):
     """How much of a bar is filled, in points: used % of it, capped at all of it, and at least its height (one
     round end) when anything is used; none at 0 or when not known."""
     if not _num(used) or used <= 0:
@@ -499,28 +525,11 @@ def fill_width(used, width=BAR_W, height=BAR_H):
     return max(height, min(float(used), 100.0) / 100.0 * width)
 
 
-def item_ops(r):
-    """The item's image, 18 x 10 pt, top-left origin: ('box', x, y, w, h, radius, colour) for each track and fill.
-    Colours: 'ink30' the track, 'ink' a fill, 'sysred' a fill at or over its line (only in the colour image). An
-    account with no 5-hour number to show has its weekly bar alone, in the middle."""
-    ops = []
-    one = r['five'] is None and r['week'] is not None
-    for lim, y in [(r['week'], (IMAGE_H - BAR_H) / 2)] if one else [(r['five'], 0.0), (r['week'], BAR_H + GAP)]:
-        ops.append(('box', 0.0, y, BAR_W, BAR_H, BAR_H / 2, 'ink30'))
-        f = fill_width(lim['used']) if lim else 0.0
-        if f:
-            ops.append(('box', 0.0, y, f, BAR_H, BAR_H / 2, 'ink50' if r.get('stale') else
-                        'sysred' if r['red'] and lim['over'] else 'ink'))
-    return ops
-
-
 # ---------- a row's drawing, in points, top-left origin ----------
 
 def row_height(row):
-    """88 pt; 72 when there is no reset line and no note (a reading not known), as on the page; a bar row less with
-    no 5-hour number to show."""
-    return (ROW_H if row['foot'] or row['models'] else ROW_H - 16.0) - (0.0 if row['five'] or row.get('spend')
-                                                                        else BAR_ROW)
+    """72 pt: the email line and two bar rows; a bar row less with no 5-hour number to show."""
+    return ROW_H - (0.0 if row['five'] or row.get('spend') else BAR_ROW)
 
 
 def row_ops(row, hover=False, width=ROW_W):
@@ -553,31 +562,18 @@ def row_ops(row, hover=False, width=ROW_W):
         ops.append(('text', width - PAD - PCT_W, y, PCT_W, 18.0,
                     [(pct_text(lim), 12.0, 400 if lim['unknown'] or stale else 500,
                       'ink3' if lim['unknown'] or stale else 'red' if lim['over'] else 'ink')], 'right'))
-    models = []
-    for i, m in enumerate(row['models']):
-        models += [((term.SEP if i else '') + m['label'] + ' ', 11.0, 400, 'ink2'),
-                   (pct_text(m), 11.0, 400, 'red' if m['over'] else 'ink2')]
-    said = [[(row['pace'], 11.0, 400, 'ink2')]] if row.get('pace') else []     # at this pace, full before it refills
-    if row.get('spend') and row['spend']['amounts']:
-        said.append([(row['spend']['amounts'], 11.0, 400, 'ink2')])
-    if row['foot'] or models or said:
-        ops.append(('pair', PAD, 28.0 + BAR_ROW * len(bars), width - 2 * PAD, 16.0, [(row['foot'], 11.0, 400, 'ink2')],
-                    said + ([models] if models else []), SPACE))
     return ops
 
 
 def row_label(row):
-    """What VoiceOver says for a row: 'Use maya@northwind.example, checked 3 min ago, …', 'maya@… in use now, 5-hour
-    62%, weekly 70%' (no 5-hour part with no 5-hour number to show)."""
+    """What VoiceOver says for a row: 'Use maya@northwind.example, next, 5-hour 62%, weekly 70%', 'maya@… in use,
+    weekly 70%' (no 5-hour part with no 5-hour number to show): what the row shows."""
     head = {'use': 'Use %s', 'signin': 'Sign in again as %s'}.get(row['action'], '%s') % row['email']
-    state = (', in use now' if row.get('live') else ', in use') if row['in_use'] else ', next' if row['next'] else ''
-    when = ', checked %s' % row['age'] if row.get('age') and not row.get('live') else ''
+    state = ', in use' if row['in_use'] else ', next' if row['next'] else ''
     signin = ', %s' % row['signin'] if row.get('signin') else ''
     five = '5-hour %s, ' % pct_text(row['five']) if row['five'] else ''
-    said = ', ' + row['pace'][:1].lower() + row['pace'][1:] if row.get('pace') else ''
-    cost = ', spend %s' % pct_text(row['spend']) + (', %s' % row['spend']['amounts'] if row['spend']['amounts'] else '') \
-        if row.get('spend') else ''
-    return '%s%s%s%s, %sweekly %s%s%s' % (head, state, when, signin, five, pct_text(row['week']), cost, said)
+    cost = ', spend %s' % pct_text(row['spend']) if row.get('spend') else ''
+    return '%s%s%s, %sweekly %s%s' % (head, state, signin, five, pct_text(row['week']), cost)
 
 
 # ---------- when to read ----------
@@ -792,9 +788,12 @@ _HELD = []
 def take_lock(wait=None):
     """Hold the menu bar's lock for as long as this process runs. False when another menu bar holds it. A look from
     running_pid() (doctor) holds it shared for an instant, so a menu bar starting then tries again for LOCK_WAIT
-    seconds before it steps back: under its job, stepping back means no menu bar until the next login."""
+    seconds before it steps back. wait FOREVER: it waits, asleep, until the lock is free (a menu bar under its job)."""
     os.makedirs(folder(), mode=0o700, exist_ok=True)
     f = open(lock_path(), 'a')
+    if wait is not None and wait >= FOREVER:
+        fcntl.flock(f, fcntl.LOCK_EX)           # sleeps in the kernel until the one that holds it ends
+        wait = 0.0
     give_up = time.time() + (LOCK_WAIT if wait is None else wait)
     while True:
         try:
@@ -894,7 +893,7 @@ def macos_major():
 
 # ---------- `switchboard menubar` ----------
 
-USAGE = 'switchboard menubar [--applications]'
+USAGE = 'switchboard menubar [on | off | --applications]'
 
 
 def terminal():
@@ -904,11 +903,15 @@ def terminal():
         return False
 
 
-def main(args):
+def main(args, update=None):
     """`switchboard menubar`: run the menu bar (its LaunchAgent does this at login). In a terminal, with that job
-    added, the job is started instead, so the item outlives the terminal. `--applications` puts its app in
-    Applications, as the installer does, where Spotlight finds it and menu bar managers can keep it in view.
-    `--opened` is what the app runs when it is opened from Finder, Spotlight or Launchpad (menubar_wrap.py)."""
+    added, the job is started instead, so the item outlives the terminal. `on` and `off` turn the item on and off for
+    good (menubar_keep.py); update is `switchboard update`, which `on` runs when an update took the item's files out.
+    `--applications` puts its app in Applications, as the installer does, where Spotlight finds it and menu bar
+    managers can keep it in view. `--opened` is what the app runs when it is opened from Finder, Spotlight or Launchpad
+    (menubar_wrap.py)."""
+    if len(args) == 1 and args[0] in ('on', 'off'):
+        return menubar_keep.command(args[0], update)
     if [a for a in args if a not in ('--applications', '--opened')] or len(args) > 1:
         print(USAGE)
         return 2
@@ -918,7 +921,7 @@ def main(args):
             os.environ[HOPPED] = '1'        # the launcher's Python has PyObjC; if it does not, the line below says so
             os.execv(hop, [hop] + list(args))
         print(NOT_HERE)
-        return 1 if terminal() else 0       # under its job 0: launchd starts a job that failed again every 20 s
+        return cant_draw()
     if '--applications' in args:
         return to_applications()
     if '--opened' in args:
@@ -932,6 +935,18 @@ def main(args):
             print('The menu bar is on.')
             return 0
     return run()
+
+
+def cant_draw():
+    """The exit of a menu bar that can't draw here: 1 at a terminal. Under its job 0, after a wait: launchd starts the
+    job again whenever it exits (KeepAlive), every 20 s at most, so the wait keeps a Mac where it can't draw from
+    starting it more often than every CANT_DRAW_WAIT seconds."""
+    if terminal():
+        return 1
+    if menubar_keep.under_launchd():
+        sys.stdout.flush()
+        menubar_keep.pause(menubar_keep.CANT_DRAW_WAIT)
+    return 0
 
 
 def to_applications():
@@ -948,7 +963,7 @@ def to_applications():
     if running_pid() is not None and our_job() and launchctl('kickstart', '-k', '%s/%s' % (domain(), AGENT)) == 0:
         print('The menu bar started again from there.')
     elif running_pid() is not None:
-        print('Quit the menu bar and start it again to run it from there.')
+        print('To run it from there: switchboard menubar off, then switchboard menubar on')
     return 0
 
 
@@ -963,8 +978,9 @@ def open_page():
 
 def opened():
     """Switchboard.app was opened from Finder, Spotlight or Launchpad: the page when the menu bar runs (never a second
-    item), else the menu bar, through its job when there is one (so it runs as it does after a login), else here."""
-    if running_pid() is not None:
+    item), or when the item was turned off with `switchboard menubar off` (only `switchboard menubar on` turns it on
+    again); else the menu bar, through its job when there is one (so it runs as it does after a login), else here."""
+    if running_pid() is not None or menubar_keep.is_off():
         return 0 if open_page() else 1
     job = our_job()
     if job and (launchctl('kickstart', '%s/%s' % (domain(), AGENT)) == 0 or launchctl('bootstrap', domain(), job) == 0):
@@ -973,11 +989,12 @@ def opened():
 
 
 def run():
-    """The menu bar in this process, until Quit: into its wrapper app first (before AppKit loads), then one menu
-    bar per data folder."""
+    """The menu bar in this process, as long as it runs: into its wrapper app first (before AppKit loads), then one
+    menu bar per data folder. Under its job, a second one waits for the lock (the first may be one run by hand) rather
+    than exit: launchd would only start it again (KeepAlive), and it takes over the moment the first one ends."""
     from . import menubar_wrap as wrap
     wrap.relaunch_inside(['menubar'])          # returns only when staying in this interpreter
-    if not take_lock():
+    if not take_lock(wait=FOREVER if menubar_keep.under_launchd() else None):
         print('The menu bar is already running.')
         return 0
     rotate_log()
@@ -992,7 +1009,7 @@ def run():
         ui = _ui()
     except Exception as e:  # noqa: BLE001 - PyObjC is here but does not load (a wheel for another Python, say)
         print(cant_start(e))
-        return 1 if terminal() else 0       # under its job 0: launchd starts a job that failed again every 20 s
+        return cant_draw()
     if terminal():
         print('The menu bar is on. Ctrl-C stops it.')
         sys.stdout.flush()
@@ -1003,11 +1020,8 @@ LOG = 'menubar.log'         # the menu bar job's own output (install.sh: its Sta
 
 
 def _watch_start():
-    """A menu bar that runs: a quit mark from before is gone (it runs again), and its watch on the page starts.
-    Nothing here can stop the menu bar."""
-    from . import watch
+    """A menu bar that runs: its watch on the page starts. Nothing here can stop the menu bar."""
     try:
-        watch.clear_quit()
         watch_page()
     except Exception as e:  # noqa: BLE001
         sys.stderr.write("The menu bar's watch on the page did not start: %r\n" % e)
@@ -1047,9 +1061,11 @@ def _ui():
         return _UI
     import objc
     import AppKit
-    from AppKit import (NSApp, NSApplication, NSAttributedString, NSBezierPath, NSColor, NSFont,
-                        NSImage, NSMenu, NSMenuItem, NSMutableParagraphStyle, NSStatusBar, NSView, NSWorkspace)
-    from Foundation import NSObject, NSRunLoop, NSRunLoopCommonModes, NSTimer, NSURL, NSMakeRect, NSMakeSize
+    from AppKit import (NSApp, NSApplication, NSAttributedString, NSBezierPath, NSColor, NSFont, NSGraphicsContext,
+                        NSImage, NSMenu, NSMenuItem, NSMutableParagraphStyle, NSScreen, NSStatusBar, NSView,
+                        NSWorkspace)
+    from Foundation import (NSObject, NSRunLoop, NSRunLoopCommonModes, NSTimer, NSURL, NSUserDefaults, NSMakePoint,
+                            NSMakeRect, NSMakeSize)
     from PyObjCTools import AppHelper
 
     dark_names = (AppKit.NSAppearanceNameDarkAqua, AppKit.NSAppearanceNameVibrantDark,
@@ -1134,27 +1150,100 @@ def _ui():
                 if left and left[0][0]:
                     draw_line(runs(left, cols), left, x, y, right - x if pieces else w, h, 'left', baseline)
 
+    def paint_item(ops, cols):
+        """item_ops, in a flipped image: the S's path stroked with round ends, its dots, and the gap cut round a
+        state's dot (drawn as nothing: the clear operation)."""
+        for op in ops:
+            if op[0] == 'stroke':
+                _, steps, width, colour = op
+                path = NSBezierPath.bezierPath()
+                for step in steps:
+                    if step[0] == 'M':
+                        path.moveToPoint_(NSMakePoint(step[1], step[2]))
+                    elif step[0] == 'L':
+                        path.lineToPoint_(NSMakePoint(step[1], step[2]))
+                    else:
+                        _, cx, cy, r, a, b, decreasing = step
+                        path.appendBezierPathWithArcWithCenter_radius_startAngle_endAngle_clockwise_(
+                            NSMakePoint(cx, cy), r, a, b, decreasing)
+                path.setLineWidth_(width)
+                path.setLineCapStyle_(AppKit.NSLineCapStyleRound)
+                path.setLineJoinStyle_(AppKit.NSLineJoinStyleRound)
+                cols[colour].setStroke()
+                path.stroke()
+            elif op[0] == 'dot':
+                _, cx, cy, r, colour = op
+                cols[colour].setFill()
+                NSBezierPath.bezierPathWithOvalInRect_(NSMakeRect(cx - r, cy - r, 2 * r, 2 * r)).fill()
+            elif op[0] == 'clear':
+                _, cx, cy, r = op
+                context = NSGraphicsContext.currentContext()
+                was = context.compositingOperation()
+                context.setCompositingOperation_(AppKit.NSCompositingOperationClear)
+                NSBezierPath.bezierPathWithOvalInRect_(NSMakeRect(cx - r, cy - r, 2 * r, 2 * r)).fill()
+                context.setCompositingOperation_(was)
+
     def item_image(r):
-        """The item: a template image, or at a switch line a colour one (the system red and the label colour,
-        worked out each time it is drawn, so it follows the menu bar's own light or dark)."""
-        ops, red = item_ops(r), r['red']
+        """The item: the S as a template image; with a state's dot, a colour image of the same shape (the label
+        colour, worked out each time it is drawn, so it follows the menu bar's own light or dark, and the system's
+        orange or red). The S is drawn solid into an image of its own and laid down at its colour's opacity, so where
+        its path meets its round ends it is one even shade; then the gap round a dot is cut and the dot drawn."""
+        ops, dot = item_ops(r), r.get('dot')
+        shape = [op for op in ops if op[0] != 'clear' and op[-1] in ('ink', 'ink50')]
+        rest = [op for op in ops if op not in shape]
+        size = NSMakeSize(IMAGE_W, IMAGE_H)
 
         def draw(rect):
-            if red:
+            if dot:
                 ink = NSColor.labelColor().colorUsingColorSpace_(AppKit.NSColorSpace.sRGBColorSpace()) \
                     or NSColor.labelColor()
-                cols = {'ink': ink, 'ink30': ink.colorWithAlphaComponent_(ink.alphaComponent() * TRACK),
-                        'sysred': NSColor.systemRedColor()}
+                alpha, solid = ink.alphaComponent(), ink.colorWithAlphaComponent_(1.0)
+                cols = {'orange': NSColor.systemOrangeColor(), 'red': NSColor.systemRedColor()}
             else:
-                cols = {'ink': NSColor.blackColor(), 'ink30': NSColor.colorWithWhite_alpha_(0, TRACK),
-                        'ink50': NSColor.colorWithWhite_alpha_(0, 0.5)}     # numbers that are not current
-            paint(ops, cols)
+                alpha, solid, cols = 1.0, NSColor.blackColor(), {}
+            if r.get('dim'):
+                alpha *= 0.5
+
+            def solid_s(inner):
+                paint_item(shape, {'ink': solid, 'ink50': solid})
+                return True
+            layer = NSImage.imageWithSize_flipped_drawingHandler_(size, True, solid_s)
+            layer.drawInRect_fromRect_operation_fraction_respectFlipped_hints_(       # upright in this flipped image
+                NSMakeRect(0, 0, IMAGE_W, IMAGE_H), AppKit.NSZeroRect, AppKit.NSCompositingOperationSourceOver, alpha,
+                True, None)
+            paint_item(rest, cols)
             return True
-        image = NSImage.imageWithSize_flipped_drawingHandler_(NSMakeSize(IMAGE_W, IMAGE_H), True, draw)
-        image.setTemplate_(not red)
+        image = NSImage.imageWithSize_flipped_drawingHandler_(size, True, draw)
+        image.setTemplate_(not dot)
         image.setCacheMode_(AppKit.NSImageCacheNever)
         image.setAccessibilityDescription_(r['label'])
         return image
+
+    def window_facts(status):
+        """What menubar_keep.hidden() reads about the item's window: whether it is shown, its frame, and each screen's
+        frame and notch (the gap between the menu bar's two areas either side of the camera, macOS 12 and later), in
+        screen points; whether the person took the item off the menu bar (isVisible, macOS 10.12 and later); and
+        whether each screen shows its menu bar (its visible frame stops below its top). None when it can't be read."""
+        try:
+            removed = bool(status.respondsToSelector_('isVisible') and not status.isVisible())
+            window = status.button().window()
+            if window is None:
+                return {'removed': removed, 'visible': False, 'frame': None, 'screens': []}
+            screens = []
+            for screen in NSScreen.screens() or []:
+                f, v = screen.frame(), screen.visibleFrame()
+                notch = None
+                if screen.respondsToSelector_('auxiliaryTopLeftArea'):
+                    left, right = screen.auxiliaryTopLeftArea(), screen.auxiliaryTopRightArea()
+                    if left.size.width > 0 and right.size.width > 0:
+                        notch = (f.origin.x + left.origin.x + left.size.width, f.origin.x + right.origin.x)
+                screens.append({'frame': (f.origin.x, f.origin.y, f.size.width, f.size.height), 'notch': notch,
+                                'menu_bar': v.origin.y + v.size.height < f.origin.y + f.size.height})
+            f = window.frame()
+            return {'removed': removed, 'visible': bool(window.isVisible()),
+                    'frame': (f.origin.x, f.origin.y, f.size.width, f.size.height), 'screens': screens}
+        except Exception:  # noqa: BLE001 - not known: the notice counts it as neither
+            return None
 
     class SwitchboardRow(NSView):
         """One account in the menu: drawn from row_ops; a click uses it."""
@@ -1231,11 +1320,16 @@ def _ui():
             self.views = {}
             self.auto_item = None
             self.lit = None
+            from . import notify            # the hidden notice goes out on a thread of its own: osascript may be slow
+            self.hidden = menubar_keep.HiddenNotice(send=lambda note: in_background(
+                lambda: notify.send(note), lambda got: None, lambda e: None, AppHelper.callAfter))
             return self
 
         # -- set up --
 
         def applicationDidFinishLaunching_(self, notification):
+            defaults = NSUserDefaults.standardUserDefaults()        # the app's own preferences, before the item
+            menubar_keep.place(defaults.objectForKey_, lambda key, value: defaults.setDouble_forKey_(value, key))
             self.status = NSStatusBar.systemStatusBar().statusItemWithLength_(ITEM_W)
             self.status.setAutosaveName_(AGENT)
             button = self.status.button()
@@ -1245,8 +1339,8 @@ def _ui():
             self.menu.setAutoenablesItems_(False)
             self.menu.setDelegate_(self)
             self.status.setMenu_(self.menu)
-            self.show_item({'email': None, 'five': None, 'week': None, 'red': False, 'label': 'Switchboard'})
-            self.fill([('do', 'Quit', 'quit')])         # until the first reading, a moment from now
+            self.show_item({'email': None, 'dot': None, 'dim': False, 'label': 'Switchboard'})
+            self.fill(FIRST_MENU)                       # until the first reading, a moment from now
             centre = NSWorkspace.sharedWorkspace().notificationCenter()
             centre.addObserver_selector_name_object_(self, 'didWake:', AppKit.NSWorkspaceDidWakeNotification, None)
             self.read()
@@ -1297,7 +1391,16 @@ def _ui():
             except Exception:  # noqa: BLE001 - an answer it can't draw is logged; the next reading may be fine
                 import traceback
                 traceback.print_exc()
+            self.look_hidden()
             self.schedule()
+
+        @objc.python_method
+        def look_hidden(self):
+            """Is the item hidden (a full menu bar, the notch)? Said once per login (menubar_keep.HiddenNotice)."""
+            try:
+                self.hidden.look(menubar_keep.hidden(window_facts(self.status)), time.monotonic())
+            except Exception:  # noqa: BLE001 - the item runs on whatever this look meets
+                traceback.print_exc()
 
         def didWake_(self, notification):
             if not self.reading and self.pace.due(time.monotonic(), True):
@@ -1467,13 +1570,9 @@ def _ui():
             if not self.reading:
                 self.schedule()
 
-        def quit_(self, sender):
-            try:
-                from . import watch
-                watch.note_quit()               # chosen: neither launchd nor the page starts it again
-            except Exception:  # noqa: BLE001 - Quit always quits
-                pass
-            NSApp().terminate_(None)
+        def add_(self, sender):
+            """Add account: the page, at its Add form, which asks for the email and starts the browser sign-in."""
+            NSWorkspace.sharedWorkspace().openURL_(NSURL.URLWithString_(add_url()))
 
     def run():
         app = NSApplication.sharedApplication()
@@ -1485,6 +1584,6 @@ def _ui():
         app.run()
         return 0
 
-    _UI.update(run=run, paint=paint, item_image=item_image, colours=colours, Row=SwitchboardRow,
-               MenuBar=SwitchboardMenuBar, is_dark=is_dark)
+    _UI.update(run=run, paint=paint, paint_item=paint_item, item_image=item_image, colours=colours,
+               Row=SwitchboardRow, MenuBar=SwitchboardMenuBar, is_dark=is_dark, window_facts=window_facts)
     return _UI

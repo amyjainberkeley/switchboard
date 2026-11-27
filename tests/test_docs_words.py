@@ -2,10 +2,10 @@ import _isolate  # noqa: F401  (first: it gives switchboard a throwaway data fol
 
 # The words of the docs, checked as a list:
 #
-# - The README's first screen is the name, one line, the three headline features (artifacts first) and the install
-#   line, nothing else. The install line is Homebrew's; the one-line installer is the second way, further down. The
-#   name is the logo: the mark and the word, one SVG for light grounds and one for dark, as GitHub's themes
-#   pick them (<picture>), with "Switchboard" as its text.
+# - The README's first screen is the name, one short bold line (what Switchboard is for; the owner words it), one
+#   paragraph that says what Switchboard is, three things it does and the install line, nothing else. The install line is Homebrew's; the one-line installer is the second way, further down. The name is the
+#   logo: the mark and the word, one SVG for light grounds and one for dark, as GitHub's themes pick them
+#   (<picture>), with "Switchboard" as its text.
 # - No hype words.
 # - The changelog's first version heading is this version (core.VERSION), dated or "not released yet"; every later
 #   one is a dated release; versions go newest first; there is no Unreleased section.
@@ -68,25 +68,25 @@ def anchors(text):
 
 
 class ReadmeFirstScreen(unittest.TestCase):
-    def test_name_one_line_three_features_then_the_install_line(self):
+    def test_name_one_bold_line_what_it_is_three_things_then_the_install_line(self):
         text = read('README.md')
         self.assertTrue(text.startswith(LOGO), text[:200])
         for name in ('logo.svg', 'logo-dark.svg'):
             self.assertIn('aria-label="Switchboard"', read(os.path.join('docs', name)))
         head = text[len(LOGO):text.index('```')]
         lines = [x for x in head.splitlines() if x.strip()]
-        self.assertEqual(len(lines), 4, lines)
-        self.assertFalse(lines[0].startswith(('-', '#', '!', '<')), lines[0])
-        features = lines[1:]
-        self.assertTrue(all(x.startswith('- **') for x in features), features)
-        self.assertIn('Artifacts', features[0].split('**')[1])
+        self.assertEqual(len(lines), 5, lines)
+        self.assertRegex(lines[0], r'^(### [^#*]{8,60}|\*\*[^*]{8,60}\*\*)$')    # one short line, a heading or bold: what it is for
+        self.assertFalse(lines[1].startswith(('-', '#', '!', '<', '*')), lines[1])      # then what it is, in plain words
+        features = lines[2:]
+        self.assertTrue(all(x.startswith('- **') for x in features), features)          # then three things it does
         block = text[text.index('```'):]
         self.assertTrue(block.startswith('```sh\n' + BREW + '\n```\n'), block[:120])
         self.assertIn('```sh\n' + INSTALL + '\n```\n', block)               # the second way, further down
 
-    def test_each_feature_is_said_again_in_the_docs(self):
+    def test_each_of_the_three_is_said_again_in_the_docs(self):
         how = read(os.path.join('docs', 'how-it-works.md'))
-        for heading in ('## Artifacts', '## Auto-switch', '## Running as another account'):
+        for heading in ('## Auto-switch', '## Accounts', '## The page', '## Other assistants', '## Artifacts'):
             self.assertIn('\n' + heading + '\n', how)
 
 

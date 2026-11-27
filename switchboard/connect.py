@@ -78,6 +78,10 @@ ON_END = None
 # until hidden or for ten minutes. key -> {'at', 'email' (asked), 'got', 'line'}
 NOTES = {}
 NOTE_FRESH = 600
+# How the last sign-in under each key ended, for a terminal that started it through the page and follows it (look):
+# key -> {'started', 'at', 'result'}. Kept for ENDED_FRESH seconds; the page itself never reads it.
+ENDED = {}
+ENDED_FRESH = 600
 
 
 CLAUDE_PATH = 'claude_path'     # settings.json: the claude a terminal's PATH found, for the page's job to find too
@@ -297,8 +301,38 @@ def stop(key):
     c = RUNNING.pop(key, None)
     if c:
         c.setdefault('result', {'ok': False, 'why': 'stopped'})
+        _ended(key, c)
         _end(c)
     return c
+
+
+def _ended(key, c):
+    """Note how a sign-in ended (its result), under its key and start time, for look()."""
+    now = time.time()
+    for k, e in list(ENDED.items()):
+        if not 0 <= now - e['at'] < ENDED_FRESH:
+            ENDED.pop(k, None)
+    ENDED[key] = {'started': c.get('started'), 'at': now, 'result': dict(c.get('result') or {})}
+
+
+def look(key, started=None):
+    """Where one sign-in stands, for a terminal that started it through the page (POST /api/connect-look):
+    {'state': 'waiting' (open in the browser), 'keeping' (the browser approved it; the engine is keeping its login),
+    'over' (with 'result', as _result says it), or None (no such sign-in: never started here, or long over)},
+    with 'started', and 'default_browser' while it is under way. `started` (what /api/connect answered) tells this
+    sign-in from a later one under the same key; None takes whichever is there."""
+    c = RUNNING.get(key)
+    if c and (started is None or c.get('started') == started):
+        state = under_way(c)
+        if state == 'failed':                   # its process ended badly: over now, before collect() sweeps it
+            return {'state': 'over', 'started': c.get('started'),
+                    'result': {'ok': False, 'why': 'the sign-in did not finish'}}
+        return {'state': 'waiting' if state == 'waiting' else 'keeping', 'started': c.get('started'),
+                'default_browser': c.get('opened') == 'default'}
+    e = ENDED.get(key)
+    if e and (started is None or e['started'] == started) and 0 <= time.time() - e['at'] < ENDED_FRESH:
+        return {'state': 'over', 'started': e['started'], 'result': dict(e['result'])}
+    return {'state': None}
 
 
 def _result(out, c):
@@ -520,6 +554,7 @@ def collect():
             elif RUNNING.get(key) is c:             # (not one a Cancel took meanwhile, nor a newer one in its place)
                 RUNNING.pop(key, None)
                 c['result'] = _result(out, c)
+                _ended(key, c)
                 c['over'] = True
                 _clean(c['dir'])
         if again:

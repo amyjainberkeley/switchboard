@@ -58,7 +58,7 @@ class TheModel(unittest.TestCase):
         self.assertEqual([x[1]['email'] for x in items if x[0] == 'row'], ['ana@work.example', 'ana@home.example'])
         self.assertNotIn(('do', 'Start', 'start'), items)
         r = menubar.reading(state, status)
-        self.assertTrue(r['red'])                                   # still current enough: its red stays
+        self.assertEqual(r['dot'], 'orange')                        # still current enough: its dot stays
 
     def test_sixty_seconds_without_a_good_reading_greys_the_bars_and_says_since_when(self):
         w = menubar.Watch()
@@ -67,11 +67,11 @@ class TheModel(unittest.TestCase):
         state, status = w.view(161.0, TZ)
         self.assertEqual(status, {'kind': 'busy', 'stale': True, 'line': 'Switchboard is busy · not updated since 2:02 PM'})
         r = menubar.reading(state, status)
-        self.assertEqual((r['red'], r['stale']), (False, True))
+        self.assertEqual((r['dot'], r['dim']), (None, True))
         self.assertEqual(r['label'], 'Switchboard: ana@work.example, weekly 96% · Switchboard is busy · not updated '
                                      'since 2:02 PM')
-        fills = [op[-1] for op in menubar.item_ops(r) if op[-1] != 'ink30']
-        self.assertEqual(fills, ['ink50'])                          # grey, never red
+        inks = set(op[-1] for op in menubar.item_ops(r))
+        self.assertEqual(inks, {'ink50'})                           # the S dimmed, never coloured
         rows = [x[1] for x in menubar.menu(state, status=status, tz=TZ) if x[0] == 'row']
         self.assertTrue(all(r['stale'] for r in rows))
         colours = set(op[-1] for row in rows for op in menubar.row_ops(row) if op[0] == 'box')
@@ -108,7 +108,7 @@ class TheModel(unittest.TestCase):
         w.took(None, 'busy', 1.0, WALL)
         state, status = w.view(1.0)
         self.assertEqual(menubar.menu(state, status=status), [('line', 'Switchboard is busy'), ('separator',),
-                                                              ('do', 'Quit', 'quit')])
+                                                              ('do', 'Open Switchboard', 'open')])
         self.assertEqual(menubar.reading(state, status)['label'], 'Switchboard is busy')
         w = menubar.Watch()
         w.took(None, 'down', 1.0, WALL)
@@ -231,17 +231,17 @@ class ThePage(PageSandbox):
             w.took(*self.read(timeout=0.3), mono, WALL)
             self.assertEqual(w.status(mono)['kind'], 'busy')
             self.assertFalse(w.status(mono)['stale'])
-            self.assertTrue(menubar.reading(*w.view(mono))['red'])
+            self.assertEqual(menubar.reading(*w.view(mono))['dot'], 'orange')
         mono += 16                                                  # 61 s
         w.took(*self.read(timeout=0.3), mono, WALL)
         self.assertTrue(w.status(mono)['stale'])
-        self.assertTrue(menubar.reading(*w.view(mono))['stale'])
+        self.assertTrue(menubar.reading(*w.view(mono))['dim'])
         self.page.hold.set()
         self.page.mode = 'ok'
         mono += 15
         w.took(*self.read(), mono, WALL)
         self.assertIsNone(w.status(mono))
-        self.assertFalse(menubar.reading(*w.view(mono))['stale'])
+        self.assertFalse(menubar.reading(*w.view(mono))['dim'])
 
 
 # ---------- the real menu bar class keeps the last good state ----------

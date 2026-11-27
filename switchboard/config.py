@@ -281,6 +281,10 @@ ROWS = (
         command='switchboard update --port N', low=1024, high=65535,
         page_why="the page runs on it; switchboard update --port N moves the page's background job too",
         file_key='port', as_command=lambda v: 'switchboard update --port %d' % v),
+    Row('menubar_position', 'install', 'on-off', True, 'The first time the menu bar item is made, it asks to sit '
+        'beside the clock (off: macOS places it).', lambda f: f.file().get('menubar_position') is not False,
+        where='by hand in the settings file', page_why='set by hand in the settings file',
+        file_key='menubar_position'),
     Row('update_check', 'install', 'choice', 'off', 'Look for a newer version once a day (daily), or only when you ask '
         'with switchboard update --check (off).', _read_of('newer', 'check_setting'), setter=_of('newer', 'set_check'),
         choices=('off', 'daily'), page_why='set with switchboard config', file_key='update_check'),
@@ -296,7 +300,8 @@ BY_KEY = dict((r.key, r) for r in ROWS)
 OWN_KEYS = ('key', 'let_go', 'auto_on_said', 'auto_set_by_you', 'notify_set_by_you', 'notify_by_itself', 'notify_seen',
             'links_wanted', 'links_by_itself', 'links_forwarded', 'session_hooks', 'session_hooks_set_by_you',
             'session_hooks_by_itself', 'statusline_set_by_you', 'statusline_by_itself', 'statusline_theirs_said',
-            'setup_hidden', 'claude_path', 'desktop_note_said')
+            'setup_hidden', 'claude_path', 'desktop_note_said', 'skill', 'skill_set_by_you', 'skill_by_itself',
+            'skill_theirs_said')
 # read by policy.settings_from
 POLICY_KEYS = ('session_at', 'weekly_at', 'model_at', 'model', 'strategy', 'rules', 'own_lines', 'ranks')
 

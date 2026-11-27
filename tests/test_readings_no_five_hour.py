@@ -142,22 +142,20 @@ class TheMenuBar(unittest.TestCase):
         self.assertIsNone(r['five'])
         ops = menubar.row_ops(r)
         self.assertEqual([(op[2], op[5][0][0]) for op in ops if op[0] == 'text'], [(28.0, 'Weekly'), (28.0, '27%')])
-        self.assertEqual([op[2] for op in ops if op[0] == 'pair'], [8.0, 46.0])      # the reset line under the weekly bar
-        self.assertEqual(menubar.row_height(r), 70.0)
-        self.assertEqual(menubar.row_label(r), 'ana@ultra.example, in use, checked just now, weekly 27%')
+        self.assertEqual([op[2] for op in ops if op[0] == 'pair'], [8.0])          # the email line, no reset line
+        self.assertEqual(menubar.row_height(r), 54.0)
+        self.assertEqual(menubar.row_label(r), 'ana@ultra.example, in use, weekly 27%')
         v = view()
         v['accounts'][0]['usage'].update(weekly={'pct': None, 'resets': SAT_NOON}, scoped=[])   # weekly not known
         r = self.row(ULTRA, v)
-        self.assertEqual((r['foot'], r['models'], menubar.row_height(r)), ('', [], 54.0))
+        self.assertEqual((menubar.pct_text(r['week']), menubar.row_height(r)), ('—', 54.0))
 
     def test_a_5_hour_window_at_0_with_no_reset_has_not_started(self):
         r = self.row(IDLE)
         self.assertEqual((r['five']['label'], menubar.pct_text(r['five'])), ('5-hour', '0%'))
-        self.assertEqual(menubar.reset_line(r['five'], NOW, TZ), 'Not started')
-        self.assertEqual(menubar.row_height(r), 88.0)
-        self.assertEqual(menubar.row_label(r), 'Use ana@team.example, checked just now, 5-hour 0%, weekly 17%')
-        busy = self.row(BUSY)
-        self.assertEqual(busy['foot'], '5-hour resets 6:10 PM · weekly Mon 12:00 PM')
+        self.assertFalse(r['five']['started'])
+        self.assertEqual(menubar.row_height(r), 72.0)
+        self.assertEqual(menubar.row_label(r), 'Use ana@team.example, 5-hour 0%, weekly 17%')
 
     def test_a_reading_not_known_is_a_weekly_dash_alone(self):
         # (it kept both dashes: the 5-hour row is now drawn only when there is a 5-hour number to show)
@@ -165,25 +163,17 @@ class TheMenuBar(unittest.TestCase):
         self.assertEqual((r['five'], menubar.pct_text(r['week'])), (None, '—'))
         self.assertEqual(menubar.row_height(r), 54.0)
 
-    def test_the_item_shows_the_weekly_bar_alone_in_the_middle(self):
+    def test_the_item_reads_the_weekly_limit_alone(self):
         r = menubar.reading(view())
-        self.assertIsNone(r['five'])
         self.assertEqual(r['label'], 'Switchboard: ana@ultra.example, weekly 27%')
-        self.assertEqual(menubar.item_ops(r), [('box', 0.0, 3.0, 18.0, 4.0, 2.0, 'ink30'),
-                                               ('box', 0.0, 3.0, menubar.fill_width(27.0), 4.0, 2.0, 'ink')])
+        self.assertIsNone(r['dot'])
         v = view()
-        v['accounts'][0]['usage']['weekly']['pct'] = 96.0              # at its weekly line: red, from that bar alone
-        r = menubar.reading(v)
-        self.assertTrue(r['red'])
-        self.assertEqual(menubar.item_ops(r)[-1][-1], 'sysred')
-        # an account with a 5-hour limit keeps its two bars, 5-hour on top
-        r = menubar.reading(in_use(view(), BUSY))
-        self.assertEqual([op[2] for op in menubar.item_ops(r) if op[-1] == 'ink30'], [0.0, 6.0])
+        v['accounts'][0]['usage']['weekly']['pct'] = 96.0              # at its weekly line: the orange dot
+        self.assertEqual(menubar.reading(v)['dot'], 'orange')
+        r = menubar.reading(in_use(view(), BUSY))                      # an account with a 5-hour limit names both
         self.assertEqual(r['label'], 'Switchboard: ana@busy.example, 5-hour 40%, weekly 70%')
-        # no account in use: two bare tracks
-        r = menubar.reading(in_use(view(), None))
-        self.assertEqual(menubar.item_ops(r), [('box', 0.0, 0.0, 18.0, 4.0, 2.0, 'ink30'),
-                                               ('box', 0.0, 6.0, 18.0, 4.0, 2.0, 'ink30')])
+        r = menubar.reading(in_use(view(), None))                      # no account in use: the red dot
+        self.assertEqual((r['dot'], r['label']), ('red', 'Switchboard: no account in use'))
 
 
 # ---------- the status line, notifications and the history ----------

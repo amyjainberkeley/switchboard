@@ -51,9 +51,9 @@ it on or off (statusline_set_by_you, marked by the page's switch and `switchboar
 before this was kept left its install record); only when Claude Code's settings file can be read and Claude Code
 would run it. A status line of the person's own is never replaced: it stays, and one line says so.
 
-Links (links_by_itself): at a first run at a terminal, macOS is asked once to make the link app the default browser, so
-a claude.ai artifact clicked anywhere opens as its owner. Never after the person turned links on or off, and not
-without the link app; the page's banner offers it until it is the default.
+Links: the first run at a terminal says what the link app does and asks macOS to make it the default browser only after
+the person presses Enter (firstrun.py), and marks links_by_itself when it asked. links_by_itself() below asks without
+that question; the first run no longer calls it. The page's banner offers it until it is the default.
 """
 import os
 import threading
@@ -389,7 +389,8 @@ def _linked(path):
 def first_run_tick(rows, kept=None):
     """The page's first run ends when a look finds an account held after one that found none (the page's Add or its
     sign-in, a /login kept, or `switchboard setup` while the page ran): notifications go on by
-    themselves then (notify_by_itself), and the status line (statusline_by_itself). `kept`: a login keep.look kept on
+    themselves then (notify_by_itself), the status line (statusline_by_itself), the session hooks and Switchboard's
+    skill (skillfile.by_itself). `kept`: a login keep.look kept on
     this tick. Returns True when notifications went on."""
     if accounts(rows) + (1 if kept else 0) == 0:
         FIRST['none'] = True
@@ -400,14 +401,16 @@ def first_run_tick(rows, kept=None):
     notified = notify_by_itself()
     statusline_by_itself()
     session_hooks_by_itself()
+    from . import skillfile
+    skillfile.by_itself()                       # Switchboard's skill for coding agents, by the same rules
     return notified
 
 
-# ---------- links open as their owner, asked for at the first run ----------
+# ---------- links open as their owner, asked for without a question first ----------
 #
-# Opening links as their owner is what Switchboard is for, so the first run at a terminal asks macOS to
-# make Switchboard Links the default browser, as the page's banner does: macOS asks, and only the person's yes changes
-# it. Once: never after the person turned links on or off (links_wanted: the banner, `switchboard links on|off`), never
+# Opening links as their owner is what Switchboard is for, so this asks macOS to make Switchboard Links the default
+# browser, as the page's banner does: macOS asks, and only the person's yes changes it. (The first run in the terminal
+# asks through firstrun.py instead, after saying what the link app does.) Once: never after the person turned links on or off (links_wanted: the banner, `switchboard links on|off`), never
 # after it was asked for by itself before (links_by_itself), not without the link app, not when it is the default
 # already. The page's banner offers it again until it is the default, unless it was turned off on purpose.
 

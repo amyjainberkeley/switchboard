@@ -466,8 +466,8 @@ class SignIn(unittest.TestCase):
         started = []
         with mock.patch.object(core, 'DEMO', False), mock.patch.object(browser, 'present', lambda: False), \
                 mock.patch.object(connect, 'start', lambda email, profile: started.append((email, profile)) or 'new'):
-            self.assertEqual(server.act('/api/connect', {'email': '', 'profile': '+new'}), {'key': 'new'})
-            self.assertEqual(server.act('/api/connect', {'email': B, 'profile': 'No such profile'}), {'key': 'new'})
+            self.assertEqual(server.act('/api/connect', {'email': '', 'profile': '+new'})['key'], 'new')
+            self.assertEqual(server.act('/api/connect', {'email': B, 'profile': 'No such profile'})['key'], 'new')
         self.assertEqual(started, [('', None), (B, None)])       # never a profile that no browser could open
         said = [e['text'] for e in core.load()['events']]
         self.assertIn('Opened the sign-in in your browser', said)

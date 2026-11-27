@@ -126,7 +126,7 @@ class BrowserNeedsItsApp(Sandbox):
         self.browser_data('chrome', {'P1': 'Work'})
         started = []
         self.patch(connect, 'start', lambda email, profile: started.append((email, profile)) or 'new')
-        self.assertEqual(server.act('/api/connect', {'email': B, 'profile': 'P1'}), {'key': 'new'})
+        self.assertEqual(server.act('/api/connect', {'email': B, 'profile': 'P1'})['key'], 'new')
         self.assertEqual(started, [(B, None)])
         self.assertIn('Opened the sign-in for %s in your browser' % B, [e['text'] for e in core.load()['events']])
 
@@ -782,7 +782,8 @@ THIS_MAC = ('localhost', '127.0.0.1')
 # chromewebstore.google.com: the Claude extension's page, opened in the person's own browser profile from Chrome
 # setup; Switchboard never fetches it.
 NAMED_ONLY = {'www.w3.org': ('web/index.html', 'web/go.html'), 'openfontlicense.org': ('web/Geist-OFL.txt',),
-              'no-color.org': ('statusline.py',), 'chromewebstore.google.com': ('browser.py',)}
+              'no-color.org': ('statusline.py',), 'chromewebstore.google.com': ('browser.py',),
+              'openai.com': ('skill/reference/codex.md', 'skill/reference/what-it-does-not-do.md')}   # its terms, a link to read
 # Not addresses: the gateway's own loopback address filled in at run time, and a refusal that shows the form.
 PLACEHOLDERS = {('gateway.py', '%s'): 'LOOPBACK', ('keys.py', 'host'): 'SwitchError'}
 # Fetched only when a pack is turned on and its plan agreed to: Node's own release, pinned with its checksum;

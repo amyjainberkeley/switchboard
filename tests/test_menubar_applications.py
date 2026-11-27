@@ -376,7 +376,7 @@ class MenubarOpened(Base):
         self.assertEqual(self.ran, [1])
 
     def test_it_is_not_in_the_usage_line_and_other_words_still_are_refused(self):
-        self.assertEqual(menubar.USAGE, 'switchboard menubar [--applications]')
+        self.assertEqual(menubar.USAGE, 'switchboard menubar [on | off | --applications]')
         self.assertEqual(self.run_cli('--nope'), (2, menubar.USAGE + '\n'))
 
 

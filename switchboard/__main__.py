@@ -10,9 +10,10 @@
   switchboard status [--json]
                               your accounts and their limits, without the question; --json prints them as JSON
   switchboard add [--as SHORT] [--at N]
-                              add accounts, one sign-in at a time (signing in with /login in Claude Code
-                              is enough: each login is kept by itself); --as gives the first one kept a short
-                              name, --at puts it at place N in the list
+                              add accounts, one sign-in at a time, each in your browser while the page runs
+                              (a login made with /login in Claude Code is kept by itself too); --as gives the
+                              first one kept a short name, --at puts it at place N in the list
+  switchboard add EMAIL       sign in as that account in your browser (a new one, or one whose sign-in ended)
   switchboard add PROVIDER    add another provider (codex) to your order; its own app keeps its sign-in, and
                               Switchboard never reads or keeps it (switchboard add claude is switchboard add)
   switchboard add --token [-] [--for NAME | --label WORD] [--as SHORT]
@@ -76,12 +77,13 @@
   switchboard log [-n N] [-f] [--json]
                               what happened, newest at the bottom: switches and why, keeps, auto-switch, limits,
                               sign-ins, problems; -f follows it, --json prints each line as JSON
-  switchboard setup [--yes]   the first run: keeps the account Claude Code is on
+  switchboard setup [--yes]   the first run: keeps the account Claude Code is on, adds the others through your
+                              browser, and explains the link app before macOS asks (--yes asks nothing)
   switchboard page            open the page
-  switchboard menubar [--applications]
-                              the menu bar item: two small bars for the account in use, every account in its menu
-                              (it starts at login, or when you open Switchboard in Applications); --applications
-                              puts the app back in Applications
+  switchboard menubar [on | off | --applications]
+                              the menu bar item: Switchboard's S beside the clock, every account in its menu (it
+                              starts at login and comes back if it stops); off turns it off until you run
+                              switchboard menubar on; --applications puts the app back in Applications
   switchboard use NAME [--json]
                               move Claude Code to an account (the same as switch NAME)
   switchboard current [--json]
@@ -140,6 +142,10 @@
   switchboard hooks [on|off]  the session hooks: they tell an open Claude Code session what a switch means for it
                               (which account owns an artifact, how to open it); on and off change its settings
                               file, and off takes exactly them out
+  switchboard skill [on|off|show]
+                              Switchboard's skill, which lets a coding agent answer questions about it, in Claude
+                              Code's skills folder (and in ~/.agents/skills for Codex, when Codex is here); show
+                              prints it for any other agent
   switchboard models [on|off] Sonnet for helpers: Claude Code's helpers that name no model run on Sonnet
                               instead of the chat's model (one setting in its settings file; off until you turn it on)
   switchboard keys list|add NAME|remove NAME
@@ -169,6 +175,7 @@
   switchboard demo            the page with made-up accounts, to try it first
   switchboard serve           run the page (the background job does this)
   switchboard version         which version this is
+  switchboard about [--json]  what is installed and where, each fact checked now; --json prints it as JSON
   --debug                     after any command or before it (or SWITCHBOARD_DEBUG=1 at a terminal): what it did,
                               on standard error
   short words: ls and list are status, rm is remove, upgrade is update, whoami is current
@@ -500,17 +507,31 @@ def _closing(view, state):
     accounts = state['accounts']
     saved = [a for a in accounts if not a['unmanaged']]
     on = state['head']['email']
+    if not accounts and added_elsewhere(view):  # Codex is on the list; Claude accounts join it with Claude Code
+        return term.run_this('Your Claude accounts join this list once Claude Code is %s. Then run' % (
+            'installed (https://claude.com/claude-code)' if not connect.claude_bin() else 'signed in'), 'switchboard',
+            colour()), False
     if not accounts:                            # none at all: Claude Code is not signed in either
         return term.run_this('Install Claude Code first (https://claude.com/claude-code), then run' if not
-                             connect.claude_bin() else 'Sign in to Claude Code first, then run', 'switchboard setup',
+                             connect.claude_bin() else 'Sign in to Claude Code first, then run', 'switchboard',
                              colour()), False
     if not saved:
         return term.run_this('Add it with', 'switchboard setup', colour()), False
     if on and not any(a['email'] == on for a in accounts):
         return term.run_this('%s is not in Switchboard yet. Add it with' % on, 'switchboard add', colour()), True
     if len(saved) == 1 and saved[0]['active']:
-        return term.another_account(job_installed()), False
+        return term.another_account(colour()), False
     return None, True
+
+
+def added_elsewhere(view):
+    """Another assistant (Codex) is added to the list, in the view's providers board."""
+    try:
+        from .providers import view as provider_view
+        return any(p.get('id') != 'claude' and not p.get('account_list')
+                   for p in provider_view._listed(view.get('providers') or {}, 'providers'))
+    except Exception:  # noqa: BLE001 - only the closing line's words depend on it
+        return False
 
 
 def show(view, ask=False):
@@ -589,11 +610,17 @@ def pick(slots):
 
 
 def act_on(a, view):
-    """Use the account picked: switch to it, or start its sign-in when its login needs a fresh one."""
+    """Use the account picked: switch to it, or start its sign-in when its login needs a fresh one: through the
+    browser while the page runs (firstrun.sign_in_again, as its row's Sign in), else /login in Claude Code."""
+    if a['needs_login']:
+        from . import firstrun
+        code = firstrun.sign_in_again(sys.modules[__name__], a['email'])
+        if code is not None:
+            return code
     if a['needs_login'] and not a['active']:
         return sign_in(a['email'])
     if a['needs_login']:
-        print('In Claude Code, run /login and sign in as %s.' % a['email'])
+        print('The page is not running, so sign in through Claude Code: run /login and sign in as %s.' % a['email'])
         return 0
     if not a['active']:
         switch(a['email'], view)
@@ -640,16 +667,17 @@ def resolve(name, view):
 
 
 def home():
-    """`switchboard`: the accounts, and in a terminal the question. A first run (nothing added yet) comes first; a
-    login Claude Code is on that is not here yet is kept first."""
+    """`switchboard`: the accounts, and in a terminal the question. At a terminal with nothing kept yet, the whole
+    first run comes first (also when Claude Code is not signed in or not installed: then its words for that), and
+    the accounts follow once one is kept. A login Claude Code is on that is not here yet is kept first."""
     ask = terminal()
     if ask and not core.DEMO and not saved_identities():
-        if identity():
-            code = first_run(Tty(sys.stdin, sys.stdout), last_line=False)
-            if code:
-                return code
-            print()
-            return show(current_view(fresh=True), ask=True)
+        code = first_run(Tty(sys.stdin, sys.stdout), last_line=False)
+        from . import firstrun
+        if code or not (saved_identities() or firstrun.added_providers()):    # nothing to list: the first run said
+            return code                                                         # the one thing to do
+        print()
+        return show(current_view(fresh=True), ask=True)
     kept = keep_now()
     return show(current_view(fresh=kept), ask=ask)
 
@@ -775,8 +803,7 @@ def go_to(target):
         raise SwitchError('No account %s. Run `switchboard` to see them.' % target)
     row = next(x for x in term.read(view)['accounts'] if x['email'] == a['email'])
     if row['needs_login'] and not row['active'] and not terminal():
-        raise SwitchError('%s needs a fresh sign-in: in Claude Code, run /login and sign in as it, then run '
-                          'switchboard add.' % a['email'])
+        raise SwitchError('%s needs a fresh sign-in: switchboard add %s' % (a['email'], a['email']))
     return act_on(row, view)
 
 
@@ -847,11 +874,13 @@ def saved_identities():
     return engine.saved_identities()
 
 
-def wait_for_login(before):
+def wait_for_login(before, saved=None):
     """Wait until Claude Code is signed in to an account other than `before` (None: any). Looks again each time
-    Claude Code's own file changes. Returns (email, organization)."""
-    path, last = core.claude_json(), None
-    with transient('Waiting… Ctrl-C to stop'):
+    Claude Code's own file changes. When it changes to an account already kept (`saved`, a set of (email,
+    organization); `before` itself too, signed in again), one line says so and what to do, and it waits on. Returns
+    (email, organization)."""
+    path, last, said = core.claude_json(), None, None
+    with transient('Waiting for a new sign-in in Claude Code… Ctrl-C to stop'):
         while True:
             try:
                 st = os.stat(path)
@@ -859,11 +888,18 @@ def wait_for_login(before):
             except OSError:
                 seen = None
             if seen != last:
-                last = seen
+                first, last = last is None, seen
                 now = identity()
-                if now and now != before:
+                if now and now != before and (saved is None or now not in saved):
                     return now
+                if now and not first and saved is not None and now != said:
+                    said = now
+                    sys.stdout.write('\r\x1b[2K' if sys.stdout.isatty() else '')
+                    print(SAME_LOGIN % now[0])
             _sleep(POLL)
+
+
+SAME_LOGIN = 'Claude Code signed in as %s, which is already here. Run /login again and sign in as another account.'
 
 
 def save_new():
@@ -878,9 +914,14 @@ def save_new():
             _sleep(SETTLE)
 
 
+ADD_WITHOUT_PAGE = ('The page is not running, so each account is added through /login in Claude Code. To sign in '
+                    'through your browser instead, start the page with switchboard serve, then run switchboard add.')
+
+
 def add(args):
-    """`switchboard add`: one sign-in at a time. In Claude Code, /login to the next account; Switchboard notices it
-    and saves it, then asks whether there is another."""
+    """`switchboard add`: one sign-in at a time. At a terminal while the page runs, each one signs in through the
+    browser as the page's Add account does (firstrun.add). Without the page: /login in Claude Code to the next
+    account; Switchboard notices it and saves it, then asks whether there is another."""
     if args:                                    # --as SHORT, --at N: places.py, which runs this with none
         from . import places
         return places.add_named(args, sys.modules[__name__])
@@ -899,14 +940,18 @@ def add(args):
         auto_here()
     if tty is None:
         if not me:
-            raise SwitchError('Claude Code is not signed in. Run /login in Claude Code, then switchboard add again.')
-        print('To add another, run /login in Claude Code, then switchboard add again.')
+            raise SwitchError('Claude Code is not signed in. To add an account: switchboard add EMAIL')
+        print('To add another, run switchboard add at a terminal.')
         return 0
+    if page_running():                          # each account signs in through the browser (firstrun.py)
+        from . import firstrun
+        return firstrun.add(sys.modules[__name__], tty)
     paint = question_colour(tty)
+    print(ADD_WITHOUT_PAGE)
     try:
         while True:
             print('In Claude Code, run /login and sign in to the next account.')
-            me = wait_for_login(me)
+            me = wait_for_login(me, set(saved_identities()))
             save_new()
             keep.forget(me)
             print(term.saved(me[0]))
@@ -925,7 +970,7 @@ def sign_in(email):
     me = identity()
     if me and me in saved_identities():
         save_current()                          # the account in use keeps its newest login
-    print('In Claude Code, run /login and sign in as %s.' % email)
+    print('The page is not running, so sign in through Claude Code: run /login and sign in as %s.' % email)
     try:
         now = wait_for_login(me)
     except KeyboardInterrupt:
@@ -1026,63 +1071,16 @@ def job_installed():
 def first_step():
     """With no account yet: Claude Code to install, or to sign in to."""
     if not connect.claude_bin():
-        return 'Install Claude Code first (https://claude.com/claude-code), then run switchboard setup again.'
-    return 'Sign in to Claude Code first, then run switchboard setup again.'
+        return 'Install Claude Code first (https://claude.com/claude-code), then run switchboard again.'
+    return 'Sign in to Claude Code first, then run switchboard again.'
 
 
 def first_run(tty, yes=False, last_line=True):
-    """The first minute: keep the account Claude Code is on (nothing asked: it changes nothing). With two accounts
-    auto-switch goes on, and notifications and the status line go on (keep.py). At a terminal, macOS is asked once to
-    make the link app the default browser, so links open as their owner. Without a terminal nothing is asked, and one
-    line says what is left. Returns 0, or 1 when something failed."""
-    if core.DEMO:
-        raise SwitchError('The demo has made-up accounts, so there is nothing to set up.')
-    one_line = tty is None and not yes
-    me = identity()
-    if me:
-        try:
-            save_current()
-        except SwitchError:
-            if not one_line:
-                print(term.found_login(me[0]))
-            raise
-        keep.forget(me)                         # the first run keeps it on purpose, as add does
-        if not one_line:
-            print(term.found_login(me[0], kept=True))
-    n = len(saved_identities())
-    end = ended(n)
-    if one_line:
-        if end['lined'] == 'theirs':
-            print(term.STATUSLINE_THEIRS)
-        print(term.done(n, colour(), auto=end['auto'], notify=end['notify'], statusline=end['statusline'])
-              if n else first_step())
-        return 0
-    # Links open as their owner: at a terminal, with an account kept, macOS is asked once to make the link app the
-    # default browser (keep.links_by_itself); its question is said here, before the last line.
-    links = bool(n) and tty is not None and keep.links_by_itself()
-    if me:                                      # each other account: sign in with /login, and it is kept
-        if end['turned']:
-            print(term.AUTO_ON)
-        said = term.on_words(notify=end['notified'], statusline=end['lined'] == 'on').strip()
-        if said:
-            print(said)
-        if end['lined'] == 'theirs':
-            print(term.STATUSLINE_THEIRS)
-        if links:
-            print(term.LINKS_FIRST_RUN)
-        if last_line:
-            print(term.sign_in_others(job_installed()))
-        return 0
-    if end['lined'] == 'theirs' and n:
-        print(term.STATUSLINE_THEIRS)
-    if links:
-        print(term.LINKS_FIRST_RUN)
-    if last_line:
-        print(term.done(n, colour(), auto=end['auto'], notify=end['notify'], statusline=end['statusline'])
-              if n else first_step())
-    elif n:
-        print(term.counted(n, end['auto'], end['notify'], end['statusline']))
-    return 0
+    """The first run (firstrun.py): the account Claude Code is on is kept without a question; at a terminal, each
+    other account signs in through the browser, macOS's question about links is explained before it is shown, and
+    the last step names what is on. Without a terminal nothing is asked. Returns 0."""
+    from . import firstrun
+    return firstrun.run(sys.modules[__name__], tty, yes=yes, closing=last_line)
 
 
 def ended(n):
@@ -1100,6 +1098,8 @@ def ended(n):
         end['lined'] = keep.statusline_by_itself()
         end['statusline'] = statusline_on()
         end['hooked'] = keep.session_hooks_by_itself()      # the page's history says so; the first run's words don't
+        from . import skillfile
+        end['skill'] = skillfile.by_itself()                # Switchboard's skill, for coding agents (skillfile.py)
     end['auto'] = bool(engine.auto_settings().get('enabled'))
     return end
 
@@ -1426,6 +1426,10 @@ def links_command(args):
         if core.DEMO:
             raise SwitchError('The demo has made-up accounts; nothing is changed.')
         on = args[0] == 'on'
+        tty = open_tty() if on and terminal() else None
+        if tty is not None:                     # at a terminal: what macOS's question is for, before it is shown
+            from . import firstrun
+            return firstrun.links_on(sys.modules[__name__], tty)
         try:
             said = ask_page('/api/links', {'on': on})   # the page asks macOS, then watches for its answer
         except OSError:
@@ -1806,8 +1810,8 @@ def claude_on_keys(args):
 
 def tidy(everything=False):
     """For the uninstaller: a cut-off sign-in's leftovers, and everything Switchboard changed in Claude Code put
-    back (the status line, the notification hooks, the session hooks, the Models setting, house rules, the code map,
-    claude-mem's settings). With everything: the keys too (their Keychain items). Prints one line per change, and one for each
+    back (the status line, the notification hooks, the session hooks, Switchboard's skill, the Models setting, house
+    rules, the code map, claude-mem's settings). With everything: the keys too (their Keychain items). Prints one line per change, and one for each
     thing it could not put back; a step that can't be done never stops the ones after it. A file counts as left only
     when Switchboard's own record says it changed that file (or the record can't be read): one it never changed that
     can't be read, isn't JSON, or is a folder or a link holds nothing of Switchboard's. Returns 1 when anything is
@@ -1881,6 +1885,15 @@ def tidy(everything=False):
             kept('Session hooks', r['left'], they=True)
     except Exception as e:  # noqa: BLE001
         kept('Session hooks', claudecode.plain_error(e), they=True)
+    try:
+        from . import skillfile
+        said, gone = skillfile.take_out_all()
+        for x in said:
+            print(x)
+        for label, why in gone:
+            kept(label, why)
+    except Exception as e:  # noqa: BLE001
+        kept('Skill', claudecode.plain_error(e))
     try:
         if server.models_turn(False).get('changed'):
             print('Models setting: taken out.')
@@ -1959,6 +1972,8 @@ def doctor():
     here = os.path.dirname(os.path.abspath(__file__))
     line(os.path.isfile(os.path.join(here, 'web', 'index.html')), 'Program files in %s' % _short_path(os.path.dirname(here)),
          'Run the installer again.')
+    from . import about
+    about.doctor_line(line, os.path.dirname(here))       # the files as installed (SHA256SUMS)
     on_path = [d for d in os.environ.get('PATH', '').split(os.pathsep) if d and
                os.path.realpath(os.path.join(d, 'switchboard')) == os.path.realpath(core.data_path('bin/switchboard'))]
     line(bool(on_path) or None, 'The switchboard command%s' % (' (%s)' % _short_path(on_path[0]) if on_path else ''),
@@ -2030,6 +2045,9 @@ def doctor():
          notify_hooks.off_line(sh['off_by']) if sh['works'] else
          "Claude Code's settings file can't be read." if sh['in'] is None else
          'The Python or the folder they run is gone. Run: switchboard hooks on')
+    from . import skillfile
+    for good, text, fix in skillfile.doctor_lines():
+        line(good, text, fix)
     if browser.present():
         _doctor_tabs(line, page)
     if ok and kept == 0:                # nothing set up yet is not "All good": the first screen's own next step
@@ -2408,7 +2426,10 @@ def watch_line(view):
 def _doctor_menubar(line):
     """The menu bar: what it runs on, its job (launchd is asked only about a job this install added), whether it runs,
     and its app. Reads only: it starts nothing and makes nothing."""
-    from . import menubar, menubar_wrap
+    from . import menubar, menubar_keep, menubar_wrap
+    if menubar_keep.is_off():                   # turned off on purpose: that one line, and the way back
+        line(*menubar_keep.doctor_line(_short_path))
+        return
     hop = menubar.launcher()
     if not (os.path.isfile(hop) and os.access(hop, os.X_OK)):
         line(None, 'Menu bar: not installed', 'Add it with: switchboard update --menu-app')
@@ -2423,9 +2444,7 @@ def _doctor_menubar(line):
         job = subprocess.run(['launchctl', 'print', 'gui/%d/%s' % (os.getuid(), menubar.AGENT)],
                              capture_output=True).returncode == 0
     line(job, 'Menu bar job (starts it at login)', 'Run the installer again to add it.')
-    pid = menubar.running_pid()
-    line(True if pid is not None else None, 'Menu bar running%s' % (' (pid %d)' % pid if pid else ''),
-         'Start it with: switchboard menubar. Its log: %s' % _short_path(core.data_path('menubar.log')))
+    line(*menubar_keep.doctor_line(_short_path))
     app = menubar_wrap.present()
     if libs and libs['framework']:
         line(None, 'Menu bar app (%s)' % _short_path(app or menubar_wrap.path()), menubar.FRAMEWORK)
@@ -2551,12 +2570,9 @@ def switch_command(args):
     rows = [a for a in term.read(view)['accounts'] if not a['unmanaged'] and a['slot']]
     if len(rows) < 2:
         raise SwitchError('There is no other account to switch to. Add one with: switchboard add')
-    at = next((i for i, a in enumerate(rows) if a['active']), -1)
-    usable = [a for a in rows[at + 1:] + rows[:max(at, 0)]
-              if not a['needs_login'] and not a['active'] and a['rule'] != 'out']
-    taken = set(a.get('email') for a in view.get('accounts') or [] if a.get('elsewhere'))   # shown, never decided on
-    for a in [x for x in usable if x['email'] in taken or not any(lim['over'] for lim in x['limits'])] + usable:
-        return _said_after(use(a['email']))        # the next one under its lines, else the next one in the list
+    a, _ = next_account(view, rows)
+    if a:
+        return _said_after(use(a['email']))
     others = [a for a in rows if not a['active']]
     if all(a['rule'] == 'out' for a in others):
         raise SwitchError('Every other account is kept out of auto-switch; name one to move there: '
@@ -2564,7 +2580,24 @@ def switch_command(args):
     if any(a['rule'] == 'out' for a in others):
         raise SwitchError('Every other account needs a fresh sign-in or is kept out of auto-switch; name a kept-out '
                           'one to move there: switchboard switch NAME')
-    raise SwitchError('Every other account needs a fresh sign-in: in Claude Code, run /login as one of them.')
+    raise SwitchError('Every other account needs a fresh sign-in. Sign in again with: switchboard signin')
+
+
+def next_account(view, rows=None):
+    """The account `switchboard switch` alone moves Claude Code to, and whether it is under its lines: (the next one in
+    the list after the one in use that is under its lines, True), else (the next one in the list, False), else (None,
+    False). Passed over: one that needs a fresh sign-in, one kept out of auto-switch, the one in use. One in use
+    elsewhere is shown, never decided on: it counts as under its lines."""
+    if rows is None:
+        rows = [a for a in term.read(view)['accounts'] if not a['unmanaged'] and a['slot']]
+    at = next((i for i, a in enumerate(rows) if a['active']), -1)
+    usable = [a for a in rows[at + 1:] + rows[:max(at, 0)]
+              if not a['needs_login'] and not a['active'] and a['rule'] != 'out']
+    taken = set(a.get('email') for a in view.get('accounts') or [] if a.get('elsewhere'))
+    room = [x for x in usable if x['email'] in taken or not any(lim['over'] for lim in x['limits'])]
+    if room:
+        return room[0], True
+    return (usable[0], False) if usable else (None, False)
 
 
 def _said_after(code):
@@ -2660,11 +2693,25 @@ def nearest_command(cmd):
 
 def unknown(cmd):
     """A command it does not know, with --help or without: it says so, with the nearest real command when one is
-    close, then the help."""
+    close, then the short help."""
+    from . import firstrun
     near = nearest_command(cmd)
     print('Unknown command: %s.%s' % (cmd, ' Did you mean %s?' % near if near else ''))
-    print(__doc__.strip())
+    print(firstrun.short_help())
     return 2
+
+
+def help_command(args):
+    """`switchboard help`: what a new person needs, on one screen (firstrun.short_help); `help all`: every command;
+    `help CMD`: that command's own lines."""
+    from . import firstrun
+    if args == ['all']:
+        print(__doc__.strip())
+    elif len(args) == 1 and command_help(args[0]):
+        print(command_help(args[0]))
+    else:
+        print(firstrun.short_help())
+    return 0
 
 
 def command_help(cmd):
@@ -2709,12 +2756,17 @@ def main(argv=None):
     if asks_help(cmd, args[1:]):
         if not command_help(cmd) and cmd not in UNLISTED:
             return unknown(cmd)
-        print(command_help(cmd) or __doc__.strip())
-        return 0
+        if command_help(cmd):
+            print(command_help(cmd))
+            return 0
+        return help_command([])
     if cmd in ('-h', '--help', 'help'):
-        print(__doc__.strip())
+        return help_command(args[1:])
     elif cmd in ('version', '--version', '-v'):
         print('switchboard %s' % core.version_text())         # with the commit it was made from, when known
+    elif cmd == 'about':                        # the facts of this install, checked now (about.py)
+        from . import about
+        return about.main(args[1:], sys.modules[__name__])
     elif cmd == 'serve':
         from . import server
         server.serve()
@@ -2736,7 +2788,7 @@ def main(argv=None):
         return status()
     elif cmd == 'menubar':
         from . import menubar
-        return menubar.main(args[1:])
+        return menubar.main(args[1:], update=update)
     elif cmd == 'setup':
         return setup(args[1:])
     elif cmd == 'add' and '--token' in args[1:]:    # a one-year token or an API key kept as an account
@@ -2746,6 +2798,9 @@ def main(argv=None):
         return add(args[2:])
     elif cmd == 'add' and args[1:2] and args[1].startswith('-'):    # its flags: switchboard add --as work
         return add(args[1:])
+    elif cmd == 'add' and len(args) == 2 and EMAIL_RE.match(args[1]):  # one account's sign-in in the browser
+        from . import firstrun
+        return firstrun.add_one(sys.modules[__name__], args[1])
     elif cmd == 'add' and len(args) > 1:            # another provider: switchboard add codex
         from .providers import cli as providers_cli
         return providers_cli.main(args)
@@ -2836,6 +2891,9 @@ def main(argv=None):
         return hooks_command(args[1:])
     elif cmd == 'models':
         return models_command(args[1:])
+    elif cmd == 'skill':
+        from . import skillfile
+        return skillfile.main(args[1:])
     elif cmd == 'tidy':                         # used by the uninstaller: see tidy()
         return tidy('--all' in args)
     elif cmd == 'keys':

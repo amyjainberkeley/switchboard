@@ -386,44 +386,33 @@ class AgeInTheTerminal(unittest.TestCase):
         self.assertEqual(self.rows(view)[-1], '5  ana@mail.example       Max 20x · Personal  in use · now')
 
 
-class AgeInTheMenuBar(unittest.TestCase):
+class NoAgeInTheMenuBar(unittest.TestCase):
+    """How old each account's numbers are is said on the page and in the terminal. The menu bar's row is its email,
+    one word and its bars, so it never says it, Now included, and VoiceOver reads what the row shows."""
+
     def state(self):
         s = test_menubar.view()
         test_menubar.find(s, 'ana@fernhill.example')['usage_at'] = test_menubar.NOW - 480
         return s
 
-    def test_each_row_says_how_old_its_numbers_are(self):
+    def test_no_row_says_how_old_its_numbers_are(self):
         marks = dict((r['email'], r['marks']) for r in menubar.rows(self.state(), test_menubar.TZ))
         self.assertEqual(marks, {
-            'ana@northwind.example': [('1 min ago', 'next'), ('Use', 'use')],
-            'ana@fernhill.example': [('8 min ago', 'next'), ('Use', 'use')],
-            'ana@harbor.example': [('1 min ago', 'next'), ('Use', 'use')],
-            'ana@lab.example': [('1 min ago', 'next'), ('Next', 'next'), ('Use', 'use')],
-            'ana@mail.example': [('1 min ago', 'next'), ('In use', 'in-use')]})
-
-    def test_now_beside_in_use_on_claude_codes_own_numbers(self):
+            'ana@northwind.example': [('Use', 'use')],
+            'ana@fernhill.example': [('Use', 'use')],
+            'ana@harbor.example': [('Use', 'use')],
+            'ana@lab.example': [('Next', 'next')],
+            'ana@mail.example': [('In use', 'in-use')]})
         s = self.state()
         test_menubar.find(s, 'ana@mail.example')['live'] = True
-        self.assertEqual(test_menubar.row_of(s, 'ana@mail.example')['marks'], [('Now', 'next'), ('In use', 'in-use')])
+        self.assertEqual(test_menubar.row_of(s, 'ana@mail.example')['marks'], [('In use', 'in-use')])
 
-    def test_voiceover_says_it_too(self):
+    def test_voiceover_reads_what_the_row_shows(self):
         s = self.state()
         label = lambda e: menubar.row_label(test_menubar.row_of(s, e))      # noqa: E731
-        self.assertRegex(label('ana@fernhill.example'),                  # ahead of its week: its pace words too
-                         r'^Use ana@fernhill\.example, checked 8 min ago, weekly 94%, at this pace, full by [^,]+$')
-        self.assertEqual(label('ana@lab.example'), 'Use ana@lab.example, next, checked 1 min ago, weekly 65%')
-        self.assertEqual(label('ana@mail.example'), 'ana@mail.example, in use, checked 1 min ago, weekly 27%')
-        test_menubar.find(s, 'ana@mail.example')['live'] = True
-        self.assertEqual(label('ana@mail.example'), 'ana@mail.example, in use now, weekly 27%')
-
-    def test_sign_in_again_and_one_switchboard_does_not_hold(self):
-        s = self.state()
-        test_menubar.find(s, 'ana@harbor.example')['needs_login'] = True
-        test_menubar.find(s, 'ana@northwind.example')['unmanaged'] = True
-        self.assertEqual(test_menubar.row_of(s, 'ana@harbor.example')['marks'], [('1 min ago', 'next'), ('Sign in again', 'use')])
-        self.assertEqual(test_menubar.row_of(s, 'ana@northwind.example')['marks'], [('1 min ago', 'next')])
-        test_menubar.find(s, 'ana@northwind.example')['usage_at'] = None
-        self.assertEqual(test_menubar.row_of(s, 'ana@northwind.example')['marks'], [])
+        self.assertEqual(label('ana@fernhill.example'), 'Use ana@fernhill.example, weekly 94%')
+        self.assertEqual(label('ana@lab.example'), 'Use ana@lab.example, next, weekly 65%')
+        self.assertEqual(label('ana@mail.example'), 'ana@mail.example, in use, weekly 27%')
 
 
 @unittest.skipUnless(os.path.exists(test_app.CHROME), 'needs Google Chrome')

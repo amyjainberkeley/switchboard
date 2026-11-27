@@ -11,10 +11,12 @@ Each way Switchboard can stop has more than one thing that brings it back:
   hour (then it stays as it is and says so).
 - Another program holds the page's port: the page runs everything but its page (the readings, the loop that switches,
   the notes), tries the port again every minute, and says so once (port_note; the menu bar reads port_mark).
-- The menu bar item stops without being quit: the page starts its job again (MenuBarKeeper).
+- The menu bar item stops, for any reason but `switchboard menubar off`: launchd starts it again (its job's KeepAlive),
+  and the page starts its job when launchd did not (MenuBarKeeper).
 
 What the person did on purpose is never undone: the page writes a stop mark when it is stopped (SIGTERM: launchd's
-bootout, the installer, the uninstaller, a person), and the menu bar writes a quit mark when Quit is chosen.
+bootout, the installer, the uninstaller, a person), and the menu bar item stays off while it was turned off in the
+terminal (menubar_keep.is_off). The menu bar has no Quit.
 
 Everything here is plain Python 3.9: the menu bar imports it too. Times that measure a wait are on the monotonic
 clock, which stops while the Mac sleeps; the wall clock is used only for what other processes must read.
@@ -691,38 +693,25 @@ def _notify():
     return notify
 
 
-QUIT = 'menubar-quit.json'         # {'at', 'pid'}: Quit was chosen in the menu bar; a menu bar that starts removes it
 BAR_DOWN_FOR = 60.0     # awake seconds the menu bar is not running before the page starts its job: launchd starts one
-                        # that crashed within 20 s, so a minute means launchd did not
+                        # that exited within 20 s (KeepAlive), so a minute means launchd did not
 BAR_GAP = 300.0         # at most one start of the menu bar by the page every five minutes
 BAR_PER_HOUR = 3        # and three an hour (a menu bar that can't draw exits at once: no more than that)
 BAR_TRIES = 'menubar-tries.json'   # {'tries': [wall times]}: the page's starts of the menu bar, kept for an hour
 
 
-def note_quit(now=None):
-    """Quit was chosen in the menu bar: neither launchd (its job starts it again only after a crash) nor the page
-    starts it again."""
-    _write(QUIT, {'at': round(time.time() if now is None else now, 3), 'pid': os.getpid()})
-
-
-def quit_chosen():
-    rec = core.read_json(data_path(QUIT))
-    at = rec.get('at')
-    return rec if _number(at) else None
-
-
-def clear_quit():
-    _remove(QUIT)
-
-
 class MenuBarKeeper(object):
     """The page's watch on the menu bar. When the menu bar's job is installed (job: () -> its plist or None), the menu
-    bar has not run for BAR_DOWN_FOR awake seconds (running: () -> bool) and the person did not quit it (quit_chosen),
-    the page starts its job again (start: (plist) -> True, False or None), at most every BAR_GAP and BAR_PER_HOUR an
-    hour."""
+    bar has not run for BAR_DOWN_FOR awake seconds (running: () -> bool) and the person did not turn it off (off: () ->
+    bool, menubar_keep.is_off), the page starts its job again (start: (plist) -> True, False or None), at most every
+    BAR_GAP and BAR_PER_HOUR an hour."""
 
-    def __init__(self, running, job, start, mono=time.monotonic, wall=time.time):
+    def __init__(self, running, job, start, off=None, mono=time.monotonic, wall=time.time):
         self.running, self.job, self.start = running, job, start
+        if off is None:
+            from . import menubar_keep
+            off = menubar_keep.is_off
+        self.off = off
         self.mono, self.wall = mono, wall
         self.gone_since = None
         self.said = set()
@@ -735,7 +724,7 @@ class MenuBarKeeper(object):
             self.gone_since = None
             self.said.clear()
             return None
-        if quit_chosen() is not None:
+        if self.off():
             self.gone_since = None
             return None
         if self.gone_since is None:
@@ -753,6 +742,6 @@ class MenuBarKeeper(object):
             return None
         _write(BAR_TRIES, {'tries': recent + [round(w, 3)]})
         took = self.start(plist)
-        log('the menu bar was not running and was not quit: the page %s its job' % (
+        log('the menu bar was not running and was not turned off: the page %s its job' % (
             'started' if took else 'could not start'))
         return 'started' if took else 'failed'

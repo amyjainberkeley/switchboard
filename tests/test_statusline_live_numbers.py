@@ -34,6 +34,9 @@ MINE = '{\n  "statusLine": {\n    "type": "command",\n    "command": "~/.claude/
 ON_SAID = 'Status line in Claude Code: on'
 THEIRS_SAID = 'You already have a status line in Claude Code, so Switchboard left it.'
 THEIRS_LINE = THEIRS_SAID + " To use Switchboard's instead: switchboard statusline on --replace"
+# The first run's step 4, with the status line and notifications on (firstrun.where).
+STEP_4_BOTH = ('  Claude Code   a status line with the account and its limits, and a notification when a long turn\n'
+               '                is done or it needs you\n')
 H, D = 3600, 86400
 
 
@@ -292,33 +295,39 @@ class TerminalFirstRun(test_term.Sandbox):
             return json.load(f)
 
     def test_setup_turns_it_on_and_says_so_with_notifications(self):
-        code, out = self.run_cli('setup', tty=test_term.FakeTty([]))
-        self.assertEqual((code, out), (0, 'Found Claude Code signed in as ana@work.example. Kept.\n'
-                                          'Notifications and the status line are on.\n%s\n' % test_term.SIGN_IN))
+        code, out = self.run_cli('setup', tty=test_term.FakeTty(['s']))
+        self.assertEqual(code, 0)
+        self.assertIn(STEP_4_BOTH, out)
         self.assertTrue(sl.is_ours(self.settings()['statusLine']))
         self.assertEqual(json.dumps(self.settings()).count(nh.MARK), 3)      # the hooks beside it
-        code, out = self.run_cli('setup', tty=test_term.FakeTty([]))         # the first run again: said once, done once
-        self.assertEqual((code, out), (0, 'Found Claude Code signed in as ana@work.example. Kept.\n%s\n'
-                                       % test_term.SIGN_IN))
+        code, again = self.run_cli('setup', tty=test_term.FakeTty(['s']))   # the first run again: done once, still on
+        self.assertEqual(code, 0)
+        lines = out.split('\n')                                            # the first run names what it turned on;
+        i = next(n for n, line in enumerate(lines) if line.startswith("  Changed in Claude Code's settings:"))
+        j = next(n for n in range(i, len(lines)) if lines[n] == '')       # the second turned nothing on, so says
+        self.assertEqual(again, '\n'.join(lines[:i] + lines[j:]))           # the same without that line
 
     def test_without_a_terminal_its_one_line_says_so(self):
-        self.assertEqual(self.run_cli('setup'), (0, '✓ 1 account. Notifications and the status line are on. Type '
-                                                    'switchboard to see it.\n'))
+        self.assertEqual(self.run_cli('setup'), (0, 'Claude Code is signed in as ana@work.example. Kept.\n'
+                                                    'Notifications and the status line are on.\n'
+                                                    'Add your other accounts at a terminal with switchboard setup.\n'))
 
     def test_a_status_line_of_your_own_stays_and_one_line_says_so(self):
         with open(self.path, 'w') as f:
             f.write(MINE)
-        code, out = self.run_cli('setup', tty=test_term.FakeTty([]))
-        self.assertEqual((code, out), (0, 'Found Claude Code signed in as ana@work.example. Kept.\n'
-                                          'Notifications are on.\n%s\n%s\n' % (THEIRS_LINE, test_term.SIGN_IN)))
+        code, out = self.run_cli('setup', tty=test_term.FakeTty(['s']))
+        self.assertEqual(code, 0)
+        self.assertIn('  Claude Code   a notification when a long turn is done or it needs you\n', out)
+        self.assertIn(' '.join(THEIRS_LINE.split()), ' '.join(out.split()))
         self.assertEqual(self.settings()['statusLine'], json.loads(MINE)['statusLine'])
-        code, out = self.run_cli('setup')                                    # without a terminal: before its one line
-        self.assertEqual(out, '%s\n✓ 1 account. Notifications are on. Type switchboard to see it.\n' % THEIRS_LINE)
+        code, out = self.run_cli('setup')                                    # without a terminal: in its three lines
+        self.assertEqual(out, 'Claude Code is signed in as ana@work.example. Kept.\nNotifications are on. %s\n'
+                              'Add your other accounts at a terminal with switchboard setup.\n' % THEIRS_LINE)
 
     def test_one_you_turned_off_stays_off(self):
         self.run_cli('statusline', 'off')
         code, out = self.run_cli('setup')
-        self.assertEqual(out, '✓ 1 account. Notifications are on. Type switchboard to see it.\n')
+        self.assertEqual(out.splitlines()[1], 'Notifications are on.')
         self.assertNotIn('statusLine', self.settings())
 
 
@@ -593,7 +602,7 @@ class AWindowThatRefilled(LiveBase):
         self.assertEqual(u['weekly']['pct'], 55.0)
         self.assertEqual(term.window(u['session'], self.now, 90, '5-hour')['words'], 'not started')
         five = menubar._limit('five', '5-hour', menubar._window(u, 'session'), 90)
-        self.assertEqual((menubar.pct_text(five), menubar.reset_line(five, self.now)), ('0%', 'Not started'))
+        self.assertEqual((menubar.pct_text(five), five['over']), ('0%', False))      # the menu bar's bar: 0%
 
     def test_a_window_the_record_does_not_have(self):
         """Claude Code may send one window without the other, and drops one once its reset passes."""
@@ -643,22 +652,16 @@ class NowForTheAccountInUse(LiveBase):
                 got = dict((x['email'], x['live']) for x in server.render(st, facts)['accounts'])
                 self.assertEqual(got, {A: want, B: False})
 
-    def test_the_menu_bar_says_now_beside_in_use(self):
+    def test_the_menu_bar_row_is_the_same_on_claude_codes_own_numbers(self):
+        # "now" is said on the page and in the terminal; the menu bar's row is its email, one word and its bars.
         state = test_menubar.view()
         state['accounts'][0]['live'] = True                                  # ana@mail.example, in use
         marks = dict((r['email'], r['marks']) for r in menubar.rows(state, test_menubar.TZ))
-        self.assertEqual(marks['ana@mail.example'], [('Now', 'next'), ('In use', 'in-use')])
-        self.assertEqual(marks['ana@lab.example'], [('1 min ago', 'next'), ('Next', 'next'), ('Use', 'use')])
+        self.assertEqual(marks['ana@mail.example'], [('In use', 'in-use')])
         row = next(r for r in menubar.rows(state, test_menubar.TZ) if r['email'] == 'ana@mail.example')
-        # ana@mail.example has no 5-hour window (Ultra): no 5-hour part, "now" all the same
-        self.assertEqual(menubar.row_label(row), 'ana@mail.example, in use now, weekly 27%')
-        five = test_menubar.view(active='ana@harbor.example')               # a Team account, its 5-hour window open
-        test_menubar.find(five, 'ana@harbor.example')['live'] = True
-        row = next(r for r in menubar.rows(five, test_menubar.TZ) if r['email'] == 'ana@harbor.example')
-        self.assertEqual(menubar.row_label(row), 'ana@harbor.example, in use now, 5-hour 0%, weekly 17%')
+        self.assertEqual(menubar.row_label(row), 'ana@mail.example, in use, weekly 27%')
         state['accounts'][0]['live'] = False
-        marks = dict((r['email'], r['marks']) for r in menubar.rows(state, test_menubar.TZ))
-        self.assertEqual(marks['ana@mail.example'], [('1 min ago', 'next'), ('In use', 'in-use')])  # its own age
+        self.assertEqual(dict((r['email'], r['marks']) for r in menubar.rows(state, test_menubar.TZ)), marks)
 
 
 @unittest.skipUnless(os.path.exists(test_app.CHROME), 'needs Google Chrome')
@@ -696,16 +699,18 @@ class Readme(unittest.TestCase):
     # the README has no "What it does" list; what goes into Claude Code's settings is said under "What it
     # changes on your Mac", and "What follows a switch" comes after the first minute
     def test_the_status_line_paragraph(self):
-        does = self.readme[self.readme.index('## What it changes on your Mac'):self.readme.index('## The Mac app')]
+        does = self.readme[self.readme.index('## What it changes on your Mac'):self.readme.index('## Not for you if')]
         line = next((x for x in does.splitlines() if 'status line' in x.lower() and 'by itself' in x), '')
         self.assertIn('switchboard statusline off', line)
 
     def test_the_first_minute_is_what_the_installer_prints(self):
-        # the first run keeps the account Claude Code is on and says how to add the others, as cli.first_run
-        # prints it for a login it kept
+        # the first run keeps the account Claude Code is on, then goes on to the others, as firstrun.run prints it
+        # for a login it kept
+        from switchboard import firstrun
         first = self.readme[self.readme.index('## Quick start'):self.readme.index('## What follows a switch')]
-        said = '\n'.join((term.found_login('maya@northwind.example', kept=True),
-                          term.on_words(notify=True, statusline=True).strip(), term.sign_in_others(True)))
+        said = '\n'.join((firstrun.TITLE, '', '1 of 4  ' + firstrun.STEP_ACCOUNT,
+                          '  ' + firstrun.SIGNED_IN_KEPT % 'maya@northwind.example', '',
+                          '2 of 4  ' + firstrun.STEP_OTHERS))
         self.assertIn('```\n' + said + '\n```\n', first)
 
 

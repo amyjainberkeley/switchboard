@@ -389,19 +389,18 @@ class TheQuestion(unittest.TestCase):
     def test_what_is_missing_is_said_last(self):
         one = dict(VIEW, accounts=[VIEW['accounts'][4]])
         code, out, _, _ = self.ask([], one)                     # nothing to switch to: no question
-        self.assertTrue(out.endswith('in 20 hours\n\nSign in to another account with /login in Claude Code, then type '
-                                     'switchboard to keep it.\n'), out)
+        self.assertTrue(out.endswith('in 20 hours\n\nAdd another account with switchboard add.\n'), out)
         first = dict(one, accounts=[dict(VIEW['accounts'][4], unmanaged=True)])
         self.assertTrue(self.ask([], first)[1].endswith('\n\nAdd it with switchboard setup.\n'))
         with self.assertRaises(core.SwitchError) as e:          # nothing added yet: nothing to switch to
             cli.switch('ana@mail.example', dict(first, accounts=[dict(first['accounts'][0], active=False)]))
         self.assertEqual(str(e.exception), 'ana@mail.example is not in Switchboard yet. Add it with: switchboard setup')
         none = dict(VIEW, active=None, accounts=[])
-        self.assertTrue(self.ask([], none)[1].endswith('weekly\n\nSign in to Claude Code first, then run switchboard '
-                                                      'setup.\n'))
+        self.assertTrue(self.ask([], none)[1].endswith('weekly\n\nSign in to Claude Code first, then run switchboard.'
+                                                      '\n'))
         with mock.patch.object(connect, 'claude_bin', lambda: None):
             self.assertTrue(self.ask([], none)[1].endswith('\n\nInstall Claude Code first (https://claude.com/claude-code'
-                                                          '), then run switchboard setup.\n'))
+                                                          '), then run switchboard.\n'))
         guarded = dict(one, guard="Another program is also switching Claude Code's login (com.example.x). Turn it "
                                   'off first.')
         self.assertTrue(self.ask([], guarded)[1].endswith("\n\nAnother program is also switching Claude Code's login "
@@ -417,7 +416,9 @@ class TheQuestion(unittest.TestCase):
 # The first run keeps each login as you sign in, and auto-switch turns on by itself with a second account.
 AUTO_ON = ('Auto-switch is on: Claude Code moves to another account before a limit. Turn it off with '
            'switchboard auto off.')
-SIGN_IN = 'Sign in to your other accounts with /login in Claude Code, then type switchboard to keep each one.'
+# The first run's step 2 with no page running and no background job to start one (firstrun.PAGE_DOWN).
+PAGE_DOWN = ('  Accounts are added through the page, which is not running and did not start. Run switchboard doctor '
+             'to see why, then add them with switchboard add.\n')
 
 # ---------- a sandbox: throwaway folders, the stand-in engine, no page unless a test starts its stand-in ----------
 
@@ -691,17 +692,26 @@ class FirstRun(Sandbox):
             return 0
 
     def test_with_a_terminal(self):
-        code, out = self.run_cli('setup', tty=FakeTty([]))
-        self.assertEqual((code, out), (0, 'Found Claude Code signed in as ana@work.example. Kept.\n'
-                                          'Notifications and the status line are on.\n%s\n' % SIGN_IN))
+        code, out = self.run_cli('setup', tty=FakeTty(['s']))
+        self.assertEqual(code, 0, out)
+        self.assertTrue(out.startswith('Switchboard setup.\n\n1 of 3  Your account\n'
+                                       '  Claude Code is signed in as ana@work.example. Kept.\n\n'
+                                       '2 of 3  Your other accounts\n'), out)
+        self.assertIn(' '.join((PAGE_DOWN + '\n3 of 3  Where to find it\n'
+                                '  Claude Code   a status line with the account and its limits, and a notification '
+                                'when a long turn is done or it needs you\n').split()), ' '.join(out.split()))
+        self.assertTrue(out.endswith('\n\n1 Claude account. Type switchboard to see it.\n'), out)
         self.assertEqual(self.calls(), [('add_current',)])     # the order stays the engine's own: what refills first
         self.assertEqual(self.hooks(), 3)
-        code, out = self.run_cli('setup', tty=FakeTty([]))              # the first run again: said once, done once
-        self.assertEqual((code, out), (0, 'Found Claude Code signed in as ana@work.example. Kept.\n%s\n' % SIGN_IN))
+        changed = re.compile(r"  Changed in Claude Code's settings: [^\n]*(?:\n  [^\n]+)*\n")
+        self.assertRegex(out, changed)                                  # what it put in, each with its undo
+        code, again = self.run_cli('setup', tty=FakeTty(['s']))         # the first run again: done once, said as it is
+        self.assertEqual((code, again), (0, changed.sub('', out)))      # and nothing new was put in
 
     def test_without_a_terminal(self):
-        self.assertEqual(self.run_cli('setup'), (0, '✓ 1 account. Notifications and the status line are on. Type '
-                                                    'switchboard to see it.\n'))
+        self.assertEqual(self.run_cli('setup'), (0, 'Claude Code is signed in as ana@work.example. Kept.\n'
+                                                    'Notifications and the status line are on.\n'
+                                                    'Add your other accounts at a terminal with switchboard setup.\n'))
 
     def test_the_flag_that_changes_nothing_is_taken_and_a_wrong_one_is_not(self):
         self.assertEqual(self.run_cli('setup', '--no-bringover', tty=FakeTty([]))[0], 0)
@@ -711,9 +721,10 @@ class FirstRun(Sandbox):
         self.run_cli('notify', 'off')
         hold(self.fake, B)
         code, out = self.run_cli('setup', '--yes')
-        self.assertEqual(out.splitlines()[-1], 'Sign in to your other accounts with /login in Claude Code, then type '
-                                               'switchboard to keep each one.')
+        self.assertEqual(out.splitlines()[-1], '2 Claude accounts. Type switchboard to see them.')
+        self.assertIn('  Add each one at a terminal with: switchboard add\n', out)
         self.assertIn('Auto-switch is on', out)
+        self.assertNotIn('notification', out)
         self.assertEqual(self.hooks(), 0)
 
     def test_with_claude_codes_hooks_turned_off_nothing_is_put_in_or_said(self):
@@ -721,24 +732,27 @@ class FirstRun(Sandbox):
         with open(path, 'w') as f:
             f.write('{\n  "disableAllHooks": true\n}\n')
         code, out = self.run_cli('setup')
-        self.assertEqual(out.splitlines()[-1], '✓ 1 account. Type switchboard to see it.')
+        self.assertEqual(out.splitlines(), ['Claude Code is signed in as ana@work.example. Kept.',   # nothing on
+                                            'Add your other accounts at a terminal with switchboard setup.'])
         with open(path) as f:
             self.assertEqual(f.read(), '{\n  "disableAllHooks": true\n}\n')
 
     def test_not_signed_in(self):
         os.remove(os.path.join(self.home, '.claude', '.claude.json'))
         self.assertEqual(self.run_cli('setup', tty=FakeTty([])),
-                         (0, 'Sign in to Claude Code first, then run switchboard setup again.\n'))
+                         (0, 'Switchboard setup.\n\n1 of 1  Your account\n'
+                             '  Sign in to Claude Code first, then run switchboard again.\n'))
         self.assertEqual(self.calls(), [])
 
     def test_without_claude_code_it_says_to_install_it(self):
         os.remove(os.path.join(self.home, '.claude', '.claude.json'))
         with mock.patch.object(connect, 'claude_bin', lambda: None):
             self.assertEqual(self.run_cli('setup', tty=FakeTty([])),
-                             (0, 'Install Claude Code first (https://claude.com/claude-code), then run switchboard '
-                                 'setup again.\n'))
+                             (0, 'Switchboard setup.\n\n1 of 1  Your account\n'
+                                 '  Install Claude Code first (https://claude.com/claude-code), then run switchboard '
+                                 'again.\n'))
             self.assertEqual(self.run_cli('setup'), (0, 'Install Claude Code first (https://claude.com/claude-code), '
-                                                        'then run switchboard setup again.\n'))
+                                                        'then run switchboard again.\n'))
             with self.assertRaises(core.SwitchError) as e:
                 self.run_cli('add', tty=FakeTty([]))
         self.assertIn('Claude Code is not installed on this Mac', str(e.exception))
@@ -755,12 +769,15 @@ class FirstRun(Sandbox):
         self.assertEqual(self.emails(), [A])
 
     def test_bare_switchboard_in_a_terminal_starts_with_the_first_run(self):
-        with mock.patch.object(cli, 'terminal', lambda: True), mock.patch.object(cli, 'read_one_key', lambda: '\r'):
+        with mock.patch.object(cli, 'terminal', lambda: True), mock.patch.object(cli, 'read_one_key', lambda: '\r'), \
+                mock.patch.object(sys, 'stdin', io.StringIO('s\n')):   # its questions read the terminal: s skips
             code, out = self.run_cli()
         self.assertEqual(code, 0, out)
-        self.assertTrue(out.startswith('Found Claude Code signed in as ana@work.example. Kept.\n'
-                                       'Notifications and the status line are on.\n\n'
-                                       'Claude Code is on ana@work.example · auto-switch off'), out)
+        self.assertTrue(out.startswith('Switchboard setup.\n\n1 of 3  Your account\n'
+                                       '  Claude Code is signed in as ana@work.example. Kept.\n'), out)
+        self.assertIn('\n3 of 3  Where to find it\n', out)
+        self.assertNotIn('Type switchboard to see', out)           # the accounts follow at once
+        self.assertIn('\n\nClaude Code is on ana@work.example · auto-switch off', out)
         # once something is added, it is the view straight away
         with mock.patch.object(cli, 'terminal', lambda: True), mock.patch.object(cli, 'read_one_key', lambda: 'q'):
             code, out = self.run_cli()
@@ -793,6 +810,7 @@ class AddLoop(Sandbox):
         code, out = self.run_cli('add', tty=FakeTty(['y', 'n']))
         self.assertEqual(code, 0, out)
         self.assertEqual(out, '✓ Saved ana@work.example\n'
+                              '%s\n'
                               'In Claude Code, run /login and sign in to the next account.\n'
                               '✓ Saved ana@home.example\n'
                               '%s\n'
@@ -800,7 +818,7 @@ class AddLoop(Sandbox):
                               'In Claude Code, run /login and sign in to the next account.\n'
                               '✓ Saved cy@lab.example\n'
                               'Add another? [y/N] n\n'
-                              '3 accounts. Type switchboard to see them.\n' % AUTO_ON)
+                              '3 accounts. Type switchboard to see them.\n' % (cli.ADD_WITHOUT_PAGE, AUTO_ON))
         # each login kept; with the second account, auto-switch on (once: the engine keeps the setting)
         self.assertEqual(self.calls(), [('add_current',), ('add_current',), ('set_auto', {'enabled': True}),
                                         ('add_current',)])
@@ -810,19 +828,21 @@ class AddLoop(Sandbox):
         self.fake.hold(A, 'org-a')
         self.logins((B, ''))
         code, out = self.run_cli('add', tty=FakeTty(['']))
-        self.assertEqual(out, 'In Claude Code, run /login and sign in to the next account.\n'
+        self.assertEqual(out, '%s\n'
+                              'In Claude Code, run /login and sign in to the next account.\n'
                               '✓ Saved ana@home.example\n'
                               '%s\n'
                               'Add another? [y/N] \n'
-                              '2 accounts. Type switchboard to see them.\n' % AUTO_ON)
+                              '2 accounts. Type switchboard to see them.\n' % (cli.ADD_WITHOUT_PAGE, AUTO_ON))
         # its newest login kept before Claude Code moves on; with the second account, auto-switch on
         self.assertEqual(self.calls(), [('add_current',), ('add_current',), ('set_auto', {'enabled': True})])
 
     def test_ctrl_c_leaves_cleanly(self):
         self.logins(KeyboardInterrupt())
         code, out = self.run_cli('add', tty=FakeTty([]))
-        self.assertEqual((code, out), (0, '✓ Saved ana@work.example\n'
-                                          'In Claude Code, run /login and sign in to the next account.\n\n'))
+        self.assertEqual((code, out), (0, '✓ Saved ana@work.example\n%s\n'
+                                          'In Claude Code, run /login and sign in to the next account.\n\n'
+                                       % cli.ADD_WITHOUT_PAGE))
         self.logins((B, ''))
         code, out = self.run_cli('add', tty=FakeTty([KeyboardInterrupt()]))     # at the question too
         self.assertEqual(code, 0)
@@ -831,7 +851,7 @@ class AddLoop(Sandbox):
     def test_without_a_terminal_it_saves_the_account_claude_code_is_on(self):
         code, out = self.run_cli('add')
         self.assertEqual((code, out), (0, '✓ Saved ana@work.example\n'
-                                          'To add another, run /login in Claude Code, then switchboard add again.\n'))
+                                          'To add another, run switchboard add at a terminal.\n'))
         os.remove(os.path.join(self.home, '.claude', '.claude.json'))
         with self.assertRaises(core.SwitchError):
             self.run_cli('add')
@@ -851,7 +871,8 @@ class AddLoop(Sandbox):
         out = io.StringIO()
         with redirect_stdout(out):
             self.assertEqual(cli.sign_in(B), 0)
-        self.assertEqual(out.getvalue(), 'In Claude Code, run /login and sign in as ana@home.example.\n'
+        self.assertEqual(out.getvalue(), 'The page is not running, so sign in through Claude Code: run /login and '
+                                         'sign in as ana@home.example.\n'
                                          '✓ Saved ana@home.example\n')
         self.assertEqual(self.calls(), [('add_current',), ('add_current',)])
         self.logins((C, ''))
@@ -986,7 +1007,7 @@ class TheHelp(unittest.TestCase):
     def test_it_names_the_new_commands_and_no_alias(self):
         out = io.StringIO()
         with redirect_stdout(out):
-            cli.main(['help'])
+            cli.main(['help', 'all'])
         for words in ('switchboard                 your accounts', 'switchboard 2', 'switchboard status',
                       'switchboard add', 'switchboard setup [--yes]', 'switchboard page',
                       'switchboard use NAME', 'switchboard update', 'switchboard doctor'):

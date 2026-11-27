@@ -171,10 +171,16 @@ class NoPage(Fresh):
 COMMANDS = ['2', 'switch', 'status', 'add', 'signin', 'remove', 'move', 'swap', 'leftovers', 'alias', 'run', 'folder',
             'folders', 'resume', 'auto', 'log', 'setup', 'page', 'menubar', 'use', 'current', 'update', 'open', 'owner',
             'pages', 'check', 'links', 'usage', 'chats', 'providers', 'continue', 'back', 'hand', 'allow', 'stay',
-            'order', 'awake', 'config', 'statusline', 'notify', 'hooks', 'models', 'keys', 'claude', 'export', 'import',
-            'readings', 'doctor', 'demo', 'serve', 'version']
+            'order', 'awake', 'config', 'statusline', 'notify', 'hooks', 'skill', 'models', 'keys', 'claude', 'export',
+            'import', 'readings', 'doctor', 'demo', 'serve', 'version', 'about']
 HELP_LINES = inspect.cleandoc(cli.__doc__).splitlines()    # as Python 3.13 and newer keep it, on every Python
 MAIN_HELP = cli.__doc__.strip() + '\n'
+
+
+def short_help():
+    """`switchboard help`: what a new person needs, on one screen (the page's port is read when it prints)."""
+    from switchboard import firstrun
+    return firstrun.short_help() + '\n'
 AUTO = ('switchboard auto [on|off]   whether auto-switch is on; on or off changes it, and it stays as you set it\n'
         'switchboard auto check [--dry-run] [--json] [--five-hour N] [--week N] [--order WORD]\n'
         '                            one pass of auto-switch now, then exit, also with auto-switch off, for a scheduled\n'
@@ -282,12 +288,12 @@ class HelpAfterACommand(Fresh):
         self.assertTrue(out.startswith('switchboard keys list|add NAME|remove NAME\n'), out)
 
     def test_the_uninstallers_own_command_runs_nothing_either(self):
-        self.assertEqual(self.asked('tidy', '--help'), (0, MAIN_HELP, '', []))      # not in the help: the whole help
+        self.assertEqual(self.asked('tidy', '--help'), (0, short_help(), '', []))   # not in the help: the short help
 
     def test_an_unknown_command_stays_unknown_whatever_follows(self):
         for args in (('bogus', '--help'), ('bogus', 'list'), ('bogus',), ('bogus', '-h'), ('bogus', '--version')):
             with self.subTest(args=args):
-                self.assertEqual(self.asked(*args), (2, 'Unknown command: %s.\n' % args[0] + MAIN_HELP, '', []))
+                self.assertEqual(self.asked(*args), (2, 'Unknown command: %s.\n' % args[0] + short_help(), '', []))
 
     def test_run_keeps_claudes_arguments_after_the_double_dash(self):   # only those before `--` are ours
         seen = []
@@ -333,17 +339,18 @@ class HelpAfterACommand(Fresh):
             self.cli('claude', '--model', 'opus', '-h')
         self.assertEqual(seen, [['--model', 'opus', '-h']])
 
-    def test_help_alone_is_the_whole_help(self):
+    def test_help_alone_is_the_short_help_and_help_all_the_whole_help(self):
         for args in (('--help',), ('-h',), ('help',)):
             with self.subTest(args=args):
-                self.assertEqual(self.asked(*args), (0, MAIN_HELP, '', []))
+                self.assertEqual(self.asked(*args), (0, short_help(), '', []))
+        self.assertEqual(self.asked('help', 'all'), (0, MAIN_HELP, '', []))
 
 
 class UnknownCommand(Fresh):
     def test_an_unknown_command_says_so_first(self):
         with nothing_runs() as ran:
-            self.assertEqual(self.cli('bogus'), (2, 'Unknown command: bogus.\n' + MAIN_HELP, ''))
-            self.assertEqual(self.cli('--colour'), (2, 'Unknown command: --colour.\n' + MAIN_HELP, ''))
+            self.assertEqual(self.cli('bogus'), (2, 'Unknown command: bogus.\n' + short_help(), ''))
+            self.assertEqual(self.cli('--colour'), (2, 'Unknown command: --colour.\n' + short_help(), ''))
         self.assertEqual(ran, [])
 
     def test_a_command_it_knows_without_its_words_gets_its_own_lines(self):

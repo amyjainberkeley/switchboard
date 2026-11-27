@@ -182,9 +182,9 @@ class TheMenuBar(unittest.TestCase):
             labels = [op[5][0][0] for op in menubar.row_ops(rows[email]) if op[0] == 'text']
             self.assertEqual(labels[0::2], ['Weekly'], email)                      # one bar row: Weekly
         old = rows[OLD]
-        self.assertEqual((menubar.pct_text(old['week']), old['foot'], old['models']), ('—', '', []))
+        self.assertEqual(menubar.pct_text(old['week']), '—')
         self.assertEqual(menubar.row_height(old), 54.0)                           # the email line and one bar row
-        self.assertEqual(menubar.row_label(old), 'Use ana@old.example, checked 4 days ago, weekly —')
+        self.assertEqual(menubar.row_label(old), 'Use ana@old.example, weekly —')
         v = view()
         v['accounts'][1]['usage']['session'] = w(None, at(13, 18))                # a 5-hour window with no number
         self.assertIsNone(self.rows(v)[TEAM]['five'])
@@ -192,31 +192,24 @@ class TheMenuBar(unittest.TestCase):
     def test_a_5_hour_row_at_0_not_started_stays(self):
         team = self.rows()[TEAM]
         self.assertEqual((team['five']['label'], menubar.pct_text(team['five'])), ('5-hour', '0%'))
-        self.assertEqual(menubar.reset_line(team['five'], NOW, TZ), 'Not started')
-        self.assertEqual(menubar.row_height(team), 88.0)
+        self.assertFalse(team['five']['started'])                                 # Anthropic's "not started"
+        self.assertEqual(menubar.row_height(team), 72.0)
 
-    def test_no_models_week_but_the_counted_one_over_its_line(self):
+    def test_a_models_week_is_the_pages_to_say(self):
         rows = self.rows()
-        self.assertEqual(rows[ULTRA]['models'], [])                               # Fable 22%: nothing
-        self.assertEqual([(m['label'], menubar.pct_text(m), m['over']) for m in rows[FULL]['models']],
-                         [('Fable', '97%', True)])
-        foot = [op for op in menubar.row_ops(rows[FULL]) if op[0] == 'pair'][-1]
-        self.assertEqual(foot[6][-1], [('Fable ', 11.0, 400, 'ink2'), ('97%', 11.0, 400, 'red')])   # red, at the right
-        v = view()
-        v['auto']['models'] = []                                                  # not counted: never said
-        self.assertEqual(self.rows(v)[FULL]['models'], [])
-        v = view()
-        v['accounts'][4]['usage']['scoped'] = [fable(96, at(16, 13)), fable(99, at(16, 13), 'Fable 5.2')]
-        self.assertEqual([m['pct'] for m in self.rows(v)[FULL]['models']], [99])  # the highest, alone
+        full = [lim['label'] for lim in menubar.limits(next(a for a in view()['accounts'] if a['email'] == FULL),
+                                                      view()['auto'])]
+        self.assertEqual(full, ['Weekly', 'Fable'])                    # counted, at its line: the page says it
+        self.assertNotIn('Fable', repr(menubar.row_ops(rows[FULL])))              # the menu bar's row does not
 
-    def test_the_item_draws_a_reading_not_known_as_its_weekly_track_alone(self):
+    def test_the_item_for_a_reading_not_known_is_the_s_dimmed(self):
         v = view()
         for a in v['accounts']:
             a['active'] = a['email'] == OLD
         v['active'] = OLD
         r = menubar.reading(v)
-        self.assertIsNone(r['five'])
-        self.assertEqual(menubar.item_ops(r), [('box', 0.0, 3.0, 18.0, 4.0, 2.0, 'ink30')])
+        self.assertEqual((r['dot'], r['dim']), (None, True))
+        self.assertEqual(set(op[-1] for op in menubar.item_ops(r)), {'ink50'})
         self.assertEqual(r['label'], 'Switchboard: ana@old.example, weekly —')
 
     def test_the_auto_switch_item_names_only_what_the_rows_show(self):

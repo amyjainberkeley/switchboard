@@ -150,21 +150,14 @@ class TheMenuBar(unittest.TestCase):
     def rows(self, v=None):
         return dict((r['email'], r) for r in menubar.rows(v or view(), TZ))
 
-    def test_the_reset_line_says_when_it_would_be_full(self):
-        fast = self.rows()[FAST]
-        self.assertEqual(fast['pace'], 'At this pace, full by Sat 4:23 PM')
-        foot = [op for op in menubar.row_ops(fast) if op[0] == 'pair'][-1]
-        self.assertEqual(foot[5], [('Resets Mon 12:00 PM', 11.0, 400, 'ink2')])         # room for them: no "in 3 days"
-        self.assertEqual(foot[6], [[('At this pace, full by Sat 4:23 PM', 11.0, 400, 'ink2')]])   # whole, at the right
-
-    def test_nothing_when_it_lasts(self):
-        rows = self.rows()
-        for email in (SLOW, EARLY, OLD):
-            self.assertEqual(rows[email]['pace'], '', email)
-            for op in menubar.row_ops(rows[email]):
-                self.assertNotIn('pace', repr(op), email)
-        foot = [op for op in menubar.row_ops(rows[SLOW]) if op[0] == 'pair'][-1]
-        self.assertEqual(foot[6], [])
+    def test_the_pace_is_the_pages_to_say(self):
+        # The menu bar's row is its email, one word and its bars; when the week would be full is said on the page
+        # and in the terminal (above), never in the row.
+        for email, r in self.rows().items():
+            text = repr(menubar.row_ops(r))
+            self.assertNotIn('At this pace', text, email)
+            self.assertNotIn('full by', text, email)
+            self.assertNotIn('pace', r, email)
 
 
 class TheJson(unittest.TestCase):

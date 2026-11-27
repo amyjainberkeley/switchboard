@@ -17,7 +17,7 @@ import time
 from contextlib import contextmanager
 from datetime import datetime
 
-VERSION = '0.2.0'
+VERSION = '0.3.0'
 SHORT_NAME = 'sb'    # the command's short name, the same command as switchboard (the installer adds it when free)
 
 

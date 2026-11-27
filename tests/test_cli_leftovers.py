@@ -132,8 +132,8 @@ class Clearing(Leftovers):
                 code, out = self.run_cli('leftovers', 'clear', *args)
                 self.assertEqual(code, 1)
                 self.assertIn('Kept %s: it is the only copy of the login for %s until that account signs in again. '
-                              'To free it, sign in to %s again: in Claude Code, run /login as it.\n'
-                              % (needed, N, N), out)
+                              'To free it, sign in to %s again: switchboard add %s\n'
+                              % (needed, N, N, N), out)
         self.assertIn('successor:uuid-n', self.keys())
         self.assertEqual(self.rig.kc.get(vault.SERVICE_RECOVERY, 'successor:uuid-n'), self.made_up)
 

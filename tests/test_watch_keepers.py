@@ -2,9 +2,9 @@ import _isolate  # noqa: F401  (first: it gives switchboard a throwaway data fol
 # Two processes watch each other. The menu bar starts the page through launchd when the page has refused every
 # connection for minutes and the person did not stop it (watch.PageKeeper), at most every five minutes and three times
 # an hour across every watcher (the count in page-tries.json), and says so in one notification either way. The page
-# starts the menu bar's job when the menu bar stopped without being quit (watch.MenuBarKeeper). And NOT in the normal
-# cases: a page launchd is restarting, a page stopped on purpose, a page waiting for its port, a wake, a menu bar the
-# person quit. While the page waits for its port, the menu bar says which port and what to do.
+# starts the menu bar's job when the menu bar stopped and was not turned off (watch.MenuBarKeeper). And NOT in the
+# normal cases: a page launchd is restarting, a page stopped on purpose, a page waiting for its port, a wake, a menu bar
+# the person turned off. While the page waits for its port, the menu bar says which port and what to do.
 # launchctl, notifications and clocks are stand-ins; nothing is started.
 import os
 import shutil
@@ -188,8 +188,9 @@ class ThePageStartsTheMenuBar(Base):
         self.runs = [False]
         self.plist = ['/job.plist']
         self.starts = []
+        self.off = [False]
         self.keeper = watch.MenuBarKeeper(running=lambda: self.runs[0], job=lambda: self.plist[0],
-                                          start=lambda p: self.starts.append(p) or True,
+                                          start=lambda p: self.starts.append(p) or True, off=lambda: self.off[0],
                                           mono=lambda: self.clock.mono, wall=lambda: self.clock.wall)
 
     def ticks(self, minutes):
@@ -209,11 +210,11 @@ class ThePageStartsTheMenuBar(Base):
         self.ticks(5)
         self.assertEqual(self.starts, [])
 
-    def test_a_menu_bar_the_person_quit_stays_quit(self):
-        watch.note_quit()
+    def test_a_menu_bar_the_person_turned_off_stays_off(self):
+        self.off[0] = True                              # switchboard menubar off
         self.ticks(30)
         self.assertEqual(self.starts, [])
-        watch.clear_quit()                              # the person started it again, and it stopped by itself later
+        self.off[0] = False                             # switchboard menubar on, and it stopped by itself later
         self.ticks(2)
         self.assertEqual(len(self.starts), 1)
 
@@ -243,15 +244,6 @@ class ThePageStartsTheMenuBar(Base):
                 server.BAR_KEEPER[0].gone_since -= watch.BAR_DOWN_FOR + 1
                 self.assertEqual(server.menubar_tick(), 'started')
         self.assertEqual(calls, [('kickstart', '%s/%s' % (menubar.domain(), menubar.AGENT))])
-
-
-class TheQuitMark(Base):
-    def test_quit_leaves_a_mark_and_a_menu_bar_that_runs_takes_it_away(self):
-        watch.note_quit()
-        self.assertIsNotNone(watch.quit_chosen())
-        with mock.patch.object(menubar, 'watch_page', lambda: None):
-            menubar._watch_start()
-        self.assertIsNone(watch.quit_chosen())
 
 
 class TheMenuBarSaysThePort(Base):

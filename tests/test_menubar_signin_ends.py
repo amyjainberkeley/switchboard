@@ -43,7 +43,7 @@ class TheRows(unittest.TestCase):
     def test_a_sign_in_that_ends_within_the_week_gets_its_mark_and_keeps_use(self):
         s = state(**{LAB: (t(16, 9), False)})
         r = row_of(s, LAB)
-        self.assertEqual(r['marks'], [('1 min ago', 'next'), ('Sign-in ends by Mon', 'next'), ('Next', 'next'), ('Use', 'use')])
+        self.assertEqual(r['marks'], [('Sign-in ends by Mon', 'next'), ('Next', 'next')])
         self.assertEqual(r['action'], 'use')
         self.assertEqual(r['signin'], 'Sign-in ends by Mon 9:00 AM')
         self.assertEqual(after(menubar.menu(s, tz=TZ), LAB), ('do', 'Sign in again as ' + LAB, 'signin'))
@@ -51,14 +51,14 @@ class TheRows(unittest.TestCase):
     def test_one_that_ended_keeps_sign_in_again_and_says_when(self):
         s = state(**{HARBOR: (t(9, 20, 38), True)})
         r = row_of(s, HARBOR)
-        self.assertEqual(r['marks'], [('1 min ago', 'next'), ('ended by Mon', 'next'), ('Sign in again', 'use')])
+        self.assertEqual(r['marks'], [('ended by Mon', 'next'), ('Sign in again', 'use')])
         self.assertEqual(r['action'], 'signin')
         self.assertEqual(after(menubar.menu(s, tz=TZ), HARBOR)[0], 'row')      # its own click signs in again
 
     def test_the_account_in_use_signs_in_again_like_any_other(self):
         s = state(**{MAIL: (t(15, 2, 6), False)})
         r = row_of(s, MAIL)
-        self.assertEqual(r['marks'], [('1 min ago', 'next'), ('Sign-in ends by Sun', 'next'), ('In use', 'in-use')])
+        self.assertEqual(r['marks'], [('Sign-in ends by Sun', 'next'), ('In use', 'in-use')])
         self.assertIsNone(r['action'])
         items = menubar.menu(s, tz=TZ)
         self.assertEqual(after(items, MAIL), ('do', 'Sign in again as ' + MAIL, 'signin'))
@@ -95,7 +95,7 @@ class TheRows(unittest.TestCase):
     def test_the_account_in_use_once_ended_signs_in_again(self):
         s = state(**{MAIL: (t(13, 9), True)})
         r = row_of(s, MAIL)
-        self.assertEqual(r['marks'], [('1 min ago', 'next'), ('ended by today', 'next'), ('In use', 'in-use')])
+        self.assertEqual(r['marks'], [('ended by today', 'next'), ('In use', 'in-use')])
         self.assertEqual(after(menubar.menu(s, tz=TZ), MAIL), ('do', 'Sign in again as ' + MAIL, 'signin'))
 
     def test_nothing_for_a_date_far_off_not_known_or_refused_before_it(self):
@@ -122,9 +122,9 @@ class TheRows(unittest.TestCase):
     def test_voiceover_reads_the_whole_words(self):
         s = state(**{LAB: (t(16, 9), False), HARBOR: (t(9, 20, 38), True)})
         self.assertEqual(menubar.row_label(row_of(s, LAB)),
-                         'Use ana@lab.example, next, checked 1 min ago, Sign-in ends by Mon 9:00 AM, weekly 65%')
+                         'Use ana@lab.example, next, Sign-in ends by Mon 9:00 AM, weekly 65%')
         self.assertEqual(menubar.row_label(row_of(s, HARBOR)),
-                         'Sign in again as ana@harbor.example, checked 1 min ago, Sign-in ended by Mon 8:38 PM, 5-hour 0%, '
+                         'Sign in again as ana@harbor.example, Sign-in ended by Mon 8:38 PM, 5-hour 0%, '
                          'weekly 17%')
 
     def test_a_new_item_rebuilds_the_menu(self):

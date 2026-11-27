@@ -507,10 +507,10 @@ class ThePagesRoute(SignIns):
         return [t for t in self.texts(core.load()) if t.startswith('Opened the sign-in')]
 
     def test_pressed_again_for_a_new_profile_opens_the_one_its_sign_in_is_in(self):
-        self.assertEqual(server.act('/api/connect', {'email': B, 'profile': '+new'}), {'key': B})
+        self.assertEqual(server.act('/api/connect', {'email': B, 'profile': '+new'})['key'], B)
         first = self.opened[0][0]
         self.long_ago(B)
-        self.assertEqual(server.act('/api/connect', {'email': B, 'profile': '+new'}), {'key': B})
+        self.assertEqual(server.act('/api/connect', {'email': B, 'profile': '+new'})['key'], B)
         self.assertEqual([p for p, _ in self.opened], [first, first])       # not one more new profile
         self.assertEqual(len(self.made), 1)
         self.assertEqual(len(self.opened_said()), 2)

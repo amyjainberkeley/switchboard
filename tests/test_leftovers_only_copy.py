@@ -156,8 +156,8 @@ class TheCommand(OnlyCopy):
         code, out, _ = self.run_cli('leftovers', 'clear', i, '--yes')
         self.assertEqual(code, 1)
         self.assertEqual(out, 'Kept %s: it is the only copy of a login that was in use, and its account is not known. '
-                              'To keep that account, sign in to it with /login in Claude Code, then run switchboard '
-                              'add. To give this copy up for good: switchboard leftovers clear %s --only-copy.\n'
+                              'To keep that account, add it with switchboard add. '
+                              'To give this copy up for good: switchboard leftovers clear %s --only-copy.\n'
                          % (i, i))
         self.assertTrue(self.x_is_somewhere())
 
@@ -202,7 +202,7 @@ class EveryKeptSentence(unittest.TestCase):
         cases = [
             ({'need': 'only_login', 'needed_by': 'maya@northwind.example'},
              'Kept 3f9a1c: it is the only copy of the login for maya@northwind.example until that account signs in '
-             'again. To free it, sign in to maya@northwind.example again: in Claude Code, run /login as it.'),
+             'again. To free it, sign in to maya@northwind.example again: switchboard add maya@northwind.example'),
             ({'need': 'only_login', 'needed_by': None},
              'Kept 3f9a1c: it is the only copy of the login for an account until that account signs in again. Run '
              'switchboard doctor.'),
@@ -217,11 +217,11 @@ class EveryKeptSentence(unittest.TestCase):
              'switchboard doctor.'),
             ({'need': 'only_copy', 'needed_by': 'maya@northwind.example'},
              'Kept 3f9a1c: it is the only copy of a login maya@northwind.example was using. To free it, sign in to '
-             'maya@northwind.example again: in Claude Code, run /login as it, then run switchboard add. To give this '
+             'maya@northwind.example again: switchboard add maya@northwind.example. To give this '
              'copy up for good: switchboard leftovers clear 3f9a1c --only-copy.'),
             ({'need': 'only_copy', 'needed_by': None},
              'Kept 3f9a1c: it is the only copy of a login that was in use, and its account is not known. To keep that '
-             'account, sign in to it with /login in Claude Code, then run switchboard add. To give this copy up for '
+             'account, add it with switchboard add. To give this copy up for '
              'good: switchboard leftovers clear 3f9a1c --only-copy.'),
             ({'need': 'only_copy', 'needed_by': None, 'unsure': True},
              "Kept 3f9a1c: Claude Code's login can't be read now, so whether this is the only copy of a login that was "

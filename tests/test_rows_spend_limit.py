@@ -161,10 +161,9 @@ class TheMenuBar(unittest.TestCase):
         ops = menubar.row_ops(ultra)
         labels = [op[5][0][0] for op in ops if op[0] == 'text']
         self.assertEqual(labels[0::2], ['Weekly', 'Spend'])
-        self.assertEqual(menubar.row_height(ultra), 88.0)                      # two bar rows, as with a 5-hour one
+        self.assertEqual(menubar.row_height(ultra), 72.0)                      # two bar rows, as with a 5-hour one
         self.assertNotIn('red', repr([op for op in ops if op[0] == 'box']))
-        foot = [op for op in ops if op[0] == 'pair'][-1]
-        self.assertIn([('$412 of $1,000', 11.0, 400, 'ink2')], foot[6])
+        self.assertNotIn('$412', repr(ops))                                    # its amounts are the page's
         self.assertIn('spend 41%', menubar.row_label(ultra))
 
     def test_none_without_a_spend_limit(self):

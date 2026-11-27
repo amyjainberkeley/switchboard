@@ -2821,7 +2821,9 @@ def _act(path, body):
             with locked() as st:
                 event(st, 'Opened the sign-in%s in %s' % (' for ' + email if email else '', '%s (%s)' % (
                     browser.app(), browser.profiles().get(where, where)) if where else 'your browser'))
-        return {'key': key}
+        return {'key': key, 'started': connect.look(key).get('started')}
+    if path == '/api/connect-look':             # `switchboard setup` and `add` follow the sign-in they started
+        return connect.look(text(body, 'key'), body.get('started') if isinstance(body.get('started'), float) else None)
     if path == '/api/cancel':
         connect.stop(text(body, 'key'))
         return
@@ -3734,15 +3736,16 @@ BAR_KEEPER = []             # the page's watch on the menu bar (watch.MenuBarKee
 
 
 def menubar_tick():
-    """Each tick, when launchd runs the page: the menu bar started again through its own job when it has stopped
-    without being quit (watch.MenuBarKeeper). Returns what it did."""
+    """Each tick, when launchd runs the page: the menu bar started again through its own job when it has stopped and
+    was not turned off (watch.MenuBarKeeper). Returns what it did."""
     if core.DEMO or not watch.background():
         return None
-    from . import menubar
+    from . import menubar, menubar_keep
     if not BAR_KEEPER:
         BAR_KEEPER.append(watch.MenuBarKeeper(
             running=lambda: menubar.running_pid() is not None, job=menubar.our_job,
-            start=lambda plist: watch.start_job(menubar.AGENT, plist, menubar.launchctl, menubar.domain())))
+            start=lambda plist: watch.start_job(menubar.AGENT, plist, menubar.launchctl, menubar.domain()),
+            off=menubar_keep.is_off))
     return BAR_KEEPER[0].look()
 
 

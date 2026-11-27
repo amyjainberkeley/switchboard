@@ -3,8 +3,11 @@
 Switchboard installs two ways, both in the main README: Homebrew (`brew install amyjainberkeley/apps/switchboard`), the first
 line, and the one-line installer without Homebrew. This folder holds what Homebrew runs.
 
-Neither way needs a Mac app built ahead of time, a Developer ID or notarizing. The menu bar item is part of the
-Python program, and the installer builds the link app on the Mac that uses it.
+The menu bar item is part of the Python program. The link app, a small Swift program, can come two ways: a release
+carries it already built, signed with the publisher's Developer ID and notarized by Apple (`router/prebuilt`, made as
+in "Signing a release" below), and the installer puts that copy in place once it has checked it. When the release
+carries none, or any check fails, the installer builds it on the Mac that uses it, as before, which needs Apple's
+command line tools. Nothing needs a Developer ID on the Mac that installs.
 
 ## Homebrew
 
@@ -44,9 +47,48 @@ A copy whose `REPO` line still holds its placeholder stops before it writes anyt
 
 ## Releasing a version
 
-Tag it `v<version>` on GitHub. Then, in a clone of the tap (the `homebrew-tap` repository, not this one), run its
+Make the link app again first, as in "Signing a release": a new version changes `router/Info.plist`, and the installer
+takes a prebuilt link app only when it was made from the tree's own `Info.plist` and `SwitchboardLinks.swift`. Tag it
+`v<version>` on GitHub. Then, in a clone of the tap (the `homebrew-tap` repository, not this one), run its
 `./update-switchboard.sh <version>`, which sets the cask's version and SHA-256 from the tag's download and runs
 `brew style`.
+
+## Signing a release
+
+`router/build.sh --release` makes the link app a release carries. It runs on the publisher's Mac, with Xcode or
+Apple's command line tools, the Developer ID Application certificate in the login keychain, and a notary profile saved
+once with `xcrun notarytool store-credentials <profile>`:
+
+    sh router/build.sh --release router/prebuilt --identity <SHA-1 fingerprint> --notarize <profile> --check
+    sh router/build.sh --release router/prebuilt --identity <SHA-1 fingerprint> --notarize <profile>
+
+The first line checks everything the second needs (the tools, the certificate for that fingerprint with its issuer and
+end date, the screen, the notary profile, the disk) and builds nothing. The second:
+
+- builds one program for Apple silicon and Intel (two `swiftc -target` builds for the macOS in `LSMinimumSystemVersion`,
+  joined by `lipo`), in the same bundle as the installer's build: the same `Info.plist`, so the same bundle
+  identifier, which keeps the link app's place as the default browser;
+- signs it with the hardened runtime and a secure timestamp, and verifies the signature;
+- sends it to Apple's notary service and waits, staples the ticket to the app, and checks it with Gatekeeper
+  (`spctl --assess`);
+- writes `router/prebuilt/SwitchboardLinks.zip` and `router/prebuilt/links.json` (the zip's SHA-256, the source's
+  SHA-256, the team, the architectures, the minimum macOS, whether it is notarized). Nothing else is written,
+  registered with macOS or opened.
+
+The identity is given by its SHA-1 fingerprint (`security find-identity -v -p codesigning` lists them), never by its
+name: two certificates can carry the same name, and codesign then refuses the name as ambiguous. Notarizing takes a
+few minutes, and the screen must stay unlocked until it ends: notarytool reads its saved sign-in from the keychain.
+
+Commit the two files, and set `LINKS_TEAM` in `install.sh` to the team the build prints (once: a team stays the same for
+later releases; `tests/test_link_app_release.py` fails while the zip is in the tree and `LINKS_TEAM` is empty). The
+release is cut from the tree, so they ride along with it. The installer uses the prebuilt app only when the zip matches
+its SHA-256, it was made from the tree's `router/SwitchboardLinks.swift` and `router/Info.plist`, its signature verifies
+(`codesign --verify --strict`), it is signed by the team in `links.json` and in `LINKS_TEAM`, it carries a stapled
+notarization ticket, and it was built for the Mac's processor and macOS. On any other outcome it says which check failed
+and builds the app on the Mac as before.
+
+`--identity -` makes the same build signed ad hoc and never notarized, to try the release build without a
+certificate. The installer never uses it.
 
 ## PyPI
 

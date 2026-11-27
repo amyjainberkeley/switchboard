@@ -24,7 +24,7 @@ ROOT = os.path.join(HERE, '..')
 sys.path.insert(0, ROOT)
 
 from switchboard import __main__ as cli
-from switchboard import connect, core, demo, engine, notify_hooks, server, statusline
+from switchboard import connect, core, demo, engine, firstrun, notify_hooks, server, statusline
 from switchboard.accounts import api
 from fakes_accounts_api import FakeAccounts, install
 import test_app  # its headless-Chrome helper; it has no tests of its own
@@ -188,7 +188,9 @@ class Sandbox(unittest.TestCase):
         self.fake = install(self, FakeEngine())
         self.host = FakeHost(self.fake)
         self.shown = []
+        self.page_starts = []                   # each time the first run asked launchd to start the page's job
         for target, name, value in ((engine, 'HOST', self.host), (server, 'NOTIFY_RUN', self.note),
+                                    (firstrun, 'start_page', lambda: self.page_starts.append('job') or 'job'),
                                     (server, 'tell', lambda *a, **k: None),
                                     (server.artifacts, 'refresh', lambda: None),
                                     (connect, 'claude_bin', lambda: '/made/up/claude'),
@@ -625,7 +627,7 @@ class AutoCommand(Sandbox):
     def test_the_help_and_the_readme_name_it(self):
         out = io.StringIO()
         with redirect_stdout(out):
-            cli.main(['help'])
+            cli.main(['help', 'all'])
         self.assertIn('switchboard auto [on|off]', out.getvalue())
         with open(os.path.join(ROOT, 'README.md'), encoding='utf-8') as f:
             readme = f.read()
@@ -685,27 +687,29 @@ class InTheTerminal(Sandbox):
     def test_the_first_run(self):
         self.job()
         self.signed_in(A)
-        code, out = self.run_cli('setup', tty=FakeTty([]))
-        self.assertEqual((code, out), (0, 'Found Claude Code signed in as maya@northwind.example. Kept.\n'
-                                          'Notifications and the status line are on.\n'
-                                          'Sign in to your other accounts with /login in Claude Code. Each one is kept '
-                                          'as you sign in.\n'))
+        code, out = self.run_cli('setup', tty=FakeTty(['s']))
+        self.assertEqual(code, 0, out)
+        self.assertTrue(out.startswith('Switchboard setup.\n\n1 of 4  Your account\n'      # "See it move" is planned:
+                                       # the job may start the page, so a second account may follow
+                                       '  Claude Code is signed in as maya@northwind.example. Kept.\n'), out)
+        self.assertNotIn('/login', out)                 # the other accounts sign in through the browser
         self.assertEqual(self.fake.emails(), [A])
 
-    def test_the_first_run_without_the_background_job_says_what_keeps_them(self):
+    def test_the_first_run_without_the_page_names_doctor(self):
         self.signed_in(A)
-        code, out = self.run_cli('setup', tty=FakeTty([]))
-        self.assertEqual(out.splitlines()[-1], 'Sign in to your other accounts with /login in Claude Code, then type '
-                                               'switchboard to keep each one.')
+        code, out = self.run_cli('setup', tty=FakeTty(['s']))
+        self.assertIn('Accounts are added through the page, which is not running and did not start. Run switchboard '
+                      'doctor', ' '.join(out.split()))
+        self.assertNotIn('switchboard serve', out)
+        self.assertTrue(out.endswith('1 Claude account. Type switchboard to see it.\n'), out)
 
-    def test_one_account_in_the_view_points_at_login_not_at_add(self):
+    def test_one_account_in_the_view_points_at_add(self):
         self.job()
         core.set_setting('auto_set_by_you', True)
         self.fake.hold(A)
         self.signed_in(A)
         code, out = self.run_cli('status')
-        self.assertTrue(out.endswith('\n\nSign in to another account with /login in Claude Code: it is kept by '
-                                     'itself.\n'), out)
+        self.assertTrue(out.endswith('\n\nAdd another account with switchboard add.\n'), out)
 
     def test_switchboard_add_turns_auto_switch_on_with_the_second_account(self):
         self.fake.hold(A)
@@ -723,8 +727,8 @@ class PageWords(unittest.TestCase):
         with open(os.path.join(ROOT, 'switchboard', 'web', 'index.html'), encoding='utf-8') as f:
             html = f.read()
         body = html[html.index('function firstHTML()'):html.index('// ---------- drawing ----------')]
-        self.assertIn("addForm('first') + '<p class=\"fr-line\">Or sign in with /login in Claude Code: it is kept by "
-                      "itself.</p>'", body)
+        self.assertIn("addForm('first') + '<p class=\"fr-line\">It signs in through your browser, on Anthropic’s own "
+                      "page.</p>'", body)
 
 
 @unittest.skipUnless(os.path.exists(test_app.CHROME), 'needs Google Chrome')
@@ -737,8 +741,8 @@ class PageFirstRunInChrome(test_app.ChromePage):
         dom = self.dom()
         main = dom[dom.find('<main'):dom.find('</main>')]
         self.assertIn('Add your first account', main)
-        self.assertRegex(main, r'</form><p class="fr-line">Or sign in with /login in Claude Code: it is kept by '
-                               r'itself\.</p>')
+        self.assertRegex(main, r'</form><p class="fr-line">It signs in through your browser, on Anthropic’s own '
+                               r'page\.</p>')
 
 
 class TheLoop(Sandbox):

@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="178" viewBox="0 0 960 178" role="img" aria-label="A switch, start to finish: at a line you set, Switchboard picks an account with room, makes the switch and checks it, tells open chats, and work goes on." font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">
+<path d="M112 34 H272" stroke="#d4d4d8" stroke-width="1.6" stroke-linecap="round"/>
+<path d="M265 29 l5 5 l-5 5" fill="none" stroke="#d4d4d8" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M304 34 H464" stroke="#d4d4d8" stroke-width="1.6" stroke-linecap="round"/>
+<path d="M457 29 l5 5 l-5 5" fill="none" stroke="#d4d4d8" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M496 34 H656" stroke="#d4d4d8" stroke-width="1.6" stroke-linecap="round"/>
+<path d="M649 29 l5 5 l-5 5" fill="none" stroke="#d4d4d8" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M688 34 H848" stroke="#d4d4d8" stroke-width="1.6" stroke-linecap="round"/>
+<path d="M841 29 l5 5 l-5 5" fill="none" stroke="#d4d4d8" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="96" cy="34" r="6.5" fill="none" stroke="#a1a1aa" stroke-width="1.8"/>
+<text x="96" y="78" text-anchor="middle" font-size="18" font-weight="600" fill="#09090b">A line</text>
+<text x="96" y="101" text-anchor="middle" font-size="18" font-weight="600" fill="#09090b">you set</text>
+<text x="96" y="130" text-anchor="middle" font-size="13.5" fill="#6b6b74">90% of 5 hours,</text>
+<text x="96" y="149" text-anchor="middle" font-size="13.5" fill="#6b6b74">95% of the week</text>
+<circle cx="288" cy="34" r="6.5" fill="none" stroke="#a1a1aa" stroke-width="1.8"/>
+<text x="288" y="78" text-anchor="middle" font-size="18" font-weight="600" fill="#09090b">An account</text>
+<text x="288" y="101" text-anchor="middle" font-size="18" font-weight="600" fill="#09090b">with room</text>
+<text x="288" y="130" text-anchor="middle" font-size="13.5" fill="#6b6b74">the week that</text>
+<text x="288" y="149" text-anchor="middle" font-size="13.5" fill="#6b6b74">refills first</text>
+<circle cx="480" cy="34" r="8" fill="#006ad6"/>
+<text x="480" y="78" text-anchor="middle" font-size="18" font-weight="600" fill="#09090b">A checked</text>
+<text x="480" y="101" text-anchor="middle" font-size="18" font-weight="600" fill="#09090b">switch</text>
+<text x="480" y="130" text-anchor="middle" font-size="13.5" fill="#6b6b74">saved, written,</text>
+<text x="480" y="149" text-anchor="middle" font-size="13.5" fill="#6b6b74">read back</text>
+<circle cx="672" cy="34" r="6.5" fill="none" stroke="#a1a1aa" stroke-width="1.8"/>
+<text x="672" y="78" text-anchor="middle" font-size="18" font-weight="600" fill="#09090b">Open chats</text>
+<text x="672" y="101" text-anchor="middle" font-size="18" font-weight="600" fill="#09090b">are told</text>
+<text x="672" y="130" text-anchor="middle" font-size="13.5" fill="#6b6b74">which account,</text>
+<text x="672" y="149" text-anchor="middle" font-size="13.5" fill="#6b6b74">and what to open</text>
+<circle cx="864" cy="34" r="6.5" fill="none" stroke="#a1a1aa" stroke-width="1.8"/>
+<text x="864" y="78" text-anchor="middle" font-size="18" font-weight="600" fill="#09090b">Work</text>
+<text x="864" y="101" text-anchor="middle" font-size="18" font-weight="600" fill="#09090b">goes on</text>
+<text x="864" y="130" text-anchor="middle" font-size="13.5" fill="#6b6b74">on the account</text>
+<text x="864" y="149" text-anchor="middle" font-size="13.5" fill="#6b6b74">with room</text>
+</svg>

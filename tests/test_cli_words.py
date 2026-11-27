@@ -67,15 +67,17 @@ class UnknownCommandWithHelp(Fresh):
     def test_an_unknown_command_with_help_says_so_first(self):
         for args in (('bogus', '--help'), ('bogus', '-h'), ('bogus', 'now', '--help'), ('--colour', '-h')):
             with self.subTest(args=args):
-                self.assertEqual(self.asked(*args), (2, 'Unknown command: %s.\n' % args[0] + cli_help.MAIN_HELP, '', []))
+                self.assertEqual(self.asked(*args), (2, 'Unknown command: %s.\n' % args[0] + cli_help.short_help(), '',
+                                                     []))
 
     def test_it_is_what_the_command_says_without_help(self):
         self.assertEqual(self.asked('bogus', '--help'), self.asked('bogus'))
 
     def test_commands_it_knows_keep_their_help(self):
-        for args, said in ((('tidy', '--help'), cli_help.MAIN_HELP), (('help', '-h'), cli_help.MAIN_HELP),
-                           (('--help', '--help'), cli_help.MAIN_HELP), (('-h', '-h'), cli_help.MAIN_HELP),
-                           (('--version', '--help'), cli_help.MAIN_HELP), (('-v', '-h'), cli_help.MAIN_HELP),
+        short = cli_help.short_help()           # a word with no lines of its own in the help: the short help
+        for args, said in ((('tidy', '--help'), short), (('help', '-h'), short),
+                           (('--help', '--help'), short), (('-h', '-h'), short),
+                           (('--version', '--help'), short), (('-v', '-h'), short),
                            (('auto', '--help'), cli_help.AUTO), (('2', '-h'), cli_help.TWO), (('use', 'maya', '--help'), cli_help.USE)):
             with self.subTest(args=args):
                 self.assertEqual(self.asked(*args), (0, said, '', []))

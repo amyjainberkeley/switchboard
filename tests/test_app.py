@@ -1940,7 +1940,7 @@ class CommandLine(Sandbox):
 
     def test_version_help_and_an_unknown_command_answer(self):
         self.assertEqual(self.run_cli('version'), (0, 'switchboard %s\n' % core.version_text()))   # its build
-        code, out = self.run_cli('help')
+        code, out = self.run_cli('help', 'all')
         for word in ('switchboard status', 'switchboard use NAME', 'switchboard usage', 'switchboard awake --once',
                      'switchboard statusline on|off|show', 'switchboard demo'):
             self.assertIn(word, out)

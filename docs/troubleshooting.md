@@ -37,7 +37,7 @@ macOS shows Switchboard's notifications as Script Editor's. If Script Editor may
 
 ## No menu bar item
 
-Open Switchboard.app (type "Switchboard" in Spotlight), or run `switchboard menubar`. After Quit it stays off until you open it again, or until the next login.
+If you turned it off, run `switchboard menubar on`. Otherwise open Switchboard.app (type "Switchboard" in Spotlight), or run `switchboard menubar`. If it is behind the notch of a MacBook's screen, click the desktop so Finder is in front; when the S shows, hold Command and drag it toward the clock.
 
 A menu bar manager (Ice, Bartender) can hide the item. On macOS 26 it can keep it in view only when Switchboard.app is in /Applications. `switchboard doctor` says whether the item is installed and running, and where its app is.
 

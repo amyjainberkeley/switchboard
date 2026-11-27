@@ -231,7 +231,7 @@ class SessionHooks(Cli):
         self.assertIn('Let Switchboard check links', lines[0][2])
 
     def test_the_help_lists_hooks(self):
-        _, out, _ = self.run_cli('help')
+        _, out, _ = self.run_cli('help', 'all')
         self.assertIn('switchboard hooks [on|off]', out)
         for line in ('switchboard switch [NAME]', 'switchboard remove NAME', 'switchboard alias NAME', 'switchboard run [NAME]',
                      'switchboard owner LINK'):

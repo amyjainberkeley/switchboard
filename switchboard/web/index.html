@@ -1621,7 +1621,7 @@ function addForm(zone) {
     (zone === 'add' ? '<button type="button" class="btn ghost sm quiet" data-do="closeAdd" data-k="closeAdd">Cancel</button>' : '') + note(zone) + '</form>';
 }
 function footHTML() {
-  return adding ? addForm('add') : '<button type="button" class="btn ghost sm quiet" data-do="add" data-k="add" title="Or /login in Claude Code: it’s kept by itself">' + I.plus + 'Add account</button>' + note('add');
+  return adding ? addForm('add') : '<button type="button" class="btn ghost sm quiet" data-do="add" data-k="add" title="Signs in through your browser. Claude Code stays on the account it is on.">' + I.plus + 'Add account</button>' + note('add');
 }
 
 // Every account at its line, and a key added: Claude Code can run on the keys instead.
@@ -2755,6 +2755,7 @@ function route() {
   const changed = sec !== ui.sec || folder !== ui.folder;
   ui.sec = sec; ui.folder = folder;
   if (sec === 'chats') { chatFocus = sub; if (!chatsLoading && Date.now() - chatsGot > 5000) loadChats(); }
+  if (sec === 'accounts' && sub === 'add') { adding = true; history.replaceState(null, '', location.pathname + location.search + '#accounts'); }   // the menu bar's Add account
   closeMenu(); sideMenu(false);
   if (mode === 'board') {
     all('.sec').forEach((el) => { el.hidden = el.id !== 'sec-' + sec; });
@@ -2791,7 +2792,7 @@ function firstHTML() {
   if (cur) {
     h += '<h1 class="fr-title" id="h-first">Claude Code is on <span class="on">' + esc(cur.email) + '</span></h1><button type="button" class="btn primary fr-add" data-do="addCurrent" data-zone="first" data-k="first:add">Add ' + esc(cur.email) + '</button>';
   } else {
-    h += '<h1 class="fr-title" id="h-first">Add your first account</h1>' + addForm('first') + '<p class="fr-line">Or sign in with /login in Claude Code: it is kept by itself.</p>';
+    h += '<h1 class="fr-title" id="h-first">Add your first account</h1>' + addForm('first') + '<p class="fr-line">It signs in through your browser, on Anthropic’s own page.</p>';
   }
   const w = waitRows();
   return h + (w ? '<div class="below"><div class="notes">' + w + '</div></div>' : '') + note('first') + '</div>';

@@ -186,9 +186,10 @@ class Words(Sandbox):
         write_exe(menubar.launcher(), '#!/bin/sh\nexit 0\n')
         with mock.patch.object(menubar, 'libraries', lambda: {'pyobjc': '13.0', 'python': '3.14.10', 'framework': False}):
             got = self.doctor_menubar()
-        running = [g for g in got if g[1].startswith('Menu bar running')]
-        self.assertEqual(running, [(None, 'Menu bar running',
-                                    'Start it with: switchboard menubar. Its log: %s' % os.path.join(self.data, 'menubar.log'))])
+        running = [g for g in got if g[1].startswith('Menu bar item')]
+        self.assertEqual(running, [(None, 'Menu bar item: installed, not running',
+                                    'Start it with: switchboard menubar on. Its log: %s' % os.path.join(self.data,
+                                                                                                       'menubar.log'))])
 
     def test_what_it_runs_on_not_loading_names_update(self):
         write_exe(menubar.launcher(), '#!/bin/sh\nexit 0\n')

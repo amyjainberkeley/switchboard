@@ -21,7 +21,7 @@ ROOT = os.path.abspath(os.path.join(HERE, '..'))
 sys.path.insert(0, ROOT)
 
 from switchboard import __main__ as cli
-from switchboard import backup, chats, config, foldercmd, history, leftovers, menubar, places, readings, resume
+from switchboard import about, backup, chats, config, foldercmd, history, leftovers, menubar, places, readings, resume
 
 FLAG = re.compile(r'(?<![\w-])(--?[A-Za-z][\w-]*)')
 
@@ -43,6 +43,7 @@ USAGES = {
     'export': backup.EXPORT_USAGE,
     'import': backup.IMPORT_USAGE,
     'readings': readings.USAGE,
+    'about': about.USAGE,
 }
 
 

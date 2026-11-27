@@ -21,6 +21,8 @@ not. The checks, in order:
 - temporary: temporary files a killed write left behind (core.sweep_temporary);
 - claude_code: after Claude Code updates itself, one read-only look at its program for the names the engine relies on
   (facts.shape_look), once per version and file; a name not found is a warning with the version, never a refusal.
+- skill: Switchboard's skill for coding agents, a copy of its own from an older program brought up to date
+  (skillfile.refresh_now).
 
 What was repaired is kept in repairs.json: a day on the page and in doctor, a week in the file.
 """
@@ -397,8 +399,20 @@ def _and(items):
     return items[0] if len(items) == 1 else ', '.join(items[:-1]) + ' and ' + items[-1]
 
 
+def check_skill(fix, now):
+    """Switchboard's skill, a copy of its own from an older program (an update came since): brought up to date, as
+    at the first run (skillfile.refresh_now: never through a link, never one a newer Switchboard wrote, never after
+    the person turned it off). A line only when one was."""
+    if not fix:
+        return []
+    from . import skillfile
+    return [Result('skill:' + place, '%s (%s)' % (skillfile.LABELS[place], skillfile.short(skillfile.place_dir(place))),
+                   'was from Switchboard %s' % was if was else 'was from an older Switchboard', REPAIRED,
+                   'brought up to date') for place, was in sorted(skillfile.refresh_now().items())]
+
+
 CHECKS = (check_accounts, check_settings, check_state, check_journal, check_python, check_entries, check_temporary,
-          check_claude_code)
+          check_claude_code, check_skill)
 
 
 def run(fix=True, now=None):

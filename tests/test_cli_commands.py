@@ -345,7 +345,7 @@ class Doctor(Cli):
 
 class CommandHelp(Cli):
     def test_the_help_names_each_account_command(self):
-        code, out, _ = self.run_cli('help')
+        code, out, _ = self.run_cli('help', 'all')
         for line in ('switchboard switch [NAME]', 'switchboard remove NAME [--yes]', 'switchboard alias NAME [SHORT]',
                      'switchboard run [NAME] [--bare]', 'switchboard owner LINK', 'switchboard open LINK',
                      'switchboard doctor', 'switchboard auto [on|off]'):

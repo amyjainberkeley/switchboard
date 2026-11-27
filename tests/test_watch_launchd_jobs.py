@@ -1,9 +1,9 @@
 import _isolate  # noqa: F401  (first: it gives switchboard a throwaway data folder)
 # What launchd is told, pinned. Switchboard stays up because launchd starts the page again whenever it exits (its
-# own watchdog ends a page that hangs, and counts on that), and starts the menu bar again when it crashes but not when
-# the person chose Quit. Those promises are a few keys in the two job descriptions install.sh writes. This reads them
-# from install.sh itself (install-check never adds the jobs) and fails when a key that must stay is lost or changed.
-# A job or a key added later is not a failure.
+# own watchdog ends a page that hangs, and counts on that), and starts the menu bar again whenever it exits (its menu
+# has no Quit; `switchboard menubar off` takes its job out). Those promises are a few keys in the two job descriptions
+# install.sh writes. This reads them from install.sh itself (install-check never adds the jobs) and fails when a key
+# that must stay is lost or changed. A job or a key added later is not a failure.
 import os
 import plistlib
 import re
@@ -64,10 +64,11 @@ class TheMenuBarJob(unittest.TestCase):
     def setUp(self):
         self.bar = job(install_sh(), 'MENUBAR_PLIST')
 
-    def test_it_comes_back_after_a_crash_but_not_after_quit(self):
-        # Quit exits 0 and leaves a mark the page reads (watch.note_quit): neither launchd nor the page starts it
-        # again then. A crash exits otherwise: launchd starts it again, and the page does too.
-        self.assertEqual(self.bar.get('KeepAlive'), {'SuccessfulExit': False})
+    def test_it_comes_back_after_any_exit(self):
+        # KeepAlive true: a crash, a clean exit, or anything else that ends it, and launchd starts it again within its
+        # ThrottleInterval. Only `switchboard menubar off` keeps it off, by taking the job out (menubar_keep.turn_off).
+        self.assertIs(self.bar.get('KeepAlive'), True)
+        self.assertEqual(self.bar.get('ThrottleInterval'), 20)
 
     def test_it_starts_at_login(self):
         self.assertIs(self.bar.get('RunAtLoad'), True)
@@ -86,8 +87,11 @@ class TheReaderCanFail(unittest.TestCase):
         self.assertIsNone(job(text, 'PLIST').get('KeepAlive'))
 
     def test_a_changed_menu_bar_rule_is_seen(self):
-        text = install_sh().replace('<key>SuccessfulExit</key><false/>', '<key>SuccessfulExit</key><true/>', 1)
-        self.assertEqual(job(text, 'MENUBAR_PLIST').get('KeepAlive'), {'SuccessfulExit': True})
+        text = install_sh()
+        at = text.index('cat > "$MENUBAR_PLIST" <<EOF')
+        text = text[:at] + text[at:].replace('<key>KeepAlive</key><true/>',
+                                             '<key>KeepAlive</key><dict><key>SuccessfulExit</key><false/></dict>', 1)
+        self.assertEqual(job(text, 'MENUBAR_PLIST').get('KeepAlive'), {'SuccessfulExit': False})
 
     def test_a_job_that_is_not_written_is_seen(self):
         with self.assertRaises(AssertionError):

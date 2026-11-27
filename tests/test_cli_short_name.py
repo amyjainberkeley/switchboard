@@ -57,7 +57,7 @@ class TheHelp(unittest.TestCase):
     def test_help_prints_it(self):
         out = io.StringIO()
         with redirect_stdout(out):
-            self.assertEqual(cli.main(['help']), 0)
+            self.assertEqual(cli.main(['help', 'all']), 0)
         self.assertEqual(len(re.findall(r'\bsb\b', out.getvalue())), 1)
 
     def test_sb_has_no_command_help_of_its_own(self):

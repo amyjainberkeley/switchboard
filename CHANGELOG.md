@@ -2,6 +2,51 @@
 
 Every change people will notice, newest first. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.3.0 (2026-11-27)
+
+The first run moves into the terminal, and every install says what it checked.
+
+### Added
+
+**The first run**
+
+- `switchboard`, typed alone after an install, runs the whole first run in the terminal, in numbered steps: your account, your other accounts, links, and where to find everything. `switchboard setup` runs it again.
+- Each other account signs in through your browser, started from the terminal: no `/login`, and nothing is signed out. It says when the browser came back as an account that is already here, and what to do. Codex is offered once when it is on the Mac.
+- One real switch during the first run, when two or more accounts are kept and one has room: Enter moves Claude Code, s skips.
+- Before macOS asks about the default web browser, the first run says what turning it on changes (only claude.ai links; every other link opens in the browser you use now) and waits for Enter. After, one line says what changed. `switchboard links on` says the same before it asks.
+- The first run ends by naming the menu bar item, the status line, notifications and the page, and every change it made in Claude Code's settings with the command that undoes it.
+- `switchboard add` at a terminal signs each account in through your browser; `switchboard add EMAIL` signs in as one account.
+
+**The install**
+
+- Every install and update ends with a block of facts, each checked at that moment: where the copy came from and whether a checksum was checked, what macOS says of each app's signature, who it runs as, where it put things, what is running, whether the program's files are as installed, where sign-ins are kept, what leaves the Mac, what the install downloaded and from where, and how to remove it. `switchboard about` prints it again; `--json` too.
+- The installer writes `~/.switchboard/app/SHA256SUMS`; `switchboard doctor` says when a program file changed since.
+- A release can carry the link app already built for Apple silicon and Intel, signed with a Developer ID and notarized (`sh router/build.sh --release`). The installer checks it (checksum, source, signature, team, stapled ticket, macOS, processor) and puts it in place without Apple's command line tools; on any failed check it says which and builds the app on the Mac as before. This release does not carry one yet.
+
+**The menu bar**
+
+- The menu bar item is Switchboard's S. A dot at its top right is orange at a switch line and red when something needs you.
+- `switchboard menubar off` turns the item off across logins and updates; `switchboard menubar on` brings it back.
+- The first time, the item asks macOS for the place beside the clock (`"menubar_position": false` leaves it to macOS). When it ends up behind the notch of a MacBook's screen, one notification per login says how to reach it.
+- Add account in the menu opens the page's Add form.
+
+**Help**
+
+- A skill lets a coding agent answer questions about Switchboard. It goes in at the first run, into Claude Code's skills folder and, when Codex is on the Mac, `~/.agents/skills`, never over a skill of your own with that name. `switchboard skill` says where it is; `on` and `off` put it in and take it out; `show` prints it for any other agent. The uninstaller takes it out.
+
+### Changed
+
+- The menu is cleaner: each account is its whole email, one word and its bars. When it was checked, reset times and a model's week stay on the page.
+- No Quit in the menu. Anything that stops the item, other than `switchboard menubar off`, starts it again.
+- `switchboard help` fits on one screen; `switchboard help all` is every command. A command it does not know prints one line and the short help.
+- No message sends you to `/login` to add an account.
+- The install's last line names the one thing to type next: `switchboard`.
+- The page's address is printed as `127.0.0.1`, where it listens.
+
+### Fixed
+
+- `uninstall.sh --all` (and Homebrew's `--zap`) now also takes one-year tokens and API keys out of the Keychain when the program itself cannot run.
+
 ## 0.2.0 (2026-11-26)
 
 The first published version.

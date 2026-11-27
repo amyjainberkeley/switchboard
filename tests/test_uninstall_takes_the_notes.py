@@ -25,7 +25,8 @@ from switchboard.providers import contract
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SCRIPT = os.path.join(ROOT, 'uninstall.sh')
 KEYCHAIN_LINE = 'SECURITY=/usr/bin/security'
-SERVICES = ('Switchboard login', 'Switchboard login (previous)', 'Switchboard recovery', 'switchboard-gateway')
+SERVICES = ('Switchboard login', 'Switchboard login (previous)', 'Switchboard recovery', 'switchboard-gateway',
+            'Switchboard token', 'Switchboard API key')
 UNTOUCHED = 'The login Claude Code is using was not touched.'
 NOTHING_LEFT = 'Nothing of Switchboard is left.'
 
@@ -158,7 +159,7 @@ class TheNotesFolderAtUninstall(unittest.TestCase):
             UNTOUCHED,
             'To remove them too: rm -rf ~/%s' % contract.NOTES_DIR_NAME])
 
-    def test_the_keychain_is_asked_only_for_switchboards_own_four_services(self):
+    def test_the_keychain_is_asked_only_for_switchboards_own_services(self):
         self.h.a_note()
         self.h.run('--all')
         asked = self.h.asked_of_the_keychain()

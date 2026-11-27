@@ -327,6 +327,9 @@ if [ -e "$SRC/.git" ] && ! grep -q '^[0-9a-f]\{4,40\}$' "$DATA/app.new/switchboa
 fi
 find "$DATA/app.new" -name '__pycache__' -type d -prune -exec rm -rf {} + 2>/dev/null || true
 chmod +x "$DATA/app.new/switchboard/shim/open"
+# SHA256SUMS beside the program: each file as it is put in place, for `switchboard about` and doctor (about.py).
+"$PY" -I -B -c 'import sys; sys.path.insert(0, sys.argv[1]); from switchboard import about; about.write_manifest(sys.argv[1])' \
+  "$DATA/app.new" 2>/dev/null || true
 if [ -d "$DATA/app" ]; then rm -rf "$DATA/app.old"; mv "$DATA/app" "$DATA/app.old"; fi
 mv "$DATA/app.new" "$DATA/app"
 rm -rf "$DATA/app.old"
@@ -605,20 +608,94 @@ if [ "$LINKAPP" = 1 ] && [ -d "$LINKS_APP" ] && [ "$(plist_value "$LINKS_APP" CF
    && half_made "$LINKS_APP"; then
   rm -rf "$LINKS_APP"
 fi
-if [ "$LINKAPP" = 0 ]; then
-  :                                                   # left out: --no-link-app, given now or kept from before
+# Launch Services only for the account's own install (LS above): otherwise the app is put in place, and macOS is not
+# told.
+if [ "$LS" = 1 ]; then REGISTER=""; else REGISTER="--no-register"; fi
+# Once the new link app is in place, the older copy goes; macOS is told (only the account's own install).
+older_links_gone() {
+  [ -d "$OLDER_LINKS" ] && [ "$(plist_value "$OLDER_LINKS" CFBundleIdentifier)" = "$LINKS_ID" ] || return 1
+  [ "$LS" = 0 ] || "$LSREGISTER" -u "$OLDER_LINKS" >/dev/null 2>&1 || true
+  rm -rf "$OLDER_LINKS"
+}
+# A release carries the link app already built, signed with its publisher's Developer ID and notarized by Apple, in
+# router/prebuilt (router/build.sh --release makes it): then this Mac needs no compiler for it. It is used only when
+# every check below passes, and is then put in place by build.sh --from exactly as a freshly built one is. On any
+# failed check one line says which, and the app is built on this Mac as before: a prebuilt app that fails a check is
+# never installed and never stops the install. LINKS_TEAM is the only Developer ID team whose prebuilt app is used;
+# while it is empty (a tree no release has set it in), a prebuilt app is never used.
+# SWITCHBOARD_BUILD_LINKS=1 builds the app on this Mac even when the release carries one (tests/install-check.sh).
+LINKS_TEAM=""
+PREBUILT="$DATA/app/router/prebuilt"
+LINKS_PLACED=0
+links_from_release() {
+  LINKS_WHY=""; LINKS_SIGNER=""
+  [ -n "$LINKS_TEAM" ] \
+    || { LINKS_WHY="this installer does not name the Developer ID team it trusts"; return 1; }
+  # links.json, read by the program's own Python: one value per line, each checked to be a plain string.
+  said="$("$PY" -I -B -c 'import json, sys
+with open(sys.argv[1]) as f:
+    d = json.load(f)
+v = [d["zip_sha256"], d["source_sha256"], d["team"], d["minimum_macos"], " ".join(d["architectures"]),
+     "yes" if d["notarized"] is True else "no"]
+if not all(isinstance(x, str) and x and "\n" not in x for x in v):
+    sys.exit(1)
+print("\n".join(v))' "$PREBUILT/links.json" 2>/dev/null)" \
+    || { LINKS_WHY="its links.json is missing or can't be read"; return 1; }
+  want_sum="$(printf '%s\n' "$said" | sed -n 1p)"; want_source="$(printf '%s\n' "$said" | sed -n 2p)"
+  want_team="$(printf '%s\n' "$said" | sed -n 3p)"; want_macos="$(printf '%s\n' "$said" | sed -n 4p)"
+  archs="$(printf '%s\n' "$said" | sed -n 5p)"; notarized="$(printf '%s\n' "$said" | sed -n 6p)"
+  [ "$(shasum -a 256 "$PREBUILT/SwitchboardLinks.zip" | cut -d ' ' -f 1)" = "$want_sum" ] \
+    || { LINKS_WHY="its SHA-256 does not match links.json"; return 1; }
+  [ "$(shasum -a 256 "$DATA/app/router/SwitchboardLinks.swift" | cut -d ' ' -f 1)" = "$want_source" ] \
+    || { LINKS_WHY="it was built from another version of router/SwitchboardLinks.swift"; return 1; }
+  [ "$notarized" = yes ] || { LINKS_WHY="links.json says it is not notarized"; return 1; }
+  case " $archs " in *" $MACHINE "*) ;; *) LINKS_WHY="it has no build for this Mac's processor ($MACHINE)"; return 1 ;; esac
+  have_macos="$(sw_vers -productVersion 2>/dev/null || true)"
+  awk -v have="$have_macos" -v need="$want_macos" 'BEGIN { split(have, h, "."); split(need, n, ".")
+    for (i = 1; i <= 3; i++) { if (h[i] + 0 > n[i] + 0) exit 0; if (h[i] + 0 < n[i] + 0) exit 1 } exit 0 }' \
+    || { LINKS_WHY="it needs macOS $want_macos or newer, and this Mac has ${have_macos:-an unknown version}"; return 1; }
+  # Unpacked without the quarantine flag: Homebrew marks what it downloads, ditto passes a zip's mark on to what it
+  # unpacks, and macOS would then ask before the first link opens. A copy built here carries none either; this one is
+  # used only once its Developer ID signature, team and stapled notarization ticket are checked below.
+  LINKS_TMP="$(mktemp -d "${TMPDIR:-/tmp}/switchboard-prebuilt.XXXXXX")"
+  ditto -x -k --noqtn "$PREBUILT/SwitchboardLinks.zip" "$LINKS_TMP" 2>/dev/null && [ -d "$LINKS_TMP/Switchboard Links.app" ] \
+    || { LINKS_WHY="its zip could not be unpacked"; return 1; }
+  cmp -s "$LINKS_TMP/Switchboard Links.app/Contents/Info.plist" "$DATA/app/router/Info.plist" \
+    || { LINKS_WHY="its Info.plist is not the one in router/Info.plist"; return 1; }
+  codesign --verify --strict "$LINKS_TMP/Switchboard Links.app" >/dev/null 2>&1 \
+    || { LINKS_WHY="its signature did not verify (codesign --verify --strict)"; return 1; }
+  shown="$(codesign -dv --verbose=2 "$LINKS_TMP/Switchboard Links.app" 2>&1 || true)"
+  team="$(printf '%s\n' "$shown" | sed -n 's/^TeamIdentifier=//p' | head -n 1)"
+  [ "$team" = "$want_team" ] || { LINKS_WHY="it is signed by team ${team:-none}, and links.json names $want_team"; return 1; }
+  [ "$team" = "$LINKS_TEAM" ] || { LINKS_WHY="it is signed by team $team, and this install.sh trusts only $LINKS_TEAM"; return 1; }
+  printf '%s\n' "$shown" | grep -qx 'Notarization Ticket=stapled' \
+    || { LINKS_WHY="its signature carries no notarization ticket"; return 1; }
+  LINKS_SIGNER="$(printf '%s\n' "$shown" | sed -n 's/^Authority=//p' | head -n 1)"
+  sh "$DATA/app/router/build.sh" --from "$LINKS_TMP/Switchboard Links.app" $REGISTER "$HOME/Applications" \
+    >/dev/null 2>"$DATA/build.log" \
+    || { LINKS_WHY="it could not be put in ~/Applications (details in $(short "$DATA/build.log"))"; return 1; }
+}
+if [ "$LINKAPP" = 1 ] && [ -f "$PREBUILT/SwitchboardLinks.zip" ] && [ "${SWITCHBOARD_BUILD_LINKS:-}" != 1 ]; then
+  LINKS_TMP=""
+  if links_from_release; then
+    LINKS_PLACED=1
+    if older_links_gone; then OLDER_SAID=" (it was ~/Applications/Switchboard.app before)"; else OLDER_SAID=""; fi
+    note "Installed the link app from the release: signed by $LINKS_SIGNER, checksum and signature checked, with a stapled notarization ticket.$OLDER_SAID"
+  else
+    say "Not using the release's link app: $LINKS_WHY."
+  fi
+  [ -z "$LINKS_TMP" ] || rm -rf "$LINKS_TMP"
+fi
+if [ "$LINKAPP" = 0 ] || [ "$LINKS_PLACED" = 1 ]; then
+  :                                                   # left out (--no-link-app, now or from before), or in place
 # Apple's /usr/bin/swiftc is a stand-in too (see apple_tool_real): real only while the developer folder holds swiftc,
 # the command line tools' own or Xcode's toolchain's; else running it shows the dialog that offers to install them.
 elif SWIFTC="$(command -v swiftc 2>/dev/null)" && xcode-select -p >/dev/null 2>&1 && { [ "$SWIFTC" != /usr/bin/swiftc ] \
      || apple_tool_real swiftc || [ -x "$(xcode-select -p)/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc" ]; }; then
   t="$(date +%s)"
   begin "Building the link app"
-  # Launch Services only for the account's own install (LS above): otherwise the app is built and macOS is not told.
-  if [ "$LS" = 1 ]; then REGISTER=""; else REGISTER="--no-register"; fi
   if sh "$DATA/app/router/build.sh" $REGISTER "$HOME/Applications" >/dev/null 2>"$DATA/build.log"; then
-    if [ -d "$OLDER_LINKS" ] && [ "$(plist_value "$OLDER_LINKS" CFBundleIdentifier)" = "$LINKS_ID" ]; then
-      [ "$LS" = 0 ] || "$LSREGISTER" -u "$OLDER_LINKS" >/dev/null 2>&1 || true
-      rm -rf "$OLDER_LINKS"
+    if older_links_gone; then
       done_in "$t" " (it was ~/Applications/Switchboard.app before)"
     else
       done_in "$t"
@@ -737,9 +814,9 @@ else
   [ "$ELSEWHERE" = 0 ] || say "This is not your account's own home folder, so no background job was added: it would take the place of your account's own."
   say "Without the background job, start the page with: $CMD serve"
 fi
-# The menu bar item's job runs its launcher at every login, under the same rule (none with --no-agent). Quit in its
-# menu exits cleanly and it stays quit until the next login, or until Switchboard.app is opened; a crash is started
-# again (KeepAlive only on an unsuccessful exit). When the menu bar can't run here, its job goes too.
+# The menu bar item's job runs its launcher at every login, under the same rule (none with --no-agent). Its menu has
+# no Quit: launchd starts it again whenever it exits (KeepAlive), and only `switchboard menubar off` turns it off, by
+# taking this job out. When the menu bar can't run here, its job goes too.
 MENUBAR_LABEL="$LABEL.menubar"
 MENUBAR_PLIST="$HOME/Library/LaunchAgents/$MENUBAR_LABEL.plist"
 APPS="${SWITCHBOARD_APPLICATIONS:-/Applications}"     # (tests point this at a folder of their own)
@@ -764,7 +841,7 @@ if [ "$AGENT" = 1 ] && [ "$MENUBAR_OK" = 1 ]; then
     <key>PATH</key><string>$(xml "$JOB_PATH")</string>
   </dict>
   <key>RunAtLoad</key><true/>
-  <key>KeepAlive</key><dict><key>SuccessfulExit</key><false/></dict>
+  <key>KeepAlive</key><true/>
   <key>ProcessType</key><string>Interactive</string>
   <key>ThrottleInterval</key><integer>20</integer>
   <key>StandardOutPath</key><string>$(xml "$DATA/menubar.log")</string>
@@ -801,7 +878,7 @@ elif [ "$MENUBAR" = 0 ] && { [ -f "$MENUBAR_PLIST" ] || [ -e "$MENUBAR_CMD" ] ||
   say "Removed the menu bar item."
 fi
 
-# ---- the end: the first run at a terminal, or one line saying what to type ----
+# ---- the end: the facts of this install, then the first run at a terminal, or one line saying what to type ----
 took=$(( $(date +%s) - T0 ))
 [ "$took" -ge 1 ] || took=1
 case "$(basename "${SHELL:-/bin/zsh}")" in
@@ -821,26 +898,37 @@ if [ "$OWN_LATER" = 1 ]; then
   say "Run this installer again when you are online to finish."
   exit 1
 fi
+# The block of facts comes from `switchboard about` (switchboard/about.py), which checks each one now, so its words
+# live in one place; it ends with "Done in N s." and what to type next. Over an install that was already here (an
+# update, `brew upgrade`, a second run) it is the short form: the version, the program's files and what runs. It
+# reads nothing from standard input. When it can't run, the last line is said here instead: the block never fails an
+# install.
+FORM=""
+[ -z "$WAS" ] || FORM="--update"
+close_line
 # At a terminal: the output is one, and /dev/tty opens (curl | sh keeps it; an agent's shell has none). The first
 # run reads its answer from the terminal, never from the pipe this file may be arriving through.
 if [ "$SETUP_WANTED" = 1 ] && [ -t 1 ] && ( : </dev/tty ) 2>/dev/null; then
-  say "Done in $took s."
+  "$SB" about --done "$took" --setup-now $FORM </dev/null || say "Done in $took s."
   rc=0
   "$SB" setup </dev/tty || rc=$?
   [ "$ON_PATH" = 1 ] || path_lines
   exit "$rc"
 fi
-# Without it: `switchboard setup` while the engine keeps no account yet, else `switchboard`. (Its accounts' file,
-# read leniently: a list of accounts or one keyed by id, each with an email.)
-ACCOUNTS="$("$PY" -I -B -c 'import json, sys
+if ! "$SB" about --done "$took" --as "$NEXT" $FORM </dev/null; then
+  # Without the block: "Next: switchboard" while the engine keeps no account yet (`switchboard` alone runs the first
+  # run then), else "Type switchboard to see your accounts.". (Its accounts' file, read leniently: a list of accounts
+  # or one keyed by id, each with an email.)
+  ACCOUNTS="$("$PY" -I -B -c 'import json, sys
 try:
     a = json.load(open(sys.argv[1])).get("accounts")
     rows = a.values() if isinstance(a, dict) else a if isinstance(a, list) else []
     print(len([r for r in rows if isinstance(r, dict) and r.get("email")]))
 except Exception:
     print(0)' "$DATA/accounts.json" 2>/dev/null || echo 0)"
-if [ "$ACCOUNTS" = 0 ]; then say "Done in $took s. Type ${BOLD}$NEXT setup${PLAIN} to add your accounts."
-else say "Done in $took s. Type ${BOLD}$NEXT${PLAIN} to see your accounts."; fi
+  if [ "$ACCOUNTS" = 0 ]; then say "Done in $took s. Next: ${BOLD}$NEXT${PLAIN}"
+  else say "Done in $took s. Type ${BOLD}$NEXT${PLAIN} to see your accounts."; fi
+fi
 [ "$ON_PATH" = 1 ] || path_lines
 }
 switchboard_install "$@"
