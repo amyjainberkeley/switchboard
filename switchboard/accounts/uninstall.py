@@ -1,11 +1,13 @@
 """Every account and every saved login, taken out for the uninstaller's --all (`switchboard tidy --all`).
 
-The engine keeps logins in the Keychain under three services (vault.py): "Switchboard login" (each account's current
-login), "Switchboard login (previous)" (its earlier generations) and "Switchboard recovery" (a refresh's successor,
-"successor:<id>", and a switch's safety copy, "safety:<fingerprint>"), plus owner-only recovery files under
-<data>/recovery when the Keychain refused one. tidy --all removes each kept account with api.remove first; what that
-leaves is a safety copy, a successor kept for an account removed while it was refreshing, and whatever an earlier
-removal could not delete. Once the uninstaller deletes the data folder, nothing could find those again.
+The engine keeps logins in the Keychain under four services (vault.py): "Switchboard login" (each account's current
+login), "Switchboard login (previous)" (its earlier generations), "Switchboard recovery" (a refresh's successor,
+"successor:<id>", and a switch's safety copy, "safety:<fingerprint>") and "Switchboard login (Mac-wide parts)" (the
+Mac-wide parts of Claude Code's item, kept for a put-back into no item at all; counted with the recovery copies),
+plus owner-only recovery files under <data>/recovery when the Keychain refused one. tidy --all removes each kept
+account with api.remove first; what that leaves is a safety copy, a successor kept for an account removed while it
+was refreshing, the Mac-wide parts, and whatever an earlier removal could not delete. Once the uninstaller deletes the
+data folder, nothing could find those again.
 
 remove_all() finds every item its own records know: the accounts kept, the accounts removed earlier, the refreshes
 and upkeep it notes, and every recovery entry (the manifest and the files beside it). Each item is looked for first
@@ -18,7 +20,7 @@ removed is named, and the records that find it stay, so the uninstaller keeps th
 """
 import os
 
-from . import roster, runas, switcher, vault
+from . import keychain, roster, runas, switcher, vault
 from .api import ABSENT, PRESENT, AccountsError
 
 # A failed delete's reason: the plain words for the refusal, and the AccountsError kind that says what to do.
@@ -28,7 +30,8 @@ _WHY = {'locked': ('it is locked', 'keychain_locked'),
         'dialog': ('macOS is waiting for you to answer a Keychain dialog', 'keychain_slow'),
         'denied': ('it refused', 'keychain_denied'),
         'no_keychain': ("the login Keychain isn't available to Switchboard here", 'other'),
-        'no_tool': ('its tool, /usr/bin/security, is missing', 'other')}
+        'no_tool': ('its tool, /usr/bin/security, is missing', 'other'),
+        'test_run': (keychain.TEST_RUN_WORDS, 'other')}
 _WHAT = {vault.SERVICE_CURRENT: "%s's saved login", vault.SERVICE_PREVIOUS: "%s's earlier login"}
 
 
@@ -135,8 +138,19 @@ def remove_all(ctx):
                     if os.path.isfile(os.path.join(vault._recovery_dir(ctx), vault._safe(key) + '.json')):
                         others += 1
                     vault.drop_stash(ctx, key)          # its file, and its line in the manifest
+            shared_left = False                         # the Mac-wide parts kept for a put-back: a recovery copy too
+            for item in vault.shared_services(ctx):
+                was, why = _take_out(ctx, vault.SERVICE_SHARED, item)
+                if why:
+                    failed.append((None, why))
+                    shared_left = True
+                    continue
+                others += 1 if was else 0
+            if not shared_left:
+                vault.forget_shared(ctx)
             if not failed:                              # (one that failed keeps its record, for the next run)
-                for service in (vault.SERVICE_CURRENT, vault.SERVICE_PREVIOUS, vault.SERVICE_RECOVERY):
+                for service in (vault.SERVICE_CURRENT, vault.SERVICE_PREVIOUS, vault.SERVICE_RECOVERY,
+                                vault.SERVICE_SHARED):
                     n, bad = _sweep(ctx, service)
                     others += n
                     if bad:

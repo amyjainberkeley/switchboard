@@ -195,8 +195,10 @@ class Marked(Base):
         self.assertTrue(by[A]['elsewhere'])
         self.assertFalse(by[B]['elsewhere'])
         rows = dict((r['email'], r) for r in term.read(view)['accounts'])
-        self.assertEqual(rows[A]['age'], 'from another Mac, 3 min ago')
-        self.assertEqual(rows[B]['age'], 'checked just now')
+        self.assertEqual(rows[A]['numbers'], 'from another Mac')     # the list says where, never how old
+        self.assertEqual(rows[B]['numbers'], '')
+        line = next(x for x in term.view(term.read(view)) if x[:1].isdigit() and A in x)
+        self.assertTrue(line.endswith('from another Mac'), line)
         doc = report.document(view, core.VERSION)
         js = dict((a['email'], a) for a in doc['accounts'])
         self.assertEqual((js[A]['from_another_mac'], js[B]['from_another_mac']), (True, False))

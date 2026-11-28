@@ -1,13 +1,15 @@
 import _isolate  # noqa: F401  (first: it gives switchboard a throwaway data folder)
 # An account shows at most two limits, in the terminal and in the menu bar as on the page:
 #
-# - 5-hour only when there is a 5-hour number to show: the reading has a 5-hour window with a number, and it is not
-#   too old to show. No 5-hour line for an account with no 5-hour limit, for a reading too old to show, or for one
-#   never read. A 5-hour window that has not started (0%, no reset) is a number: it stays.
+# - 5-hour with its bar when there is a 5-hour number to show: the reading has a 5-hour window with a number, and it
+#   is not too old to show. An account with no 5-hour limit says so in words in that place ("no 5-hour limit", no bar,
+#   no percent: test_rows_five_hour_words). No 5-hour line for a reading too old to show of a plan that has one, or for
+#   one never read. A 5-hour window that has not started (0%, no reset) is a number: it stays.
 # - Weekly always: a dash when it is not known.
-# - No line for a model's own week. A model week that auto-switch counts, at or over its switch line, is one short
-#   red note at the end of the weekly line: its name and its percent (the highest, when several are). Never for a
-#   model week auto-switch does not count, never under its line.
+# - No line for a model's own week. In the terminal's list, no note of one either (the page shows it). In the menu
+#   bar's limits, a model week that auto-switch counts, at or over its switch line, is one short note: its name and
+#   its percent (the highest, when several are; term.over_note). Never for a model week auto-switch does not count,
+#   never under its line.
 # - The switch line names only what the rows show: no model, and no 5-hour line when no account has a 5-hour limit.
 #
 # Made-up *.example accounts only. No network, no engine, no page.
@@ -82,17 +84,19 @@ class TheTerminal(unittest.TestCase):
 
     def test_no_5_hour_line_without_a_5_hour_number(self):
         got = self.limits()
-        self.assertEqual(got[ULTRA], [('weekly', 27)])                           # no 5-hour limit
+        self.assertEqual(got[ULTRA], [('5-hour', None), ('weekly', 27)])         # no 5-hour limit: words, no number
         self.assertEqual(got[OLD], [('weekly', None)])                           # too old to show
         self.assertEqual(got[NEVER], [('weekly', None)])                         # never read
         v = view()
         v['accounts'][1]['usage']['session'] = w(None, at(13, 18))               # a window with no number
         self.assertEqual(self.limits(v)[TEAM], [('weekly', 17)])
         blocks = self.blocks()
-        for email in (ULTRA, OLD, NEVER, FULL):
+        for email in (OLD, NEVER):
             self.assertNotIn('5-hour', blocks[email], email)
-        self.assertRegex(blocks[OLD], r'(?m)^   weekly  ─{24}     —$')            # a dash, its age on the line above
-        self.assertIn('checked 4 days ago', blocks[OLD].split('\n')[0])
+        for email in (ULTRA, FULL):                                                # its plan has none: said in words
+            self.assertEqual(blocks[email].split('\n')[1], '   no 5-hour limit', email)
+        self.assertRegex(blocks[OLD], r'(?m)^   weekly  ─{24}     —$')            # a dash, and nothing of its age
+        self.assertNotIn('ago', blocks[OLD].split('\n')[0])                      # (the page says how old it is)
 
     def test_a_5_hour_window_at_0_not_started_stays(self):
         self.assertEqual(self.limits()[TEAM], [('5-hour', 0), ('weekly', 17)])
@@ -103,26 +107,23 @@ class TheTerminal(unittest.TestCase):
             self.assertEqual([l for l, _ in lims if l not in ('5-hour', 'weekly')], [], email)
         self.assertNotRegex('\n'.join(self.blocks().values()), r'(?m)^\s+Fable\b')
 
-    def test_a_counted_model_week_over_its_line_is_a_red_note_at_the_end_of_the_weekly_line(self):
+    def test_a_counted_model_week_over_its_line_is_no_note_in_the_list(self):
+        # The list keeps each account's 5-hour and weekly limits only: the weekly line ends with its own words.
         blocks = self.blocks()
-        self.assertEqual(blocks[FULL].split('\n')[1],
+        self.assertEqual(blocks[FULL].split('\n')[2],
                          '   weekly  ' + '━' * 19 + '─' * 5 + '   78%  resets Mon 1:00 PM · in 3 days'
-                         ' · at this pace, full by Sat 7:17 PM  Fable 97%')
-        self.assertNotIn('Fable', blocks[ULTRA])                                  # 22%, under its line: nothing
-        coloured = self.blocks(colour=True)[FULL].split('\n')[1]
-        self.assertTrue(coloured.endswith('full by Sat 7:17 PM  \x1b[91mFable 97%\x1b[0m'),
-                        coloured)
+                         ' · at this pace, full by Sat 7:17 PM')
+        self.assertNotIn('Fable', '\n'.join(blocks.values()))
+        coloured = self.blocks(colour=True)[FULL].split('\n')[2]
+        self.assertTrue(coloured.endswith('\x1b[2m · \x1b[0mat this pace, full by Sat 7:17 PM'), coloured)
         week = dict((a['email'], a['limits'][-1]) for a in term.read(view(), tz=TZ)['accounts'])
-        self.assertEqual(week[FULL]['note'], {'label': 'Fable', 'pct': 97})
+        self.assertNotIn('note', week[FULL])
         self.assertFalse(week[FULL]['over'])                         # the weekly limit itself is under its line
-        self.assertIsNone(week[ULTRA]['note'])
 
     def test_the_note_is_only_at_or_over_the_counted_line(self):
+        # term.over_note, the one rule the menu bar's limits say a model week by
         def note(pct, models=('Fable',), model_at=95.0, name='Fable'):
-            v = view()
-            v['auto'].update(models=list(models), model_at=model_at)
-            v['accounts'][4]['usage']['scoped'] = [fable(pct, at(16, 13), name)]
-            return [a for a in term.read(v, tz=TZ)['accounts'] if a['email'] == FULL][0]['limits'][-1]['note']
+            return term.over_note({'scoped': [fable(pct, at(16, 13), name)]}, model_at, list(models))
         self.assertEqual(note(95), {'label': 'Fable', 'pct': 95})               # at its line
         self.assertEqual(note(94.6), {'label': 'Fable', 'pct': 95})             # rounds to it, as the % does
         self.assertIsNone(note(94.4))                                            # under it
@@ -130,24 +131,22 @@ class TheTerminal(unittest.TestCase):
         self.assertIsNone(note(99, models=('Opus',)))
         self.assertEqual(note(99, name='Fable 5.2'), {'label': 'Fable 5.2', 'pct': 99})    # 'Fable' counts 'Fable 5.2'
         self.assertEqual(note(91, model_at=90.0), {'label': 'Fable', 'pct': 91})           # its own line, as set
-        v = view()
-        v['auto']['models'] = ['Fable', 'Opus']
-        v['accounts'][4]['usage']['scoped'] = [fable(96, at(16, 13)), fable(99, at(16, 13), 'Opus'),
-                                               fable(98, at(16, 13), 'Sonnet')]          # Sonnet's is not counted
-        got = [a for a in term.read(v, tz=TZ)['accounts'] if a['email'] == FULL][0]['limits'][-1]['note']
+        got = term.over_note({'scoped': [fable(96, at(16, 13)), fable(99, at(16, 13), 'Opus'),
+                                         fable(98, at(16, 13), 'Sonnet')]}, 95.0, ['Fable', 'Opus'])   # Sonnet: not counted
         self.assertEqual(got, {'label': 'Opus', 'pct': 99})                       # the highest of those counted
 
-    def test_on_a_narrow_terminal_the_note_stays_and_its_reset_says_less(self):
+    def test_on_a_narrow_terminal_the_pace_words_say_less(self):
         got = term.view(term.read(view(), tz=TZ), width=60)
         self.assertLessEqual(max(len(x) for x in got), 60)
-        self.assertIn('78%  full by Sat 7:17 PM  Fable 97%', '\n'.join(got))       # the pace words say less too
-        self.assertIn('27%  resets Sat 12:00 PM · in 20 hours', '\n'.join(got))      # a line with no note keeps it all
+        self.assertTrue(next(x for x in got if '78%' in x).endswith('78%  full by Sat 7:17 PM'))   # says less
+        self.assertIn('27%  resets Sat 12:00 PM · in 20 hours', '\n'.join(got))      # a line with no pace keeps it all
 
     def test_the_note_can_be_turned_off_in_one_place(self):
+        full = next(a for a in view()['accounts'] if a['email'] == FULL)
         saved = term.MODEL_OVER_NOTE
         self.addCleanup(setattr, term, 'MODEL_OVER_NOTE', saved)
         term.MODEL_OVER_NOTE = False
-        self.assertNotIn('Fable', self.blocks()[FULL])
+        self.assertEqual([lim['label'] for lim in menubar.limits(full, view()['auto'])], ['Weekly'])
 
     def test_the_header_names_only_what_the_rows_show(self):
         header = term.view(term.read(view(), tz=TZ))[0]
@@ -180,6 +179,9 @@ class TheMenuBar(unittest.TestCase):
         for email in (ULTRA, OLD, NEVER, FULL):
             self.assertIsNone(rows[email]['five'], email)
             labels = [op[5][0][0] for op in menubar.row_ops(rows[email]) if op[0] == 'text']
+            if email in (ULTRA, FULL):                                             # no 5-hour limit: words first
+                self.assertEqual(labels[0], 'No 5-hour limit', email)
+                labels = labels[1:]
             self.assertEqual(labels[0::2], ['Weekly'], email)                      # one bar row: Weekly
         old = rows[OLD]
         self.assertEqual(menubar.pct_text(old['week']), '—')
@@ -222,7 +224,8 @@ class TheMenuBar(unittest.TestCase):
 # ---------- the demo ----------
 
 class TheDemo(unittest.TestCase):
-    """The demo shows each kind of row: no 5-hour limit, a 5-hour number, the note, and a reading too old to show."""
+    """The demo shows each kind of row: no 5-hour limit, a 5-hour number, a model week at its line (the menu bar's
+    note), and a reading too old to show."""
 
     def setUp(self):
         self.addCleanup(setattr, core, 'DEMO', core.DEMO)
@@ -238,11 +241,13 @@ class TheDemo(unittest.TestCase):
         lines = dict((e, [(l['label'], l['pct'] is not None) for l in r['limits']]) for e, r in rows.items())
         mail = next(a for a in v['accounts'] if a['email'] == 'maya.reyes@mail.example')
         self.assertIsNone(mail['usage']['session'])                                       # no 5-hour limit,
-        self.assertEqual(lines['maya.reyes@mail.example'], [('weekly', False)])           # and too old to show
-        self.assertIn('checked 1 day ago', rows['maya.reyes@mail.example']['age'])
+        self.assertEqual(lines['maya.reyes@mail.example'], [('5-hour', False), ('weekly', False)])   # too old to
+        self.assertEqual(rows['maya.reyes@mail.example']['limits'][0]['words'], 'no 5-hour limit')   # show: words
+        self.assertEqual(rows['maya.reyes@mail.example']['numbers'], '')                # and nothing of its age
         self.assertEqual(lines['maya@northwind.example'], [('5-hour', True), ('weekly', True)])   # a 5-hour number
-        self.assertEqual(rows['m.reyes@harbor.example']['limits'][-1]['note'], {'label': 'Fable', 'pct': 97})
-        self.assertEqual([e for e, r in rows.items() if r['limits'][-1].get('note')], ['m.reyes@harbor.example'])
+        noted = [a['email'] for a in v['accounts'] if [lim['label'] for lim in menubar.limits(a, v['auto'])][-1] == 'Fable']
+        self.assertEqual(noted, ['m.reyes@harbor.example'])                             # Fable 97, over its 95 line
+        self.assertFalse(any(lim.get('note') for r in rows.values() for lim in r['limits']))     # the list: none
 
     def test_the_plans_order_and_next_are_as_they_were(self):
         v = demo.view()
@@ -250,7 +255,10 @@ class TheDemo(unittest.TestCase):
         self.assertEqual([o['email'] for o in v['plan']['order']],
                          ['maya@northwind.example', 'maya@ivy.example', 'maya@fernhill.example', 'm.reyes@harbor.example',
                           'maya.reyes@mail.example'])
-        self.assertEqual(next(o for o in v['plan']['order'] if o['email'] == 'm.reyes@harbor.example')['usable'], False)
+        # harbor's Fable week is at 97, over its 95 line: a model's own week never makes an account unusable
+        # (policy.unusable_by_windows), so it is still a place to land, at 5% of its week
+        harbor = next(o for o in v['plan']['order'] if o['email'] == 'm.reyes@harbor.example')
+        self.assertEqual((harbor['usable'], harbor['reason']), (True, None))
 
 
 if __name__ == '__main__':

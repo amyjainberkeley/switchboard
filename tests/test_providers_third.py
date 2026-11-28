@@ -8,7 +8,8 @@ import _isolate  # noqa: F401  (first: it gives switchboard a throwaway data fol
 # - place.pick chooses it when Claude is out, and `continue` (with and without --to) gets as far as its own start.
 # - Its own facts are what the person reads: how it signs in, what it cannot do, its rule file and where its memory
 #   lives in the note.
-# - The terminal group, the menu bar rows and the page's group show it (the page in headless Chrome, under the lock).
+# - The terminal's list, the menu bar's menu and the page draw it as a numbered row (the page in headless Chrome, under
+#   the lock).
 import dataclasses
 import io
 import json
@@ -30,7 +31,7 @@ from fakes_provider_kit import (NOW, Rig, chat as kit_chat, claude_found, claude
                                 read_json)
 from fakes_providers import make_reach, stand_in  # noqa: E402
 from switchboard import core, demo, menubar, term  # noqa: E402
-from switchboard.providers import choices, cli, contract, handoff, place, view, words  # noqa: E402
+from switchboard.providers import choices, cli, contract, handoff, place, rows, view, words  # noqa: E402
 from switchboard.providers.contract import Room, Transcript, Event, ReadInfo  # noqa: E402
 
 
@@ -82,6 +83,19 @@ class OnTheBoard(Base):
         self.assertIs(tern['account_list'], False)
         self.assertEqual([w['label'] for w in tern['seats'][0]['windows']], ['3-day'])
         self.assertEqual(tern['seats'][0]['windows'][0]['used_pct'], 30.0)
+        self.assertEqual(self.calls.runs, [])                   # the board started nothing
+
+    def test_it_is_a_numbered_row_after_the_accounts_and_its_sign_in_is_its_own(self):
+        from switchboard.providers import rows
+        choices.add('tern', NOW - 3600)
+        (row,) = rows.from_board(view.view(self.reach), now=NOW)
+        self.assertEqual((row['provider'], row['name'], row['vendor'], row['state'], row['fresh'], row['can'],
+                          [w['label'] for w in row['windows']]),
+                         ('tern', 'Tern', 'Tern Labs', contract.ROOM, True, True, ['3-day']))
+        self.Tern.signed_in = False
+        board = view.view(self.reach)
+        self.assertEqual(rows.from_board(board, now=NOW), [])
+        self.assertIn(('provider', 'Tern', 'not signed in'), view.under_list(board, NOW))
         self.assertEqual(self.calls.runs, [])                   # the board started nothing
 
     def test_on_the_mac_and_not_added_it_is_offered(self):
@@ -176,14 +190,23 @@ class OnEverySurface(Base):
         choices.add('tern', NOW - 3600)
         return view.view(self.reach)
 
-    def test_the_terminal_group(self):
-        got = term.providers_lines(self.board(), NOW)
-        self.assertEqual([x for x in got if x.startswith('  Tern')],
-                         ['  Tern    has room · Tern Team · 3-day 30%%, refills %s' % words.when(NOW + 86400, NOW)])
+    def test_the_terminal_row(self):
+        board = self.board()
+        got = term.view(term.read({'now': NOW, 'accounts': [], 'provider_rows': rows.from_board(board, now=NOW)}))
+        self.assertEqual(got[2], '1  Tern  Tern Labs · Team')
+        self.assertEqual(got[3], '   no 5-hour limit')        # its windows hold no 5-hour one: said in that place
+        self.assertTrue(got[4].startswith('   3-day   ━━━━━━━─────────────────   30%  resets '), got)
+        self.assertEqual(term.under_list(board, NOW, rows.from_board(board, now=NOW)), [])
 
     def test_the_menu_bar_rows(self):
-        self.assertIn(('line', 'Tern: has room · Tern Team · 3-day 30%%, refills %s' % words.when(NOW + 86400, NOW)),
-                      menubar.provider_items(self.board(), NOW))
+        board = self.board()
+        state = {'now': NOW, 'accounts': [], 'providers': board, 'provider_rows': rows.from_board(board, now=NOW)}
+        self.assertEqual(menubar.provider_items(board, NOW, state['provider_rows']), [])    # a row, not a line
+        (r,) = menubar.provider_rows(state)
+        self.assertEqual((r['email'], r['maker'], r['plan'], r['five'], r['week']['label'], r['week']['pct']),
+                         ('Tern', 'Tern Labs', 'Team', None, '3-day', 30))
+        self.assertEqual(r['foot'], '')         # its reset time is the page's, as an account's
+        self.assertEqual(r['marks'], [('Continue here', 'use')])
 
     def test_doctor_has_its_line(self):
         from switchboard import __main__ as main
@@ -196,7 +219,7 @@ class OnEverySurface(Base):
 
 @unittest.skipUnless(os.path.exists(test_app.CHROME), 'needs Google Chrome')
 class OnThePage(test_app.ChromePage):
-    def test_the_page_group_draws_it_in_its_own_window_words(self):
+    def test_the_page_draws_it_as_a_row_in_its_own_window_words(self):
         root = os.path.realpath(tempfile.mkdtemp(prefix='sb-third-page-'))
         self.addCleanup(shutil.rmtree, root, True)
         shutil.rmtree(os.path.join(core.data_dir(), contract.DATA_DIR), True)
@@ -208,14 +231,16 @@ class OnThePage(test_app.ChromePage):
         demo._ready()
         demo.FACTS['providers'] = board
         got = self.run_page('''
-          const r = document.querySelector('#providers .pv-row[data-provider="tern"]');
-          done(r ? {name: r.querySelector('.em').textContent, sub: r.querySelector('.sub').textContent,
-                    label: r.querySelector('.pv-lims .ml').textContent, pct: r.querySelector('.pv-lims .pct').textContent,
-                    state: r.querySelector('.pv-state').textContent,
-                    order: [...document.querySelectorAll('#providers .pv-row')].map((x) => x.dataset.provider)} : null);
+          const r = document.querySelector('#acc-other .arow.other[data-provider="tern"]');
+          const lim = r && r.querySelector(':scope > .c[data-kind]');
+          done(r ? {name: r.querySelector('.em').textContent, sub: r.querySelector('.c-who .sub').textContent,
+                    label: lim && lim.querySelector('.ml').textContent, pct: lim && lim.querySelector('.pct').textContent,
+                    state: r.querySelector('.c-state').textContent, group: !!document.querySelector('#providers'),
+                    order: [...document.querySelectorAll('#acc-other .arow.other')].map((x) => x.dataset.provider)} : null);
         ''')
-        self.assertEqual(got, {'name': 'Tern', 'sub': 'Tern Team', 'label': '3-day', 'pct': '30%', 'state': 'Has room',
-                               'order': ['claude', 'tern']})
+        # while Continue here is there, the plan line names the chat a press drafts (otherRow): the demo's newest
+        self.assertEqual(got, {'name': 'Tern', 'sub': 'Team · chat “%s”' % demo.newest_chat_name(), 'label': '3-day',
+                               'pct': '30%', 'state': 'Continue here', 'group': False, 'order': ['tern']})
 
 
 if __name__ == '__main__':

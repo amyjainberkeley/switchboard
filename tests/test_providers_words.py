@@ -196,7 +196,7 @@ class History(unittest.TestCase):
         return template.format(**{n: SAMPLE[n] for n in names})
 
     def test_each_sentence_is_filed_under_its_own_kind(self):
-        self.assertEqual(len(words.HISTORY), 14)
+        self.assertEqual(len(words.HISTORY), 17)          # with switchboard do's two, and remove's one
         for template, kind in words.HISTORY:
             text = self.fill(template)
             with self.subTest(text=text):

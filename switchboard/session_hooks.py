@@ -4,11 +4,12 @@ for it.
 They go into Claude Code's user settings (the file the status line and the notification hooks use), each running
 the same command:
 
-  SessionStart        at the start, and after /clear or a compaction: Claude Code here moves between the person's
-                      accounts; an artifact or Claude Doc made under another account reads as "not found" but is not
-                      deleted, and no new login is needed; the exact commands (switchboard owner / open / run), and
-                      `switchboard chats`; to a resumed chat, the account it started under and where its last
-                      request went
+  SessionStart        at the start, and after /clear or a compaction, in two short sentences with no email address
+                      (the text stays in the chat's file): Claude Code here moves between the person's accounts, and
+                      is on account N of `switchboard`'s list (its plan); an artifact or Claude Doc made under another
+                      account reads as "not found" but is not deleted, no new login is needed, and `switchboard
+                      owner` names its owner; to a resumed chat, the account it started under and where its last
+                      request went, each by its number
   UserPromptSubmit    once per move per chat: "Switchboard moved Claude Code from A to B at 3:02 PM", with where this
                       chat's own last request went, what a move costs it, what it made under each account (artifacts,
                       Claude Docs, watches) and how to reach each as its owner
@@ -19,7 +20,9 @@ the same command:
                       sets the accounts apart (connector_context), what is known: where it last answered, the account
                       the chat is on and since when, that connectors are added per account on claude.ai, whether that
                       account has had it answer on this Mac in the page's window, and the way through (a tool's error
-                      reaches only PostToolUseFailure, an answer that reads as one only PostToolUse)
+                      reaches only PostToolUseFailure, an answer that reads as one only PostToolUse). While automatic
+                      switching is on, an artifact or Claude Doc of another account also gets a need switch to its
+                      owner, when the engine's gate allows it (item_need): at most once in 10 minutes per owner
   PreToolUse          on Claude in Chrome's tools: when the extension's account is not the one Claude Code is on and
                       that account has room, asks the engine for a need switch (api.request_need_switch, at most once
                       in 10 minutes); otherwise says plainly what to do
@@ -84,6 +87,11 @@ TIMEOUTS = {'SessionStart': 10, 'UserPromptSubmit': 5, 'PostToolUse': 10, 'PostT
 LIMITS = {'PreToolUse': 27}     # the program ends itself after this long (else 8 s), under each hook's timeout
 NEED_EVERY = 600                # a need switch for Claude in Chrome is asked for at most once in 10 minutes
 NEED_BUDGET = 20.0              # seconds the engine may take to answer one
+ITEM_NEED_EVERY = 600           # a need switch for an artifact or a Claude Doc: at most once in 10 minutes per owner
+ITEM_NEED_BUDGET = 5.0          # seconds an item tool's hook waits for the engine's answer (it ends itself after 8)
+ITEM_MOVING_FOR = 60            # "is moving" is said this long after a move that went; later it may have moved on
+ITEM_NEED_LOCK = 'item-need.lock'   # one at a time: a hook's change of its record of asks, and a check and its switch
+ITEM_NEED_LOCK_WAIT = 30.0      # seconds the need switch's own process waits for another one to finish
 KEEP = 7 * 86400                # a session's record is forgotten a week after its last use
 PRUNE_EVERY = 3600
 MAX_INPUT = 32 << 20
@@ -653,7 +661,6 @@ def chat_story(look, active):
 
 # ---------- what each hook says ----------
 
-CHATS_LINE = "`switchboard chats` shows what every account's chats are doing."
 COST_LINE = ("The model's private reasoning from before the move stays with %s and may be missing from here on; "
              "everything said and done in this chat is still here.")
 
@@ -663,41 +670,73 @@ def commands_line(owner='<owner>', url='<link>'):
             'Read or change it as the owner: `switchboard run %s -- -p "<what to do with %s>"`.' % (url, url, owner, url))
 
 
+START_ITEMS = ('An artifact or Claude Doc made under another account reads here as "not found" but is not deleted '
+               'and needs no new login, so do not run /login or /logout: `switchboard owner <link>` names its owner.')
+
+
 def start_context(event, m, rec, own, now, look=None):
-    """SessionStart: what this chat should know about Switchboard, in a few sentences. `look`: what the chat's own file
-    says (look_chat), for a resumed chat's accounts; without it, Switchboard's own record of the chat."""
+    """SessionStart: what this chat should know about Switchboard, in two short sentences, and for a chat that was on
+    another account before, a third that says which. This text is kept in the chat's own file and goes wherever the
+    chat goes (a shared transcript, a pasted bug report), so it holds no email address: an account is named by its
+    number in `switchboard`'s list (account_words). The notes said when something happens (a move, a "not found",
+    Claude in Chrome) name the account in full. `look`: what the chat's own file says (look_chat), for a resumed
+    chat's accounts; without it, Switchboard's own record of the chat."""
     if own:
         return ('Switchboard: this chat runs on its own login (CLAUDE_CONFIG_DIR is set to its own folder), so '
                 'Switchboard\'s moves between accounts do not change it. An artifact or Claude Doc belongs to the '
                 'account that made it; to find or open one as its owner: `switchboard owner <link>`, '
                 '`switchboard open <link>`.')
     active = _s(m.get('active'))
-    out = []
-    if active:
-        # The others are counted, never named: this text is kept in the chat's file and goes with it.
-        accts = m.get('accounts') if isinstance(m.get('accounts'), dict) else {}
-        n = len([e for e in accts if e != active and isinstance(accts[e], dict) and not accts[e].get('removed')])
-        out.append('Switchboard moves Claude Code between the person\'s Claude accounts when one runs low (now on '
-                   '%s%s).' % (_clean(active), '; %d other account%s' % (n, '' if n == 1 else 's') if n else ''))
-    else:
-        out.append('Switchboard moves Claude Code between the person\'s Claude accounts when one runs low.')
-    out.append('An artifact or Claude Doc belongs to the account that made it. One made under another account reads '
-               'here as "not found", "no such artifact" or "another organization": it is not deleted, and no new '
-               'login is needed, so do not run /login or /logout and do not ask the person to log in.')
-    out.append(commands_line())
-    out.append(CHATS_LINE)
-    if active:
-        acct = (m.get('accounts') or {}).get(active) if isinstance(m.get('accounts'), dict) else None
-        acct = acct if isinstance(acct, dict) else {}
-        p = _s(acct.get('opens'))
-        chrome = (m.get('chrome') or {}).get('profiles') if isinstance(m.get('chrome'), dict) else None
-        if p:
-            has = ((chrome or {}).get(p) or {}).get('extension') if isinstance(chrome, dict) else None
-            out.append('Claude in Chrome follows the account Claude Code is on: for %s it is the %s profile "%s"%s.' % (
-                _clean(active), _browser(m), _clean(acct.get('profile_name') or p),
-                ' (the Claude extension is not in that profile yet)' if has is False else ''))
-    out.append(_history(look, rec, active, 'before'))
-    return ' '.join(x for x in out if x)
+    here = account_words(m, active, plan=True) if active else None
+    out = ['Switchboard moves Claude Code between the person\'s Claude accounts when one runs low%s.'
+           % (' (now %s)' % here if here and here != ANOTHER else ''), START_ITEMS]
+    story = _history(look, rec, active, 'before')
+    if story:
+        out.append(_without_addresses(story, m, rec))
+    return ' '.join(out)
+
+
+ANOTHER = 'another account'
+
+
+def account_words(m, email, plan=False):
+    """An account as the start note names it: "account 2" (its number in `switchboard`'s list), with "in
+    `switchboard`'s list" and its plan's words when plan is asked for ("account 2 in `switchboard`'s list, Max 20x");
+    "another account" when its number is not known or it is no longer in the list. Never its email."""
+    accts = m.get('accounts') if isinstance(m.get('accounts'), dict) else {}
+    a = accts.get(email) if isinstance(email, str) else None
+    a = a if isinstance(a, dict) else {}
+    slot = a.get('slot')
+    if a.get('removed') or isinstance(slot, bool) or not isinstance(slot, int) or slot <= 0:
+        return ANOTHER
+    if not plan:
+        return 'account %d' % slot
+    words = _clean(a.get('plan'), 40) if isinstance(a.get('plan'), str) else ''
+    return 'account %d in `switchboard`\'s list%s' % (slot, ', %s' % words if words and '@' not in words else '')
+
+
+def _without_addresses(text, m, rec=None):
+    """text with every email address in it said as account_words (the account's number, or "another account"): first
+    each address the map or the chat's record knows, as written, longest first, so an address of any shape goes
+    (an apostrophe, letters outside ASCII, a quoted name, a host with no dot); then, as a net, anything else with an
+    @ between a name and a host."""
+    import re
+    accts = m.get('accounts') if isinstance(m.get('accounts'), dict) else {}
+    known = [k for k in accts if isinstance(k, str) and '@' in k]
+    was = (rec or {}).get('account')
+    if isinstance(was, str) and '@' in was and was not in known:
+        known.append(was)
+    for k in sorted(known, key=len, reverse=True):
+        for form in dict.fromkeys((_clean(k), k)):
+            if form:
+                text = re.sub(r'(?<![^\s,;(<"])' + re.escape(form) + r'(?=$|[\s,;)>"]|\.(?:\s|$))',
+                              lambda x, k=k: account_words(m, k), text)
+
+    def net(x):
+        found = x.group(0)
+        dots = len(found) - len(found.rstrip('.'))
+        return account_words(m, found[:len(found) - dots]) + '.' * dots
+    return re.sub(r'(?:"[^"\n]*"|[^\s@,;()<>"\[\]]+)@[^\s,;()<>"\'\[\]]+', net, text)
 
 
 def _history(look, rec, active, word):
@@ -947,6 +986,268 @@ def not_found_context(event, m, rec, own=False, look=None):
             'run /login or /logout.%s %s' % (' (now on %s)' % _clean(active) if active else '',
                                               'An' if item == 'artifact' else 'A', item,
                                               ' ' + started if started else '', commands_line(url=url)))
+
+
+# ---------- a need switch for one chat's artifact or Claude Doc ----------
+#
+# A need switch moves the whole Mac's Claude Code for one chat, and every open chat then reads its conversation
+# again, so it is asked for only when all of these hold: automatic switching is on (the page's map says so), the
+# owner map names the item's owner and it is not the account in use, this Mac has not asked for that owner in the
+# last ITEM_NEED_EVERY, and, in the need switch's own process, the engine's gate (_item_need_in_process).
+
+def _item_need_file():
+    return os.path.join(hooks_dir(), 'item-need.json')
+
+
+SURE_OWNER = ('seen', 'listed', 'published')    # how the map knows an owner well enough to move for it: never a guess
+
+
+def _asked_link(tool_input):
+    """The claude.ai artifact link a call names in its own fields (url, from_url, or a Claude Doc's container id), or
+    None. Never a link found elsewhere in its input: a comment's or a data row's text can name any page."""
+    import re
+    if not isinstance(tool_input, dict):
+        return None
+    for key in ('url', 'from_url'):
+        v = tool_input.get(key)
+        mm = re.match(r'https://claude\.ai/(?:code/)?artifact/([A-Za-z0-9_-]{16,})(?:[/?#]|$)', v.strip()) \
+            if isinstance(v, str) else None
+        if mm:
+            return 'https://claude.ai/artifact/' + mm.group(1)
+    box = tool_input.get('container')
+    cid = box.get('id') if isinstance(box, dict) else None
+    if isinstance(cid, str) and re.fullmatch(r'[A-Za-z0-9_-]{16,}', cid):
+        return 'https://claude.ai/artifact/' + cid
+    return None
+
+
+def _call_failed(event):
+    """The call itself failed: PostToolUseFailure, or a PostToolUse whose answer is marked as an error. Only such a
+    call can start a need switch; an answer that merely reads as "not found" in its first lines (a page's own title, a
+    comment) gets the words alone."""
+    if event.get('hook_event_name') == 'PostToolUseFailure':
+        return True
+    resp = event.get('tool_response')
+    return isinstance(resp, dict) and (resp.get('isError') is True or resp.get('is_error') is True)
+
+
+def _item_owner(event, m):
+    """The owner the map gives the item a failed call named in its own fields (_asked_link), when the map is sure of
+    it (SURE_OWNER: never a page published near a switch, whose owner is only a guess) and it is not the account
+    Claude Code is on now; else None (nothing to move to)."""
+    link = _asked_link(event.get('tool_input')) if _call_failed(event) else None
+    if not link:
+        return None
+    arts = m.get('artifacts') if isinstance(m.get('artifacts'), dict) else {}
+    x = arts.get(link.rsplit('/', 1)[-1])
+    owner = _s(x.get('o')) if isinstance(x, dict) and x.get('s') in SURE_OWNER else None
+    active = _s(m.get('active'))
+    return owner if owner and active and owner != active else None
+
+
+def _ago(seconds):
+    n = max(1, int(seconds // 60))
+    return '%d minute%s' % (n, '' if n == 1 else 's')
+
+
+def _ends(text):
+    text = text.strip()
+    return text if text.endswith('.') else text + '.'
+
+
+def _test_run():
+    """keychain.test_run, the one test fence (accounts/keychain.py), reached the way this file is run: inside the
+    package, or as Claude Code's hook with this file's folder on the path (command()). A fence that cannot be read
+    holds back as a test run does: no engine is asked from here."""
+    try:
+        try:
+            from .accounts import keychain
+        except ImportError:         # run by Claude Code's hook: this file's folder is on the path (command())
+            from accounts import keychain
+        return keychain.test_run()
+    except Exception:  # noqa: BLE001 - a broken install: the not-found words still stand
+        return True
+
+
+def item_need(event, m, owner, now, said, ask=None):
+    """An item tool said "not found" for an artifact or a Claude Doc of `owner`, another account than the one Claude
+    Code is on: while automatic switching is on, a need switch to the owner is asked for (at most once in
+    ITEM_NEED_EVERY per owner), and the words say what happened. `said`: the not-found words (not_found_context),
+    which stand as they are while automatic switching is off. ask(owner, account id, why, budget) -> (owner or None,
+    why not or None) stands in for the engine (_ask_item_need)."""
+    if m.get('auto') is not True:
+        return said                             # Switchboard moves nothing by itself while automatic switching is off
+    if ask is None:
+        if _test_run():
+            return said                         # a test run asks only through the stand-in a test gives
+        ask = _ask_item_need
+    tool = event.get('tool_name') if isinstance(event.get('tool_name'), str) else ''
+    item = 'Claude Doc' if 'Claude_Docs' in tool else 'artifact'
+    moving = ('This %s belongs to %s. Switchboard is moving Claude Code there; if it still exists, try again in a '
+              'moment. No new login is needed: do not run /login or /logout.' % (item, _clean(owner)))
+    lock = _lock(ITEM_NEED_LOCK, RECORD_WAIT)  # the record is read, changed and written alone
+    if lock is None:
+        return "%s Switchboard did not move Claude Code there: another chat's move is under way." % said
+    try:
+        rec = _read(_item_need_file())
+        asked = rec.get('owners') if isinstance(rec.get('owners'), dict) else {}
+        last = asked.get(owner) if isinstance(asked.get(owner), dict) else {}
+        at = _sl._num(last.get('at'))
+        if at is not None and 0 <= now - at < ITEM_NEED_EVERY:
+            went, ago = last.get('went'), _ago(now - at)
+            if went is True and now - at < ITEM_MOVING_FOR:
+                return moving                   # it went a moment ago; open chats pick up the login within ~30 s
+            if went is True:
+                return '%s Switchboard moved Claude Code there %s ago and asks at most once in 10 minutes for one ' \
+                       'account.' % (said, ago)
+            if went is None:                    # no answer came in time: it may still go
+                return '%s Switchboard asked to move Claude Code there %s ago and has no answer yet; it asks at most ' \
+                       'once in 10 minutes for one account.' % (said, ago)
+            return '%s Switchboard did not move Claude Code there: it asked %s ago and asks at most once in 10 ' \
+                   'minutes for one account.' % (said, ago)
+        whole = rec.get('last') if isinstance(rec.get('last'), dict) else {}
+        at = _sl._num(whole.get('at'))
+        if at is not None and 0 <= now - at < ITEM_NEED_EVERY:      # one move for a chat's item in 10 minutes
+            return '%s Switchboard did not move Claude Code there: it asked to move it for another chat %s ago and ' \
+                   'does that at most once in 10 minutes.' % (said, _ago(now - at))
+        asked = dict((e, v) for e, v in asked.items()
+                     if isinstance(v, dict) and 0 <= now - (_sl._num(v.get('at')) or 0) < ITEM_NEED_EVERY)
+        asked[owner] = {'at': now, 'went': None}
+        try:        # noted before asking: another chat waits its turn
+            _write(_item_need_file(), {'v': 1, 'owners': asked, 'last': {'at': now, 'owner': owner}})
+        except OSError:
+            return said                         # not noted, so not asked: the once-in-10-minutes promise holds
+    finally:
+        _unlock(lock)
+    acct = (m.get('accounts') or {}).get(owner) if isinstance(m.get('accounts'), dict) else None
+    aid = _s((acct if isinstance(acct, dict) else {}).get('id'))
+    why = 'a chat asked for %s %s of %s' % ('a' if item == 'Claude Doc' else 'an', item, owner)
+    went, why_not = ask(owner, aid, why, ITEM_NEED_BUDGET)
+    if went or why_not:                         # no answer: it stays noted as not known (the switch may hold the lock)
+        _note_item_need(owner, now, bool(went))
+    if went:
+        return moving
+    if not why_not:
+        return '%s Switchboard asked to move Claude Code there and has no answer yet: if it moves, the next try ' \
+               'works.' % said
+    return '%s Switchboard did not move Claude Code there: %s' % (said, _ends(_clean(why_not, 300)))
+
+
+def _note_item_need(owner, at, went):
+    """What came of the ask for `owner` made at `at`, written into the record under its lock; nothing when the lock
+    is not had within RECORD_WAIT (the ask stays noted with went None: no answer known)."""
+    lock = _lock(ITEM_NEED_LOCK, RECORD_WAIT)
+    if lock is None:
+        return
+    try:
+        rec = _read(_item_need_file())
+        asked = rec.get('owners') if isinstance(rec.get('owners'), dict) else {}
+        if isinstance(asked.get(owner), dict) and _sl._num(asked[owner].get('at')) == at:
+            asked[owner] = {'at': at, 'went': went}
+            rec['owners'] = asked
+            _write(_item_need_file(), rec)
+    except OSError:
+        pass
+    finally:
+        _unlock(lock)
+
+
+# The item need switch's own process: runs _item_need_in_process and answers in one JSON line
+# ({"went": owner or null, "why": words or null}).
+ITEM_NEED_CHILD = ('import json, sys\n'
+                   'sys.path.insert(0, sys.argv[1])\n'
+                   'from switchboard import session_hooks as h\n'
+                   'a = json.loads(sys.argv[2])\n'
+                   'went, why = h._item_need_in_process(a["owner"], a["id"], a["why"])\n'
+                   'try:\n'
+                   '    sys.stdout.write(json.dumps({"went": went, "why": why}) + "\\n")\n'
+                   '    sys.stdout.flush()\n'
+                   'except Exception:\n'
+                   '    pass\n')
+
+
+def item_need_command(parent, owner, account_id, why):
+    """The command line of the item need switch's own process: this program's Python, isolated, the folder that holds
+    the switchboard package, and what to ask (an email, an account id and a reason, no secret)."""
+    ask = {'owner': owner, 'id': account_id or None, 'why': why}
+    return [sys.executable, '-I', '-S', '-B', '-c', ITEM_NEED_CHILD, parent, json.dumps(ask)]
+
+
+def _ask_item_need(owner, account_id, why, budget=ITEM_NEED_BUDGET, command=None):
+    """Ask for a need switch to `owner` in a process of its own, in a session of its own (as _ask_need_switch does:
+    a switch cut off part-way by this hook's end would leave Claude Code half moved). (owner, None) when it moved,
+    (None, why not) when the engine said no, (None, None) when no answer came within `budget` seconds (the process
+    goes on by itself)."""
+    import subprocess
+    if command is None:
+        command = item_need_command(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), owner, account_id,
+                                    why)
+    try:
+        proc = subprocess.Popen(command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                                close_fds=True, start_new_session=True)
+    except OSError:
+        return None, None
+    try:
+        out, _ = proc.communicate(timeout=budget)
+    except subprocess.TimeoutExpired:
+        return None, None                       # still deciding or switching: it finishes on its own
+    lines = (out or b'').decode('utf-8', 'replace').strip().splitlines()
+    try:
+        got = json.loads(lines[-1]) if lines else {}
+    except ValueError:
+        got = {}
+    got = got if isinstance(got, dict) else {}
+    went = _s(got.get('went'))
+    return (went, None) if went else (None, _s(got.get('why')))
+
+
+def _item_need_in_process(owner, account_id, why, gather=None):
+    """The engine's gate for an item need switch, run by its own process (never by the hook itself): (owner, None)
+    when Claude Code was moved there, else (None, why not, in words that follow "did not move Claude Code there:").
+    In order:
+      1. no switch part-way: a switch's journal is there from its start until it is settled;
+      2. policy.need, the rule every need switch keeps: automatic switching on, the account saved, not kept out of
+         auto-switch, usable, numbers at most 15 minutes old and room under every line (LAND_MARGIN);
+      3. policy._hold, the waits of every optional switch, which keep it from undoing a person's own move or a chat's
+         work: a switch from any source (the person's own included) less than 45 minutes ago, an open obligation
+         under the account in use, numbers older than 10 minutes, the optional cap, a very busy Mac. Its wait for
+         Claude Code to be idle is left out: the chat asking is in the middle of a turn;
+      4. the engine (api.request_need_switch), which judges need() again on its own snapshot, at most once in 10
+         minutes per reason, and makes the switch under its switch lock.
+    gather stands in for autoloop.gather in tests."""
+    try:
+        import dataclasses
+        here = os.path.dirname(os.path.abspath(__file__))
+        parent = os.path.dirname(here)
+        if parent not in sys.path:
+            sys.path.append(parent)
+        from switchboard.accounts import api, autoloop, context, policy, switcher
+        lock = _lock(ITEM_NEED_LOCK, ITEM_NEED_LOCK_WAIT)  # one check and switch at a time, on the whole Mac
+        if lock is None:
+            return None, "another chat's move is under way"
+        try:
+            if os.path.exists(switcher.journal_path(context.current())):
+                return None, 'a switch is part-way'
+            aid = account_id or api.find(owner).id
+            snap = (gather or autoloop.gather)()    # read after the lock: a switch made just before counts
+            d = policy.need(snap, aid, why)
+            if d.action != 'switch':
+                return None, d.reason
+            by_id = dict((a.id, a) for a in snap.accounts)
+            if snap.active not in by_id:
+                return None, "the account Claude Code is on is not known"
+            calm = dataclasses.replace(snap, busy=False, idle_for_s=None)
+            hold = policy._hold(calm, policy._view(calm, by_id[snap.active]), policy._view(calm, by_id[aid]))
+            if hold:
+                return None, 'it waits: %s' % hold
+            r = api.request_need_switch(aid, why)
+            if r is not None and getattr(r, 'ok', False):
+                return owner, None
+            return None, 'the engine did not make the switch'
+        finally:
+            _unlock(lock)
+    except Exception:  # noqa: BLE001 - the engine can't be asked: the chat is told plainly instead
+        return None, "Switchboard's engine could not be asked"
 
 
 # ---------- a claude.ai connector that failed after a move ----------
@@ -1389,11 +1690,12 @@ def with_note(note, notice=None):
     return _cut_words(note, room) + '\n\n' + notice
 
 
-def hook(stdin=None, env=None, now=None, out=None, ask=None):
+def hook(stdin=None, env=None, now=None, out=None, ask=None, ask_item=None):
     """What Claude Code runs: one hook input on stdin. Prints at most one JSON answer and returns 0, whatever
-    happens."""
+    happens. ask and ask_item stand in for the engine in tests (chrome_context's and item_need's)."""
     env = os.environ if env is None else env
     lock = None
+    need_to = None
     try:
         raw = (stdin if stdin is not None else sys.stdin.buffer).read(MAX_INPUT)
         event = _sl._loads(raw) if raw and raw.strip() else None
@@ -1478,6 +1780,7 @@ def hook(stdin=None, env=None, now=None, out=None, ask=None):
                     told[url] = now
                     rec.update(ntold=_newest(told), nmove=move)
                     changed = True
+                    need_to = None if own else _item_owner(event, m)
         if note is not None:
             said = with_note(note[1], text)
             if said is None:
@@ -1514,6 +1817,8 @@ def hook(stdin=None, env=None, now=None, out=None, ask=None):
         lock = None
         if wrote:
             prune(hooks_dir(), now)
+        if text and need_to:
+            text = item_need(event, m, need_to, now, text, ask=ask_item)   # may wait on the engine: not under the lock
         if text:
             emit(name, text, out)
     except BaseException:

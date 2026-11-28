@@ -50,7 +50,7 @@ RETRY_AFTER_CAP_S = 24 * 3600.0
 EXIT_WAIT_S = RESPONSE_TIMEOUT_S + PERSIST_RESERVE_S    # a process that ends waits this long for a refresh already
                                                         # sent (its answer, then the save); whoever stops the loop
                                                         # waits longer than this before a kill (engine.AutoHost)
-HELD_ELSEWHERE = ('live', 'live_same_login', 'live_same_account', 'live_unsure', 'live_missing')
+HELD_ELSEWHERE = ('live', 'live_same_login', 'live_same_account', 'live_unsure', 'live_missing', 'live_dead')
 TOKEN_SETTLED_S = 1800.0        # after a switch onto a one-year token, how long the account it is for stays held
 CONFLICT = 'identity_conflict'  # a recovery entry holding another account's login (a token answer named it)
 
@@ -382,6 +382,17 @@ def _held_by_live(ctx, login, other, aid):
         last = (doc.get('switches') or [None])[-1]
         maybe = {named, doc.get('active')} | ({last.get('from'), last.get('to')} if isinstance(last, dict) else set())
         return 'live_missing' if aid in maybe else None
+    if aid is not None and other is not None and other.kind == 'wiped':
+        # Claude Code emptied its login of the account its settings name after Anthropic refused a renewal: the loop
+        # moves Claude Code to another account, or a new sign-in replaces it. Renewing the saved copy meanwhile would
+        # spend it behind the loop's back
+        from . import identity
+        try:
+            doc = vault.load(ctx)
+        except vault.VaultError:
+            return 'live_unsure'
+        _, block, _ = live_mod.config_identity(ctx)
+        return 'live_dead' if identity.label_id(doc, block) == aid else None
     if other is None or other.kind != 'oauth':
         return None
     if live_mod.unrenewable(other):

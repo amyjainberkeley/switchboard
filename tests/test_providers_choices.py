@@ -77,6 +77,23 @@ class Order(Base):
         choices.set_order(['claude'])
         self.assertEqual(choices.order(), ['claude', 'codex'])
 
+    def test_remove_takes_a_provider_out_of_added_the_order_and_its_notice(self):
+        choices.add('codex', NOW)
+        choices.set_order(['codex', 'claude'])
+        choices.set_notice_said(NOW, 'codex')
+        choices.set_consent(self.folder, 'codex', 'yes', NOW)
+        self.assertTrue(choices.remove('codex'))
+        self.assertEqual(choices.added(), {'claude': 0})
+        self.assertEqual(choices.order(), ['claude'])
+        self.assertFalse(choices.notice_said('codex'))
+        self.assertEqual(self.saved()['order'], ['claude'])
+        self.assertEqual(choices.consent(self.folder, 'codex'), 'yes')      # what was said per folder stays
+        self.assertFalse(choices.remove('codex'))                           # not added: nothing to take off
+        with self.assertRaises(ValueError):
+            choices.remove('claude')                                        # the first provider is always added
+        with self.assertRaises(ValueError):
+            choices.remove('nobody')
+
     def test_unknown_repeated_or_not_added_ids_are_refused(self):
         for bad in (['nope'], ['claude', 'claude'], ['codex'], ['Claude']):
             with self.assertRaises(ValueError):
@@ -229,6 +246,26 @@ class OnceAndHow(Base):
         with self.assertRaises(ValueError):                  # only an id the registry knows is kept
             choices.set_hand_ack(NOW, 'nobody')
 
+    def test_a_file_from_before_each_yes_was_kept_per_provider_is_read_as_not_yet_asked(self):
+        with open(self.path, 'w') as f:
+            json.dump({'v': 1, 'ask_ok': NOW, 'hand_ack': NOW}, f)   # one number each, as an older copy kept them
+        for pid in ('claude', 'codex'):
+            self.assertFalse(choices.ask_ok(pid))
+            self.assertFalse(choices.hand_ack(pid))
+        choices.set_ask_ok(NOW + 1, 'codex')
+        self.assertEqual(self.saved()['ask_ok'], {'codex': NOW + 1})
+        self.assertTrue(choices.ask_ok('codex'))
+
+    def test_the_notice_is_kept_per_provider(self):
+        # what a press on its row sends, to whom, under whose terms: said once, on an add or at a first press
+        self.assertFalse(choices.notice_said('codex'))
+        choices.set_notice_said(NOW, 'codex')
+        self.assertTrue(choices.notice_said('codex'))
+        self.assertFalse(choices.notice_said('claude'))
+        self.assertEqual(self.saved()['notice'], {'codex': NOW})
+        with self.assertRaises(ValueError):
+            choices.set_notice_said(NOW, 'nobody')
+
     def test_the_first_provider_is_the_registrys_first(self):
         from switchboard import providers
         self.assertEqual(choices.first(), providers.ids()[0])
@@ -265,7 +302,8 @@ class AnUnreadableFile(Base):
                        lambda: choices.set_consent(self.folder, 'codex', 'yes', NOW),
                        lambda: choices.allow(self.folder, 'codex', NOW),
                        lambda: choices.set_stay(self.folder, 'claude', NOW), lambda: choices.set_ask_ok(NOW, 'codex'),
-                       lambda: choices.set_hand_ack(NOW, 'codex'), lambda: choices.set_open_with('codex', 'app'))
+                       lambda: choices.set_hand_ack(NOW, 'codex'), lambda: choices.set_open_with('codex', 'app'),
+                       lambda: choices.set_notice_said(NOW, 'codex'), lambda: choices.remove('codex'))
             for change in changes:
                 with self.assertRaises(contract.ProviderError) as cm:
                     change()

@@ -6,7 +6,7 @@ There is no team feature. Switchboard keeps the accounts one person signs in to 
 
 ## Models and agents
 
-Switchboard does not pick models, and it does not send tasks to different agents or models: not in this version. It moves Claude Code between the person's own accounts, at the lines they set. The one model setting it has is Sonnet for helpers (off until turned on): Claude Code's helpers that name no model run on Sonnet instead of the chat's model, and the chat keeps its own.
+Switchboard does not pick models by itself. It moves Claude Code between the person's own accounts, at the lines they set, and routes work only by the routes and defaults the person set (`routing.md`). Its two model settings are off until turned on: Models by the job (four helpers, each on the model that fits its job) and Sonnet for helpers (Claude Code's helpers that name no model run on Sonnet instead of the chat's model). The chat keeps its own model.
 
 ## Signing in for you
 

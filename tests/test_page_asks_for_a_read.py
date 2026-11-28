@@ -253,7 +253,7 @@ class TheWords(AskingPage):
       await wait(300);
       const old = all('#acc .note[data-kind="age"]').map((n) => n.title);
       const five = all('#acc .arow').map((b) => { const c = b.querySelector('.c-five'); return [b.querySelector('.em').textContent, c ? c.title : null]; });
-      const why = all('#acc .arow').map((b) => [b.querySelector('.em').textContent, (b.querySelector('.c-gone') || {}).textContent || null,
+      const why = all('#acc .arow').map((b) => [b.querySelector('.em').textContent, (b.querySelector('.c-gone, .c-nofive') || {}).textContent || null,
         b.querySelector('.c-week').title]);
       done({title: $('#top .checked').title, old, five, why});
 """
@@ -283,7 +283,7 @@ class TheWords(AskingPage):
         got = self.page(self.LOOK, asked=None)
         five, why = dict(got['five']), dict((e, (gone, week)) for e, gone, week in got['why'])
         self.assertIsNone(five['maya.reyes@mail.example'])                # its reading has no 5-hour window
-        self.assertEqual(why['maya.reyes@mail.example'][0], 'No 5-hour limit')
+        self.assertEqual(why['maya.reyes@mail.example'][0], 'No 5-hour limit on this plan')   # said, in its place
         self.assertEqual(why['maya.reyes@mail.example'][1].split('\n')[-1], NO_FIVE)
         self.assertIsNone(five['maya@fernhill.example'])
         self.assertEqual(why['maya@fernhill.example'][0], 'Not known')

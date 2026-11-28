@@ -23,10 +23,11 @@ else from the sentence itself (classify), so every place that records an event i
 
 The file only grows. At 5 MB it becomes history.jsonl.1 (the one before that goes) and a new one starts.
 
-What a line holds: Switchboard's own sentence and the facts above, the sentence cut at 300 characters and each fact
-at 160, with control characters taken out. The sentences name accounts by email, browser profiles by name, an API
-key by its name and last four characters, files and folders Switchboard changed by their paths, and an artifact by
-its title as claude.ai shows it (the chat that published it named it), cut to 60 characters; a problem is said in the
+What a line holds: Switchboard's own sentence and the facts above, the sentence and the reason cut at 300 characters
+and each other fact at 160, with control characters taken out. The sentences name accounts by email, browser
+profiles by name, an API key by its name and last four characters, files and folders Switchboard changed by their
+paths, and an artifact by its title as claude.ai shows it (the chat that published it named it), cut to 60
+characters; a problem is said in the
 engine's or the system's own words, cut the same way. What a line never holds: a login, a token, a
 key, a prompt, a chat's text or a transcript line. Anything shaped like a key or a token is masked as well
 (TOKEN_RE: a known key prefix and what follows it, a JWT, and a long run of key or base64 characters).
@@ -45,6 +46,7 @@ from .notify import AUTO_ON        # auto-switch on by itself, in keep.py's word
 MAX = 5 * 1024 * 1024
 TEXT_MAX = 300
 FACT_MAX = 160
+REASON_MAX = 300            # a switch's reason is a whole sentence with two emails (policy.stay_note fits it)
 KINDS = ('switch', 'kept', 'auto', 'limit', 'signin', 'repair', 'problem', 'setting', 'removed', 'info')
 BY = ('you', 'auto', 'claude-code')
 FACTS = ('account', 'from', 'to', 'by', 'reason', 'on', 'window', 'pct', 'line')
@@ -117,7 +119,7 @@ def record(kind, text, t=None, **facts):
             if v in BY:
                 rec[k] = v
         else:
-            rec[k] = clean(v, FACT_MAX)
+            rec[k] = clean(v, REASON_MAX if k == 'reason' else FACT_MAX)
     _append((json.dumps(rec, ensure_ascii=False) + '\n').encode('utf-8'))
     return rec
 
@@ -186,8 +188,8 @@ RULES = [(re.compile(p.replace('<E>', E)), kind, by, reason) for p, kind, by, re
     (r'^Removed <E> from Switchboard$', 'removed', 'you', None),
     (r'^(Added|Removed) the key ', 'setting', 'you', None),
     (r'^Keys gateway (on|off)$', 'setting', 'you', None),
-    (r'^(Keep the Mac awake|Notifications|Sonnet for helpers|Status line in Claude Code): (on|off)$', 'setting', 'you',
-     None),
+    (r'^(Keep the Mac awake|Notifications|Sonnet for helpers|Models by the job|Status line in Claude Code): (on|off)$',
+     'setting', 'you', None),
     (r'^(House rules|Code map|Watching chats with claude-mem|claude-mem) (on|off|cap set)$', 'setting', 'you', None),
 )]
 

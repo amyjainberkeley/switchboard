@@ -84,7 +84,7 @@ def window(name, pct, resets_at=None):
 
 
 def reading(id_, windows, read_at=NOW - 120, checked_at=None, error=None, with_checked=True):
-    """A Reading. with_checked=False: the shape of her Mac's line (ff41063), which has no checked_at."""
+    """A Reading. with_checked=False: the shape of an earlier build's reading, which has no checked_at."""
     fields = dict(account_id=id_, windows=tuple(windows), read_at=read_at, source='status_line', frozen=False,
                   error=error)
     if with_checked:

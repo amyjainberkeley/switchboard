@@ -2,8 +2,8 @@ import _isolate  # noqa: F401  (first: it gives switchboard a throwaway data fol
 # Auto-switch also switches on a per-model weekly limit (Fable's). That is
 # the week of one model, the one in use, against its own line (95 by default), or none: the engine's
 # accounts.api.auto_settings() names it ('model'), and plan.py's order and Next say what the engine's policy will do.
-# A counted model week holds an account back like its 5-hour or weekly window; one that is not counted never moves
-# anyone; nothing is ever landed on over a line. The page's auto-switch line says so in a few words.
+# A counted model week never holds an account back (only its 5-hour and weekly windows do): it is a note and puts
+# the accounts with room for it first; one that is not counted never moves anyone; nothing is landed on over a line. The page's auto-switch line says so in a few words.
 #
 # Made-up accounts only. The engine is a fake of accounts.api (tests/fakes_accounts_api.py).
 import os
@@ -96,26 +96,29 @@ class TheSetting(unittest.TestCase):
 class ThePlan(unittest.TestCase):
     """plan.py, the page's order and Next, by our own rule (the one the engine's policy keeps)."""
 
-    def test_a_counted_fable_week_over_the_line_moves_it(self):
+    # The lead's rule (Nov 27): a counted model's week never makes an account unusable; it is a note and an order
+    # (landing places with room for every counted model first). These two tests pinned the old meaning.
+    def test_a_counted_fable_week_over_the_line_orders_and_notes(self):
         given = [acct('in-use', 20, 30, fable=95, active=True), acct('room', 20, 30, fable=30),
                  acct('spent', 20, 30, fable=100)]
         self.assertEqual(nxt(given, lines(['Fable'])), 'room')
         ranked = dict((a['name'], a) for a in plan.order(given, lines(['Fable']), NOW))
-        self.assertEqual((ranked['spent']['reason'], ranked['spent']['blocked_by']), ('at its limit', ['Fable']))
-        self.assertFalse(ranked['in-use']['usable'])
-        self.assertEqual(ranked['in-use']['reason'], 'over its line')
+        self.assertEqual((ranked['spent']['usable'], ranked['spent']['reason'], ranked['spent']['notes']),
+                         (True, None, ['no room for Fable']))
+        self.assertEqual([x['name'] for x in plan.order(given, lines(['Fable']), NOW)], ['in-use', 'room', 'spent'])
+        self.assertTrue(ranked['in-use']['usable'])
+        self.assertEqual((ranked['in-use']['reason'], ranked['in-use']['notes']), (None, ['no room for Fable']))
 
-    def test_every_fable_week_spent_nothing_is_next_and_it_says_when(self):
+    def test_every_fable_week_spent_the_next_is_by_its_two_windows(self):
         for five in (95, 100, 50):
             with self.subTest(five=five):
                 given = [acct('a', five, 40, fable=100, active=True), acct('b', 10, 30, fable=100),
                          acct('c', 20, 30, fable=100)]
                 n = plan.next_account(given, lines(['Fable']), NOW)
-                self.assertEqual((n['account'], n['reason'], n['back_at']),
-                                 (None, 'no other account has room', NOW + 3 * D))
+                self.assertEqual((n['account']['name'], n['reason'], n['back_at']), ('b', None, None))
                 ranked = dict((x['name'], x) for x in plan.order(given, lines(['Fable']), NOW))
-                self.assertEqual(ranked['b']['reason'], 'at its limit')
-                self.assertFalse(ranked['a']['usable'])
+                self.assertEqual((ranked['b']['reason'], ranked['b']['notes']), (None, ['no room for Fable']))
+                self.assertEqual(ranked['a']['usable'], five < 90)
                 self.assertEqual(nxt(given, lines([])), 'b')                 # not counted: it never moves anyone
 
     def test_an_uncounted_model_week_changes_nothing(self):
@@ -124,28 +127,31 @@ class ThePlan(unittest.TestCase):
         strip = lambda xs: [(x['name'], x['rank'], x['usable'], x['reason'], x['left_pct']) for x in xs]  # noqa: E731
         self.assertEqual(strip(plan.order(given, lines(['Opus']), NOW)), strip(plan.order(given, lines([]), NOW)))
 
-    def test_room_only_behind_a_limit_is_no_landing_place(self):
+    def test_room_behind_a_model_week_is_still_a_landing_place(self):
+        # was test_room_only_behind_a_limit_is_no_landing_place: b and c work, on the next model (the lead's rule)
         given = [acct('a', 100, 40, fable=30, active=True), acct('b', 10, 30, fable=100), acct('c', 20, 30, fable=100)]
-        self.assertIsNone(nxt(given, lines(['Fable'])))
+        self.assertEqual(nxt(given, lines(['Fable'])), 'b')
         self.assertEqual(nxt(given, lines([])), 'b')
 
     def test_an_account_with_no_model_week_is_not_held_back_by_it(self):
         given = [acct('a', 50, 40, fable=100, active=True), acct('b', 5, 20, fable=100), acct('team', 30, 30)]
         self.assertEqual(nxt(given, lines(['Fable'])), 'team')
-        given[2]['five_hour_used_pct'] = 100                              # ...until that account is at its own limit
-        self.assertIsNone(nxt(given, lines(['Fable'])))
+        given[2]['five_hour_used_pct'] = 100                              # ...until that account is at its own limit:
+        self.assertEqual(nxt(given, lines(['Fable'])), 'b')               # then b, which works on the next model
 
     def test_one_account_with_fable_room_is_next(self):
         given = [acct('a', 20, 40, fable=100, active=True), acct('b', 10, 30, fable=100), acct('c', 20, 30, fable=0)]
         self.assertEqual(nxt(given, lines(['Fable'])), 'c')
 
-    def test_two_models_counted_each_holds_its_own(self):
+    def test_two_models_counted_each_is_a_note_of_its_own(self):
+        # was test_two_models_counted_each_holds_its_own (the lead's rule, Nov 27: a model's week is never a reason)
         given = [acct('a', 95, 40, fable=100, opus=20, active=True), acct('b', 10, 30, fable=30, opus=100),
                  acct('c', 20, 45, fable=100, opus=100)]
-        self.assertIsNone(nxt(given, lines(['Fable', 'Opus'])))
+        self.assertEqual(nxt(given, lines(['Fable', 'Opus'])), 'b')
         self.assertEqual(nxt(given, lines(['Fable'])), 'b')
         ranked = dict((x['name'], x) for x in plan.order(given, lines(['Fable', 'Opus']), NOW))
-        self.assertEqual(ranked['c']['blocked_by'], ['Fable', 'Opus'])
+        self.assertEqual((ranked['c']['usable'], ranked['c']['blocked_by'], ranked['c']['notes']),
+                         (True, [], ['no room for Fable', 'no room for Opus']))
 
     def test_everyone_over_a_line_nothing_is_landed_on(self):
         # An engine could fall back to the account with the most room when every account was over a
@@ -167,7 +173,7 @@ class ThePlan(unittest.TestCase):
             with self.subTest(more=more):
                 given = [acct('a', 95, 40, fable=100, active=True), acct('b', 10, 30, fable=100),
                          acct('off', 10, 10, fable=0, **more)]
-                self.assertIsNone(nxt(given, lines(['Fable'])))
+                self.assertEqual(nxt(given, lines(['Fable'])), 'b')      # b works on the next model; 'off' never
                 self.assertEqual(nxt(given, lines([])), 'b')
 
 
@@ -194,8 +200,12 @@ class ThePageText(unittest.TestCase):
         with open(os.path.join(HERE, '..', 'switchboard', 'web', 'index.html'), encoding='utf-8') as f:
             self.html = f.read()
 
-    def test_the_picker_offers_none_and_the_models_seen(self):
+    def test_the_picker_offers_the_chats_models_and_the_models_seen(self):
         self.assertIn("const seen = (a.models_seen || []).map(String)", self.html)     # a tick for each model
+        # with no tick (or no model reported), the picker says what is counted then: the models the chats use, when
+        # switchboard.room is in the build (/api/keep's `follows`); else its own words (tests/test_keeprun_server.py)
+        self.assertIn("(follows ? 'The models your chats use' : 'None reported yet')", self.html)
+        self.assertIn("None ticked: the models your chats use", self.html)
         self.assertNotIn("['all', 'All']", self.html)
 
 

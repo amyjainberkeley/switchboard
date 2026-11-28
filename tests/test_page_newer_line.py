@@ -31,7 +31,7 @@ class TheNewerLine(ChromePage):
       done(out);
 """ % ('"' + LINE + '"'))
         self.assertEqual(got['before'][1], '')
-        self.assertTrue(re.match(r'^Switchboard %s · demo · localhost:\d+$' % re.escape(core.VERSION), got['before'][0]))
+        self.assertTrue(re.match(r'^Switchboard %s · demo · 127\.0\.0\.1:\d+$' % re.escape(core.VERSION), got['before'][0]))
         self.assertEqual(got['after'][0], got['before'][0])                 # the version line itself is as it was
         self.assertEqual(got['after'][1:], [LINE, True, '12px', 0, 1])       # one line of plain text, right under it
 

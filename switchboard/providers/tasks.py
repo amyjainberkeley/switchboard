@@ -182,6 +182,51 @@ def continued_from(folder: str, from_chat: str) -> Optional[Hop]:
     return None
 
 
+# What a task row begun by `switchboard do` keeps of how it was picked (its "job"): ids, codes, a path, a size and a
+# count, never a word of the task (not even the word that told its kind).
+JOB_FIELDS = ('kind', 'by', 'provider', 'model', 'effort', 'reason', 'passed', 'file', 'bytes', 'removed', 'state',
+              'version')
+JOB_STATES = ('started', 'failed')
+
+
+def _job(job: dict) -> dict:
+    bad = [k for k in job if k not in JOB_FIELDS]
+    if bad or ('state' in job and job['state'] not in JOB_STATES):
+        raise ValueError('a field or state a task row does not keep')
+    return dict(job)
+
+
+def add_task(task_id: str, folder: str, job: dict, at: float) -> str:
+    """Record a task begun by `switchboard do` in this folder: its own row, with how it was picked (JOB_FIELDS: the
+    kind, how the kind was known, the provider with its model and effort, the reason code, the providers passed with
+    their codes, the task file, its size, how many places were taken out, the state, the program's version)."""
+    if not TASK_ID_RE.match(str(task_id)):
+        raise ValueError('a task needs a t- id')
+    row = {'id': task_id, 'folder': folder, 'made_at': at, 'origin': {'provider': job.get('provider'), 'chat': None},
+           'job': _job(job)}
+    with core.file_lock(contract.LOCK_NAME):
+        data = _read(changing=True)
+        if task_id in data['tasks']:
+            raise ValueError('that task is in the ledger already')
+        data['tasks'][task_id] = row
+        _write(data)
+    return task_id
+
+
+def update_task(task_id: str, **changes) -> dict:
+    """Change the job of a task `switchboard do` began (its state, when the start failed). Raises
+    ProviderError('not_found') when it is not in the ledger."""
+    changes = _job(changes)
+    with core.file_lock(contract.LOCK_NAME):
+        data = _read(changing=True)
+        row = data['tasks'].get(task_id)
+        if not isinstance(row, dict) or not isinstance(row.get('job'), dict):
+            raise ProviderError('not_found', 'That task is not in the record any more.')
+        row['job'].update(changes)
+        _write(data)
+        return dict(row)
+
+
 def prune(now: float) -> int:
     """Drop hops older than the notes they point at (contract.NOTE_KEEP_DAYS), and tasks left with no hop that are as
     old. Returns how many hops went. The notes themselves are handoff.prune's."""

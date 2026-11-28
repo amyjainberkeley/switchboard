@@ -25,11 +25,23 @@ account); and to the account Claude Code was on then by the timeline the loop ke
 oldest first), as `account_id`, for when the chat's file doesn't say. Within 30 s before a switch the timeline counts it
 for the newer account (a running Claude Code may already be on the new login; holding a switch costs nothing).
 
+Limit notices: Claude Code's own line when a usage limit stopped a reply (an assistant entry of model "<synthetic>" or
+marked as an API error). limit_scope() says which window it names (checked in Claude Code 2.1.329 and 2.1.332, which
+write "You've hit your <window> · resets <time>", the window one of "5-hour limit", "weekly limit", "session limit",
+"weekly Opus limit", "weekly Sonnet limit", "Opus limit", "Sonnet limit", "Fable limit", "usage credit limit", "org's
+monthly spend limit" or "monthly spend limit", and older "Claude AI usage limit reached" lines): a 5-hour, weekly or
+session notice refuses everything on the account ('limited_at'); a model's own window refuses that model's family
+only, and usage credits or a spend limit refuse the family the chat was using ('refused': {family: when}).
+
+The models the chats ask for ('asked': {family: when}): the model of the last request of each chat's main loop (a
+transcript directly in a project's folder, not a helper's; entries marked isSidechain are a helper's too) written in
+the last ASKED_KEEP seconds.
+
 What is read: file times, and of recent transcripts only the lines that carry an artifact link inside a tool result
 (for the result's first words and its link), the assistant lines that call a claude.ai connector (for its name, the
-call's id and the time) and the two lines that name an account (chatfile.parse_line: the organization and the time).
-Nothing else from a transcript is kept or logged. Each look is bounded (MAX_FILES files, MAX_BYTES bytes) and each
-file is read on from where the last look stopped.
+call's id and the time), the two lines that name an account (chatfile.parse_line: the organization and the time), a
+limit notice's words, and an assistant line's model id. Nothing else from a transcript is kept or logged. Each look
+is bounded (MAX_FILES files, MAX_BYTES bytes) and each file is read on from where the last look stopped.
 
 The exact words of the Artifact tool's watch line were not checked against a real transcript, so WATCH_ON_RE and
 WATCH_OFF_RE are deliberately broad.
@@ -65,12 +77,27 @@ URL_RE = re.compile(ART_URL)
 WATCH_ON_RE = re.compile(r'\b(?:now watch(?:es|ing)|is watching|started watching|watching (?:this|the|that|it)\b|'
                          r'subscribed to)', re.I)
 # (no bare "rate limit": a per-minute 429 from the API says that too, and it is not the account's usage limit)
-LIMIT_RE = re.compile(r'\b(?:limit reached|hit your (?:usage |session |weekly )?limit|usage limit|'
-                      r'out of (?:usage|extra usage))', re.I)
+LIMIT_RE = re.compile(r"\b(?:limit reached|hit your (?:[\w'’.-]+ ){0,4}?limit|usage limit|"
+                      r"out of (?:usage|extra usage)|spend limit)", re.I)
+# The window a notice names: the words between "hit your" and "limit".
+WINDOW_RE = re.compile(r"\bhit your ((?:[\w'’.-]+ ){0,4}?)limit", re.I)
+ALL, FAMILY, CREDITS = 'all', 'family', 'credits'
+# The words of a window that is the whole account's (everything on it is refused): any other named window that is not
+# a model family, usage credits or a spend limit is not known, and changes nothing (limit_scope).
+ACCOUNT_WIDE_RE = re.compile(r"\b(?:5-hour|five-hour|hourly|daily|weekly|week|session|usage)\b", re.I)
+_UNKNOWN_SAID = set()        # the unknown windows already said in the log (once each)
+_UNKNOWN_LOCK = threading.Lock()
+ASKED_KEEP = 6 * 3600.0      # a chat's model counts as asked for this long after its last request
+MODEL_RE = re.compile(rb'"model": ?"(claude-[A-Za-z0-9._\[\]-]{1,60})"')
+TIME_RE = re.compile(rb'"timestamp": ?"([0-9T:.+Z-]{10,40})"')
+SIDE_RE = re.compile(rb'"isSidechain": ?true')
 # Words that say a notice is NOT the account's limit, taken out before LIMIT_RE looks: Claude Code's notice for the
 # server's own short throttle reads "Server is temporarily limiting requests (not your usage limit) · Rate limited".
 NOT_LIMIT_RE = re.compile(r"\b(?:not|isn't|is not) (?:your |a |the )?(?:usage |session |weekly )?limit\b", re.I)
 LIMIT_FRESH = 600.0          # a limit notice this recent means the account it was written under is refused now
+LIGHT_TAIL = 64 * 1024       # under load: the newest end of each chat file changed in LIMIT_FRESH, read for notices
+LIGHT_BYTES = 2 * 1024 * 1024   # ... at most this much in one look
+NOTICE_MARKS = (b'<synthetic>', b'isApiErrorMessage')   # a line that may be Claude Code's own limit notice
 WATCH_TOOLS = ('Artifact', 'ArtifactComments')     # the tools whose own answer says a session watches an artifact
 TOOLS_KEPT = 256                                    # tool call ids remembered per transcript
 CONNECTOR_MARK = b'mcp__claude_ai_'                 # a line that may call a claude.ai connector
@@ -101,9 +128,47 @@ def owner_at(timeline, t):
     return who
 
 
+def limit_scope(text):
+    """(scope, family) for the words of a limit notice, or None when they say no usage limit stopped a reply.
+    scope ALL: the 5-hour, weekly, session or plain usage limit (everything on the account is refused); FAMILY: a
+    model's own window, family its word ('fable', 'opus', ...); CREDITS: usage credits or a spend limit (the chat's
+    own model is refused; family None, the caller knows the chat). The words "not your usage limit" are taken out
+    first (NOT_LIMIT_RE)."""
+    from . import policy
+    text = NOT_LIMIT_RE.sub(' ', text or '')
+    if not LIMIT_RE.search(text):
+        return None
+    m = WINDOW_RE.search(text)
+    words = m.group(1).lower() if m else ''
+    if m and policy.family_of(words):
+        return FAMILY, policy.family_of(words)
+    if m and ('credit' in words or 'spend' in words):
+        return CREDITS, None
+    if m and words.strip():
+        if ACCOUNT_WIDE_RE.search(words):
+            return ALL, None                # 5-hour, weekly, session, usage
+        _unknown_window(m.group(1))         # a window not known (a new model's name?): it changes nothing
+        return None
+    low = text.lower()
+    if not m and ('spend limit' in low or 'out of usage credits' in low):
+        return CREDITS, None                # ("out of extra usage" names no one model: everything, as at 4df2f46)
+    return ALL, None
+
+
+def _unknown_window(words):
+    """Say once in the log that a limit notice named a window not known (its window's words only, 12 at most)."""
+    key = ' '.join(words.lower().split()[:12])
+    with _UNKNOWN_LOCK:
+        if key in _UNKNOWN_SAID or len(_UNKNOWN_SAID) >= 32:
+            return
+        _UNKNOWN_SAID.add(key)
+    core.log('unknown limit window: %s (the notice changes nothing)' % ' '.join(words.split()[:12]))
+
+
 def _limit_notice(line, fallback_t):
-    """[(time, 'limit', None)] when the line is Claude Code's own notice that a usage limit stopped a reply (an
-    assistant entry of model "<synthetic>", or marked as an API error, whose text says a limit was reached)."""
+    """[(time, 'limit', (scope, family))] when the line is Claude Code's own notice that a usage limit stopped a reply
+    (an assistant entry of model "<synthetic>", or marked as an API error, whose text says a limit was reached; see
+    limit_scope)."""
     try:
         d = json.loads(line)
     except ValueError:
@@ -116,9 +181,27 @@ def _limit_notice(line, fallback_t):
     content = msg.get('content')
     text = ' '.join(b.get('text') for b in content if isinstance(b, dict) and isinstance(b.get('text'), str)) \
         if isinstance(content, list) else content if isinstance(content, str) else ''
-    if not LIMIT_RE.search(NOT_LIMIT_RE.sub(' ', text or '')):
+    scope = limit_scope(text)
+    if scope is None:
         return []
-    return [(usage.parse_iso(d.get('timestamp')) or fallback_t, 'limit', None)]
+    return [(usage.parse_iso(d.get('timestamp')) or fallback_t, 'limit', scope)]
+
+
+def model_in_line(line, fallback_t):
+    """(time, family) of an assistant line's request in a chat's main loop (its model id names a family), or None.
+    A cheap look: two patterns, no JSON parse."""
+    if b'"assistant"' not in line or b'<synthetic>' in line or SIDE_RE.search(line):
+        return None
+    m = MODEL_RE.search(line)
+    if not m:
+        return None
+    from . import policy
+    fam = policy.family_of(m.group(1).decode('ascii', 'replace'))
+    if fam is None:
+        return None
+    t = TIME_RE.search(line)
+    when = usage.parse_iso(t.group(1).decode('ascii', 'replace')) if t else None
+    return (when or fallback_t), fam
 
 
 def _note_tools(line, tools):
@@ -157,12 +240,13 @@ def _connector_calls(line, fallback_t):
 
 def events_in_line(line, fallback_t, tools=None, unknown=None, born=None):
     """[(time, kind, url)] from one transcript line (bytes): kind 'artifact', 'doc', 'watch', 'unwatch', 'limit'
-    (Claude Code's own notice that a usage limit stopped a reply; url None) or 'connector' (a call to a claude.ai
-    connector; in place of a url, (its name, the call's id)). tools: this transcript's remembered calls to the watch
-    tools ({tool call id: name}, filled from assistant lines here); a watch or its end counts only in their answers, or
-    in a publish answer (without `tools`: only in a publish answer). unknown: a list that gets (tool call id, time,
-    kind, url) for an answer with watch words whose call is not in `tools` (it may lie before where a first read began;
-    the Scanner looks there). born: a list that gets the call id of each answer that is a Claude Doc born."""
+    (Claude Code's own notice that a usage limit stopped a reply; in place of a url, limit_scope's (scope, family))
+    or 'connector' (a call to a claude.ai connector; in place of a url, (its name, the call's id)). tools: this
+    transcript's remembered calls to the watch tools ({tool call id: name}, filled from assistant lines here); a watch
+    or its end counts only in their answers, or in a publish answer (without `tools`: only in a publish answer).
+    unknown: a list that gets (tool call id, time, kind, url) for an answer with watch words whose call is not in
+    `tools` (it may lie before where a first read began; the Scanner looks there). born: a list that gets the call id
+    of each answer that is a Claude Doc born."""
     if (b'<synthetic>' in line or b'isApiErrorMessage' in line) and (b'imit' in line or b'out of' in line):
         return _limit_notice(line, fallback_t)          # (LIMIT_RE's "out of usage" carries no "limit")
     if b'tool_use' in line and b'tool_result' not in line and \
@@ -250,12 +334,15 @@ class Scanner(object):
         self.accounts = {}      # path -> chatfile.Read: the account lines read so far (its steps)
         self.born = {}          # path -> {tool call id: True} of the calls whose answer was a Claude Doc born
         self.turns = {}         # path -> (mtime, open/closed/unknown)
+        self.models = {}        # path -> (time, family) of the main loop's last request (main-loop transcripts only)
+        self.read_once = False  # a look has read the transcripts (until then the models asked for are not known)
+        self.light_limits = {}  # path -> limit events from the newest end of the file, read by a light look
         self.proc_count = None
         self.proc_at = None
         self.lock = threading.Lock()
 
     def _forget(self, path):
-        for d in (self.offsets, self.events, self.tools, self.cuts, self.accounts, self.born):
+        for d in (self.offsets, self.events, self.tools, self.cuts, self.accounts, self.born, self.models):
             d.pop(path, None)
 
     def _session_of(self, path):
@@ -313,6 +400,7 @@ class Scanner(object):
             self.offsets[path] = (st.st_ino, off, skipping)
             return 0
         used = 0
+        main = len(os.path.relpath(path, self.root).split(os.sep)) == 2    # project/session.jsonl: a chat's main loop
         found = self.events.setdefault(path, [])
         tools = self.tools.setdefault(path, {})
         account = self.accounts.setdefault(path, chatfile.Read())
@@ -337,9 +425,20 @@ class Scanner(object):
                     if len(line) <= chatfile.LINE_MAX and (ACCOUNT_MARKS[0] in line or ACCOUNT_MARKS[1] in line):
                         account.take(chatfile.parse_line(line.decode('utf-8', 'replace'), json.loads))
                     made = []
-                    found.extend(events_in_line(line, mtime, tools, unknown, made))
+                    evs = events_in_line(line, mtime, tools, unknown, made)
                     for uid in made:
                         born[uid] = True
+                    if main:
+                        m = model_in_line(line, mtime)
+                        if m is not None:
+                            self.models[path] = m
+                    for t, kind, what in evs:
+                        if kind == 'limit' and what[0] == CREDITS:
+                            # usage credits or a spend limit refuse the model this chat was using; with that model
+                            # not known it refuses everything on the account (as at 4df2f46), never nothing
+                            fam = (self.models.get(path) or (None, None))[1]
+                            what = (CREDITS, fam) if fam is not None else (ALL, None)
+                        found.append((t, kind, what))
                     pos = f.tell()
         except OSError:
             return used
@@ -356,9 +455,45 @@ class Scanner(object):
         self.offsets[path] = (st.st_ino, pos, skipping)
         return used
 
+    def _light_limits(self, recent, now):
+        """{path: [(t, 'limit', (scope, family))]} from the last LIGHT_TAIL bytes of each chat file written in the last
+        LIMIT_FRESH, newest first, LIGHT_BYTES at most in all: only Claude Code's own limit notices are parsed (lines
+        that carry NOTICE_MARKS). Nothing else is kept, and the read offsets of the full reads are not touched."""
+        out, budget = {}, LIGHT_BYTES
+        for mtime, path in recent[:MAX_FILES]:
+            if now - mtime > LIMIT_FRESH or budget <= 0:
+                break
+            try:
+                with open(path, 'rb') as f:
+                    f.seek(0, os.SEEK_END)
+                    size = f.tell()
+                    start = max(0, size - min(LIGHT_TAIL, budget))
+                    f.seek(start)
+                    data = f.read(size - start)
+            except OSError:
+                continue
+            budget -= len(data)
+            lines = data.split(b'\n')
+            if start:
+                lines = lines[1:]                        # the end of a line that began before the tail
+            lines = lines[:-1]                           # the last piece: '' after a newline, or a line being written
+            found = []
+            for line in lines:
+                if any(m in line for m in NOTICE_MARKS):
+                    for t, kind, what in _limit_notice(line, mtime):
+                        if what[0] == CREDITS:
+                            fam = (self.models.get(path) or (None, None))[1]
+                            what = (CREDITS, fam) if fam is not None else (ALL, None)
+                        found.append((t, kind, what))
+            if found:
+                out[path] = found
+        return out
+
     def look(self, timeline=(), now=None, light=False):
-        """{'busy', 'idle_for_s', 'sessions', 'processes', 'obligations', 'partial'} (see the module's docstring).
-        light: under load or on a low battery, only file times are looked at (no transcript is read, no ps run)."""
+        """{'busy', 'idle_for_s', 'sessions', 'processes', 'obligations', 'partial', 'limited_at', 'refused',
+        'asked'} (see the module's docstring; 'asked' is None until a look has read the transcripts).
+        light: under load or on a low battery, only file times are looked at (no transcript is read, no ps run), and
+        the newest end of the chat files written in the last 10 minutes for limit notices (_light_limits)."""
         with self.lock:
             return self._look(list(timeline or ()), self.clock.wall() if now is None else now, light)
 
@@ -381,7 +516,11 @@ class Scanner(object):
         idle_for = 0.0 if busy else (None if last is None else max(0.0, now - last))
 
         partial = False
+        # under load no transcript is read whole, but a limit notice must still be seen (Nov 27: 19 notices in 11 tabs
+        # went unseen at load 5 to 7): the newest end of each chat file changed in the last LIMIT_FRESH, bounded
+        self.light_limits = self._light_limits(recent, now) if light else {}
         if not light:
+            self.read_once = True
             budget = MAX_BYTES
             for mtime, path in recent[:MAX_FILES]:
                 if budget <= 0:
@@ -399,8 +538,20 @@ class Scanner(object):
             key = self._session_of(path)
             session_last[key] = max(session_last.get(key, 0.0), mtime)
         obligations = self._obligations(timeline, now, session_last)
-        limits = [t for evs in self.events.values() for t, kind, _ in evs
-                  if kind == 'limit' and now - LIMIT_FRESH <= t <= now + usage.AHEAD]
+        limits, refused = [], {}
+        for evs in list(self.events.values()) + list(self.light_limits.values()):
+            for t, kind, what in evs:
+                if kind != 'limit' or not now - LIMIT_FRESH <= t <= now + usage.AHEAD:
+                    continue
+                scope, fam = what if isinstance(what, tuple) else (ALL, None)
+                if scope == ALL:
+                    limits.append(t)
+                elif fam is not None:
+                    refused[fam] = max(t, refused.get(fam, t))
+        asked = {}
+        for t, fam in self.models.values():
+            if now - ASKED_KEEP <= t <= now + usage.AHEAD:
+                asked[fam] = max(t, asked.get(fam, t))
 
         if not light and (self.proc_at is None or now - self.proc_at >= PROCS_EVERY or now < self.proc_at):
             try:
@@ -413,7 +564,8 @@ class Scanner(object):
         if sessions and open_turn:
             sessions[0]['open_turn'] = True
         return {'busy': busy, 'idle_for_s': idle_for, 'sessions': sessions, 'processes': self.proc_count,
-                'obligations': obligations, 'partial': partial, 'limited_at': max(limits) if limits else None}
+                'obligations': obligations, 'partial': partial, 'limited_at': max(limits) if limits else None,
+                'refused': refused, 'asked': asked if self.read_once else None}
 
     def _obligations(self, timeline, now, session_last):
         out = {}
@@ -471,4 +623,6 @@ def activity(timeline=(), now=None, light=False):
 def _reset_for_tests():
     with _LOCK:
         del _SCANNER[:]
+    with _UNKNOWN_LOCK:
+        _UNKNOWN_SAID.clear()
 

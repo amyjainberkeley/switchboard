@@ -136,6 +136,25 @@ class KeptOnDisk(unittest.TestCase):
             self.assertTrue(server.load_week(now))
             self.assertFalse(self.asked()[0])
 
+    def test_a_week_weighed_before_reads_had_a_weight_per_model_is_shown_and_read_again_at_once(self):
+        # a build from before a cache read was weighed at its own model's price kept tokens with no cache_read_low:
+        # after an update that week shows at once, and the first read is not put off, even on a very busy Mac
+        old = {'input': 10, 'output': 20, 'cache_write': 30, 'cache_read': 400, 'cache_write_1h': 0}
+        new = dict(old, cache_read_low=0)
+        none_read = dict(old, cache_read=0)
+        now = time.time()
+        for tokens, busy, again in ((old, False, True), (old, True, True), (new, False, False), (new, True, False),
+                                    (none_read, True, False),         # no reads: nothing weighs differently
+                                    (None, True, False), ('x', True, False), ([], True, False)):
+            with self.subTest(tokens=tokens, busy=busy), mock.patch.dict(server.EASE, {'aware': busy, 'on': busy}):
+                self.keep({'page': dict(PAGE, tokens=tokens), 'extras': None, 'at': now - 10})
+                server.USAGE.update(page=None, extras=None, at=0, running=False)
+                self.assertTrue(server.load_week(now))
+                running, view = self.asked()
+                self.assertEqual(view['state'], 'ready')                       # shown at once either way
+                self.assertEqual(view['tokens'], tokens)
+                self.assertEqual(running, again)
+
     def test_hours_in_no_shape_at_all_never_stop_the_page_from_starting(self):
         now = time.time()
         for hours in (None, 'hours', 7, {}, [None, 'x', 3, []], [{'weight': 'heavy'}], [{'weight': None, 'projects': 1}],

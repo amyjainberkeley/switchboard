@@ -297,7 +297,7 @@ class TheCleanerPage(FramedPage):
         self.assertNotIn('Keyboard shortcuts', got['side']['text'])
         self.assertNotIn(server.view()['version'], got['side']['text'])         # the version is in About only
         self.assertEqual([c[1] is not None for c in got['side']['counts']], [True, True, True, False, False])   # Chats counts
-        self.assertEqual(got['about'], 'Switchboard %s · demo · localhost:%s' % (server.view()['version'], got['port']))
+        self.assertEqual(got['about'], 'Switchboard %s · demo · 127.0.0.1:%s' % (server.view()['version'], got['port']))
         self.assertEqual(got['last'], 'newer')          # after About, only the line that says a newer version is out
         self.assertFalse(any('gateway_on' in k or 'auto_policy' in k for k in got['keys']))
         self.assertIn('gateway_on', got['gateway'])                            # in the row's tooltip

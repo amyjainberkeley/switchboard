@@ -246,6 +246,8 @@ class RefusedNow(LoopCase):
         usage.feed_status_line('a1', {'five_hour': {'used_percentage': 70.0, 'resets_at': T0 + 4 * H}},
                                T0 - 3000, now=T0 - 3000 + 1)
         loop = self.loop()
+        # the hard lines alone (at 70% the sign line, 60, would move it to a2 as a sign switch)
+        core.update_setting(autoloop.POLICY_KEY, lambda old: dict(old or {}, sign_lines=False))
         loop.scanner.look = lambda timeline, now=None, light=False: {'busy': True, 'idle_for_s': 0.0,
                                                                       'obligations': [], 'limited_at': None}
         loop.run_pass()

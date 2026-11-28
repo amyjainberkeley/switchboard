@@ -74,9 +74,11 @@ def commands_in(text):
 
 
 def help_words(cmd):
-    """Every word the help lines of one command name: flags apart, then the plain words."""
+    """Every word the help lines of one command name: flags apart, then the plain words (a word with a hyphen, as in
+    `auto signed-in`, also whole)."""
     own = cli.command_help(cmd) or ''
-    return set(FLAG.findall(own)), set(re.findall(r'[A-Za-z_][\w.]*', own))
+    return set(FLAG.findall(own)), set(re.findall(r'[A-Za-z_][\w.]*', own)) | \
+        set(re.findall(r'(?<![\w-])[A-Za-z_][\w.]*(?:-[A-Za-z_][\w.]*)+', own))
 
 
 def section(text, head):

@@ -28,6 +28,7 @@ from fakes_links import Home
 from fakes_artifacts import A, B, ID1, ID2, ID3, ID4, LINK, TINY_JPEG, StandInChrome, publish
 
 from switchboard import artifacts, browser, core, previews, server, session_hooks
+import pagekey_help  # noqa: E402  (the page key, as Switchboard's own programs send it)
 
 IDS = ['%s%02dAbCdEfGhIjKlMnOp' % (c, i) for i, c in enumerate('QRSTUVWXYZ')]
 
@@ -209,7 +210,7 @@ class TheRoute(PreviewCase):
         try:
             c.putrequest('GET', path, skip_host=True, skip_accept_encoding=True)
             c.putheader('Host', headers.pop('host', '127.0.0.1:%d' % self.port))
-            for k, v in headers.items():
+            for k, v in pagekey_help.with_key(headers).items():
                 c.putheader(k.replace('_', '-'), v)
             c.endheaders()
             r = c.getresponse()

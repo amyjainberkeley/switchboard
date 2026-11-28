@@ -8,7 +8,11 @@ Keychain (account attribute = the account's id):
 - "Switchboard recovery": logins that exist nowhere else yet: the successor of a refresh whose save failed
   ("successor:<id>") and a safety copy of whatever a switch is about to write over ("safety:<fingerprint>"). If the
   Keychain refuses one, it goes to an owner-only file under <data>/recovery/ instead, so it is never lost. A manifest
-  (<data>/recovery/manifest.json, its own lock) lists every entry, without secrets.
+  (<data>/recovery/manifest.json, its own lock) lists every entry, without secrets;
+- "Switchboard login (Mac-wide parts)" (account attribute = the name of Claude Code's own item, one for the Mac in the
+  usual setup): the Mac-wide parts of Claude Code's item as Switchboard last saw them (keep_shared), used in one place
+  only: a put-back into no item at all writes the saved login with them (putback._try_once). A switch never uses it.
+  <data>/mac-wide-parts.json says which are kept, by a SHA-256 of their text, without secrets.
 
 accounts.json (schema 1, no secrets): accounts by id, their order, aliases, emails, organizations, plan, fingerprints
 and expiry stamps of the saved login, its identity block for ~/.claude.json, status, strike, last proof; the
@@ -22,6 +26,7 @@ for the change), consume lock of one account (anything that may spend its refres
 and the vault items; local work only), then Claude Code's locks. Kernel file locks: they die with their process.
 """
 import fcntl
+import hashlib
 import json
 import os
 import re
@@ -37,6 +42,9 @@ SCHEMA = 1
 SERVICE_CURRENT = 'Switchboard login'
 SERVICE_PREVIOUS = 'Switchboard login (previous)'
 SERVICE_RECOVERY = 'Switchboard recovery'
+SERVICE_SHARED = 'Switchboard login (Mac-wide parts)'
+SHARED_NOTE = 'mac-wide-parts.json'     # which records of the Mac-wide parts are kept: {item: {sha, at, size}}
+SHARED_LOCK_S = 2.0                     # the wait for the account lock to bring that record up to date (else later)
 STORE = 'accounts.json'
 BACKUPS = 5
 LAST_GOOD = STORE + '.last-good'     # the list as of its last save, written beside it with every save (restore)
@@ -489,6 +497,183 @@ def delete_logins(ctx, account_id):
                           (SERVICE_RECOVERY, 'successor:' + account_id)):
         out.append((service, ctx.keychain.delete(service, acct)))
     return out
+
+
+# ---------- the Mac-wide parts of Claude Code's item, kept once for the Mac ----------
+#
+# A saved login keeps only its account's parts (bound_text): a switch takes the Mac-wide parts (connector and plugin
+# logins, the design login) from the live item. When Claude Code's item is gone entirely there is no live item to take
+# them from, so Switchboard keeps one record of them, brought up to date whenever it holds Claude Code's item read whole
+# with an account login (roster.add_current, the keep pass, a look of the put-back), and taken out when such a read
+# holds no Mac-wide part (every connector removed), and used in one place only: a put-back into no item at all writes
+# the saved login with them. Never Claude Code's overflow pointer (facts.OVERFLOW_KEY: it points at parts that may be
+# gone or newer). A record that can't be read changes nothing: the saved login is written as before.
+
+_SHARED_LOCK = threading.Lock()
+_SHARED_SEEN = {}                   # (data folder, item) -> the SHA-256 (16 hex) of the text kept, as this process knows
+_SHARED_SAID = set()                # (data folder, item, why): a failure to keep or take out the record, said once
+
+
+def shared_parts(blob):
+    """The Mac-wide parts of a login object as the record keeps them: facts.SHARED_SIBLINGS but the overflow pointer.
+    {} when there are none (or blob is not an object)."""
+    if not isinstance(blob, dict):
+        return {}
+    return dict((k, blob[k]) for k in facts.SHARED_SIBLINGS if k in blob and k != facts.OVERFLOW_KEY)
+
+
+def _sha16(text):
+    return hashlib.sha256(text.encode('utf-8')).hexdigest()[:16]
+
+
+def _shared_noted(ctx):
+    """{item: {'sha', 'at', 'size'}} from SHARED_NOTE ({} when it is not there or can't be used)."""
+    r, obj = ccfiles.read_json(ctx.path(SHARED_NOTE))
+    if r.kind != PRESENT or not isinstance(obj, dict):
+        return {}
+    return dict((k, v) for k, v in obj.items() if isinstance(k, str) and isinstance(v, dict))
+
+
+def shared_services(ctx):
+    """The names of Claude Code's items a record of the Mac-wide parts is kept for (the uninstaller takes each out), with
+    this environment's own item always among them."""
+    names = set(_shared_noted(ctx))
+    names.add(facts.keychain_service(ctx.env))
+    return sorted(names)
+
+
+def keep_shared(ctx, lr):
+    """Bring the record of the Mac-wide parts up to date from a live read lr (live.LiveRead): only a read of Claude
+    Code's Keychain item itself (never its plain login file, a cached copy or a fallback) that holds a full account
+    login. With at least one Mac-wide part, the record is written only when the parts differ from the ones kept
+    (SHARED_NOTE, by their SHA-256), under the account lock, and read back as a saved login is; a long value goes the
+    way the vault's do (keychain.write). With none (every connector removed) and a record noted for that item, the
+    record is taken out of the Keychain and its note goes (forget_shared for that item), under the same lock, so a
+    later put-back into no item at all never writes a removed login back; nothing is asked of the Keychain while none
+    is noted. A write or a removal that does not land changes nothing and is said once in the log (a later look tries
+    again). Never raises. True when the record was written or taken out."""
+    service, sha, out = '?', None, False
+    try:
+        read, login = getattr(lr, 'read', None), getattr(lr, 'login', None)
+        if read is None or login is None or read.kind != PRESENT or read.degraded or \
+                read.provenance != 'keychain' or not login.full_pair:
+            return False
+        parts = shared_parts(login.blob)
+        service = getattr(lr, 'service', None) or facts.keychain_service(ctx.env)
+        key = (ctx.data_dir, service)
+        if not parts:
+            if service not in _shared_noted(ctx):
+                with _SHARED_LOCK:
+                    _SHARED_SEEN.pop(key, None)
+                return False
+            out = True
+            if holds('account_lock'):
+                why = _drop_shared(ctx, service)
+            else:
+                with account_lock(ctx, timeout=SHARED_LOCK_S):
+                    why = _drop_shared(ctx, service)
+        else:
+            text = live_mod.dump(parts)
+            sha = _sha16(text)
+            with _SHARED_LOCK:
+                if _SHARED_SEEN.get(key) == sha:
+                    return False
+            if (_shared_noted(ctx).get(service) or {}).get('sha') == sha:
+                with _SHARED_LOCK:
+                    _SHARED_SEEN[key] = sha
+                return False
+            if holds('account_lock'):
+                why = _write_shared(ctx, service, text, sha)
+            else:
+                with account_lock(ctx, timeout=SHARED_LOCK_S):
+                    why = _write_shared(ctx, service, text, sha)
+    except LockBusy:
+        return False                                # busy: the next look brings it up to date
+    except Exception as e:  # noqa: BLE001 - the record is a help for a rare case; nothing else may fail for it
+        why = e.__class__.__name__
+    if why is None:
+        if not out:
+            with _SHARED_LOCK:
+                _SHARED_SEEN[(ctx.data_dir, service)] = sha
+        return True
+    said = (ctx.data_dir, service, ('out:' if out else '') + why)
+    with _SHARED_LOCK:
+        new = said not in _SHARED_SAID
+        _SHARED_SAID.add(said)
+    if new and out:
+        ctx.log("Could not take out the record of the Mac-wide parts of Claude Code's login (%s), which holds none "
+                "now; a put-back into no item at all could write a removed connector login back" % why)
+    elif new:
+        ctx.log("Could not keep the Mac-wide parts of Claude Code's login (%s); a put-back into no item at all would "
+                "write the saved login without them" % why)
+    return False
+
+
+def _drop_shared(ctx, service):
+    """Under the account lock: the record of Claude Code's item `service` taken out of the Keychain, then its note
+    (forget_shared for that item). None when it is gone, else why not (then nothing changed)."""
+    if service not in _shared_noted(ctx):
+        return None                                 # another process took it out a moment ago
+    done = ctx.keychain.delete(SERVICE_SHARED, service)
+    if not done.ok:
+        return done.why or 'unknown'
+    forget_shared(ctx, service)
+    return None
+
+
+def _write_shared(ctx, service, text, sha):
+    """Under the account lock: the record written and read back, then noted. None when it landed, else why not."""
+    noted = _shared_noted(ctx)
+    if (noted.get(service) or {}).get('sha') == sha:
+        return None                                 # another process kept the same parts a moment ago
+    done = ctx.keychain.write(SERVICE_SHARED, service, text, interactive=True)
+    if not done.ok:
+        return done.why or 'unknown'
+    back = ctx.keychain.read(SERVICE_SHARED, service, fresh=True, interactive=True)
+    if back.kind != PRESENT or back.value != text:
+        return 'verify'
+    noted[service] = {'sha': sha, 'at': round(ctx.wall(), 3), 'size': len(text.encode('utf-8'))}
+    ccfiles.atomic_write(ctx.path(SHARED_NOTE), (json.dumps(noted, indent=1, sort_keys=True) + '\n').encode('utf-8'),
+                         mode=0o600)
+    return None
+
+
+def read_shared(ctx, service):
+    """The Mac-wide parts kept for Claude Code's item `service` (shared_parts of the record), or None: none is noted as
+    kept, or the record is not there, can't be read now, or is not an object holding any."""
+    if service not in _shared_noted(ctx):
+        return None
+    r = ctx.keychain.read(SERVICE_SHARED, service, fresh=True, interactive=True)
+    if r.kind != PRESENT or not r.value:
+        return None
+    return shared_parts(live_mod.parse(r.value).blob) or None
+
+
+def forget_shared(ctx, service=None):
+    """After the uninstaller took the records out of the Keychain: the note goes, and this process forgets them. With
+    service (keep_shared, once that record is out of the Keychain): only that item's line of the note, and the note
+    itself when it was the last."""
+    if service is not None:
+        noted = _shared_noted(ctx)
+        if noted.pop(service, None) is not None:
+            if noted:
+                ccfiles.atomic_write(ctx.path(SHARED_NOTE),
+                                     (json.dumps(noted, indent=1, sort_keys=True) + '\n').encode('utf-8'), mode=0o600)
+            else:
+                try:
+                    os.unlink(ctx.path(SHARED_NOTE))
+                except OSError:
+                    pass
+        with _SHARED_LOCK:
+            _SHARED_SEEN.pop((ctx.data_dir, service), None)
+        return
+    try:
+        os.unlink(ctx.path(SHARED_NOTE))
+    except OSError:
+        pass
+    with _SHARED_LOCK:
+        for key in [k for k in _SHARED_SEEN if k[0] == ctx.data_dir]:
+            del _SHARED_SEEN[key]
 
 
 # ---------- recovery: logins that exist nowhere else yet ----------

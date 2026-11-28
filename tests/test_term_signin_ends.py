@@ -177,7 +177,7 @@ class AnAccountsLine(unittest.TestCase):
 # ---------- the list `switchboard` prints ----------
 
 class TheList(unittest.TestCase):
-    """test_term's five made-up accounts (Fri Nov 13 2026, 3:31 PM): the words after each row's age."""
+    """test_term's five made-up accounts (Fri Nov 13 2026, 3:31 PM): the words after each row's status."""
 
     def rows(self, **ends):
         view = json.loads(json.dumps(test_term.VIEW))
@@ -189,40 +189,40 @@ class TheList(unittest.TestCase):
     def at(self, day, hour, minute=0):
         return datetime(2026, 11, day, hour, minute, tzinfo=test_term.TZ).timestamp()
 
-    def test_the_words_after_the_age(self):
+    def test_the_words_after_the_status(self):
         got = self.rows(**{'ana@lab.example': (self.at(16, 9), False), 'ana@harbor.example': (self.at(9, 20, 38), True),
                            'ana@mail.example': (self.at(15, 2, 6), False),
                            'ana@northwind.example': (self.at(30, 9), False)})          # far off: nothing
         self.assertEqual(got, [
-            '1  ana@northwind.example  Max 20x · Personal  checked 2 min ago',
-            '2  ana@fernhill.example   Max 20x · Personal  checked 10 min ago',
-            '3  ana@harbor.example     Team · Harbor       sign in again · checked 5 min ago · Sign-in ended by Mon 8:38 PM',
-            '4  ana@lab.example        Max 20x · Personal  next · checked 5 min ago · Sign-in ends by Mon 9:00 AM',
-            '5  ana@mail.example       Max 20x · Personal  in use · checked 3 min ago · Sign-in ends by Sun 2:06 AM'])
+            '1  ana@northwind.example  Max 20x · Personal',
+            '2  ana@fernhill.example   Max 20x · Personal',
+            '3  ana@harbor.example     Team · Harbor       sign in again · Sign-in ended by Mon 8:38 PM',
+            '4  ana@lab.example        Max 20x · Personal  next · Sign-in ends by Mon 9:00 AM',
+            '5  ana@mail.example       Max 20x · Personal  in use · Sign-in ends by Sun 2:06 AM'])
 
     def test_with_no_dates_the_list_is_as_it_was(self):
         self.assertEqual('\n'.join(test_term.lines()), test_term.PLAIN)
         self.assertEqual(self.rows(**{'ana@harbor.example': (self.at(16, 9), True)})[2],     # refused before its date
-                         '3  ana@harbor.example     Team · Harbor       sign in again · checked 5 min ago')
+                         '3  ana@harbor.example     Team · Harbor       sign in again')
 
     def test_the_account_in_use_once_ended_is_said_so(self):
         self.assertEqual(self.rows(**{'ana@mail.example': (self.at(13, 9), True)})[4],
-                         '5  ana@mail.example       Max 20x · Personal  in use · checked 3 min ago · Sign-in ended '
+                         '5  ana@mail.example       Max 20x · Personal  in use · Sign-in ended '
                          'by today 9:00 AM')
 
     def test_a_date_that_is_not_a_sane_time_says_nothing_and_breaks_nothing(self):
         for at in (-9e10, 0, 5e11):
             with self.subTest(at=at):
                 rows = self.rows(**{'ana@harbor.example': (at, True), 'ana@lab.example': (at, False)})
-                self.assertEqual(rows[2], '3  ana@harbor.example     Team · Harbor       sign in again · checked 5 min ago')
-                self.assertEqual(rows[3], '4  ana@lab.example        Max 20x · Personal  next · checked 5 min ago')
+                self.assertEqual(rows[2], '3  ana@harbor.example     Team · Harbor       sign in again')
+                self.assertEqual(rows[3], '4  ana@lab.example        Max 20x · Personal  next')
 
     def test_a_narrow_terminal_puts_them_on_the_status_line(self):
         view = json.loads(json.dumps(test_term.VIEW))
         view['accounts'][3]['signin_ends_at'] = self.at(16, 9)                     # ana@lab.example
         got = test_term.lines(view, width=60)
         i = got.index('4  ana@lab.example        Max 20x · Personal')
-        self.assertEqual(got[i + 1].strip(), 'next · checked 5 min ago · Sign-in ends by Mon 9:00 AM')
+        self.assertEqual(got[i + 1].strip(), 'next · Sign-in ends by Mon 9:00 AM')
 
 
 if __name__ == '__main__':

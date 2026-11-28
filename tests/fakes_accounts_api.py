@@ -243,7 +243,7 @@ class FakeAccounts(object):
         self._note('upkeep_pass', budget_s)
         return []
 
-    def resolve_journal(self):
+    def resolve_journal(self, older_than=None):
         self._note('resolve_journal')
         note, self.journal_note = self.journal_note, None
         return note
@@ -273,10 +273,11 @@ class FakeAccounts(object):
         return dict(self.auto)
 
     def set_auto(self, enabled=None, session_at=None, weekly_at=None, model_at=None, model=None, strategy=None,
-                 rule=None, line=None, rank=None):
+                 rule=None, line=None, rank=None, pick_hold=None, sign_lines=None):
         self.calls.append(('set_auto', dict((k, v) for k, v in (
             ('enabled', enabled), ('session_at', session_at), ('weekly_at', weekly_at), ('model_at', model_at),
-            ('model', model), ('strategy', strategy), ('rule', rule), ('line', line), ('rank', rank))
+            ('model', model), ('strategy', strategy), ('rule', rule), ('line', line), ('rank', rank),
+            ('pick_hold', pick_hold), ('sign_lines', sign_lines))
             if v is not None)))
         self._raise('set_auto')
         if strategy is not None and strategy not in ('refills-first', 'most-room', 'stay-then-refills'):
@@ -294,8 +295,13 @@ class FakeAccounts(object):
             if rule[0] not in self.by_id:
                 raise api.AccountsError('not_found', 'That account is not saved in Switchboard.')
             self._rule(rule[0], rule[1])
+        if pick_hold is not None and pick_hold not in ('default', 'until_out', 'off'):  # the real one's refusals
+            raise api.AccountsError('other', 'Pick default, until_out or off.')
+        if sign_lines is not None and not isinstance(sign_lines, bool):
+            raise api.AccountsError('other', "Moving before Claude Code's usage sign shows is either on or off.")
         for k, v in (('enabled', enabled), ('session_at', session_at), ('weekly_at', weekly_at),
-                     ('model_at', model_at), ('strategy', strategy)):
+                     ('model_at', model_at), ('strategy', strategy), ('pick_hold', pick_hold),
+                     ('sign_lines', sign_lines)):
             if v is not None:
                 self.auto[k] = v
         if model is not None:

@@ -361,7 +361,8 @@ def escaped(s, d):
 class NeverOverManySnapshots(unittest.TestCase):
     def test_never(self):
         seen = dict.fromkeys(('named', 'out stays', 'onto last', 'escape onto last', 'last before an escape', 'forced',
-                              'optional', 'held optional', 'off last', 'need', 'need to last', 'no rule'), 0)
+                              'optional', 'held optional', 'off last', 'need', 'need to last', 'no rule',
+                              'model', 'sign'), 0)       # model and sign: the moves that follow the chats' models
         for n, s in enumerate(generated(SEED, COUNT)):
             rule = lambda x: policy.rule_of(s.settings, x)          # noqa: E731
             d = policy.decide(s)
@@ -418,7 +419,8 @@ class NeverOverManySnapshots(unittest.TestCase):
                     seen['need'] += 1
                     seen['need to last'] += rule(nd.target) == 'last'
         for k, v in seen.items():                       # the snapshots really reach every case they check
-            self.assertGreater(v, 5, (k, seen))
+            if k not in ('model', 'sign'):              # counted, not aimed at: these snapshots ask for no model
+                self.assertGreater(v, 5, (k, seen))
 
 
 # ---------- plan.py agrees ----------

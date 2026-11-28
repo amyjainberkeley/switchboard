@@ -38,7 +38,8 @@ terminal's first run, the page's first run) Claude Code's "done" and "needs you"
 Notifications switch shows what is true. Once: only when the person never turned Notifications on or off
 (notify_set_by_you, marked by the page's switch and `switchboard notify on|off`), it never went on by itself before,
 and Claude Code's settings file can be read with nothing in it that stops hooks (disableAllHooks). Anything that
-stops it changes nothing and says nothing.
+stops it changes nothing and says nothing. "Done" starts off there (notify_done; notify_hooks.done_wanted) until the
+person turns it on (notify_done_by_you); an install whose hooks an older version put in keeps it on.
 
 The session hooks (session_hooks_by_itself): at the same first runs, after the status line, the hooks that tell an open
 Claude Code session what a switch means for it go in too, by the same rules (once; never after the person set them;
@@ -321,8 +322,13 @@ def auto_by_itself(count, now=None, run=None, turn_on=None):
 
 def notify_set_by_you():
     """The person turned Notifications on or off (the page's switch, `switchboard notify on|off`): from now on they
-    never go on by themselves."""
-    if core.settings().get('notify_set_by_you') is not True:
+    never go on by themselves. In a data folder where Notifications were never set before, "done" is written off
+    first (notify_hooks.done_wanted), so a new install starts quiet however its hooks go in."""
+    s = core.settings()
+    if s.get('notify_set_by_you') is not True:
+        from . import notify_hooks
+        if 'notify_done' not in s and not notify_hooks.set_before(s):
+            core.set_setting('notify_done', False)
         core.set_setting('notify_set_by_you', True)
 
 
@@ -335,9 +341,18 @@ def notify_by_you(change):
         return change()
 
 
+def notify_done_by_you(on):
+    """The person turns "done" on or off (`switchboard notify done on|off`, `switchboard config set notify_done`):
+    "Claude Code is done" after a turn of a minute or more, while Notifications are on. Written while notify_by_itself
+    waits, so a first run never writes over it."""
+    with core.file_lock(CHOICE):
+        core.set_setting('notify_done', bool(on))
+
+
 def notify_by_itself(now=None):
-    """At the end of a first run: Claude Code's "done" and "needs you" hooks go in (notify_hooks.turn), once. Not when
-    the person ever set Notifications (a `notify` setting from before this was kept counts as theirs), not when they
+    """At the end of a first run: Claude Code's "done" and "needs you" hooks go in (notify_hooks.turn), once, with
+    "done" off unless the person already set it (notify_done, written first). Not when the person ever set
+    Notifications (a `notify` setting from before this was kept counts as theirs), not when they
     went on by themselves before, not without Claude Code's settings folder, not when its settings file can't be read
     or a key there stops hooks (disableAllHooks, or managed allowManagedHooksOnly), and not when they are in already.
     A refusal or a failure is only logged. The person's own switch (notify_by_you) waits while this looks and turns,
@@ -357,6 +372,8 @@ def notify_by_itself(now=None):
             now_in = notify_hooks.status()
             if now_in['in'] is None or now_in['off_by'] or (now_in['in'] and now_in['works']):
                 return False
+            if 'notify_done' not in s:          # this first run's "done" starts off, written before the hooks go in
+                core.set_setting('notify_done', False)
             notify_hooks.turn(True)
             try:
                 core.set_setting('notify_by_itself', time.time() if now is None else now)

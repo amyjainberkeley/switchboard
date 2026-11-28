@@ -35,6 +35,11 @@ def w(i, o, cw, cr):
     return i + 5 * o + 2 * cw + 0.05 * cr
 
 
+def w_fable(i, o, cw, cr):
+    # the same on Fable 5.2, but a cache read there is 0.025 of its input token ($0.20 against $8)
+    return i + 5 * o + 2 * cw + 0.025 * cr
+
+
 # The in-window requests of Nov 10 (UTC), by hand from the fixture tree:
 #   chat S1 (opus)  m1 (10,200,1000,5000) m2 (5,100,0,6000) m3 (5,50,100,6100) m4 (3,40,0,6200) m5 (1,10,0,100)
 #   helper H1 (opus, no model)    h1a (3,300,2000,0) h1b (2,100,0,2000)
@@ -56,7 +61,7 @@ H3 = w(6, 60, 0, 3000)
 H4 = w(7, 70, 700, 0)
 W1 = w(50, 500, 3000, 10000) + w(5, 50, 0, 12000)
 W2 = w(8, 400, 1000, 4000)
-S2 = w(20, 100, 0, 0) + w(30, 300, 400, 500)
+S2 = w_fable(20, 100, 0, 0) + w_fable(30, 300, 400, 500)
 S3 = w(1, 2, 3, 4)
 TOTAL = S1_OWN + H1 + H2 + F1 + H3 + H4 + W1 + W2 + S2 + S3
 
@@ -74,13 +79,14 @@ class Fixture(unittest.TestCase):
 
     def test_hand_arithmetic_is_what_the_comments_say(self):
         self.assertAlmostEqual(S1_OWN, 5394)
-        self.assertAlmostEqual(TOTAL, 32371.2)
+        self.assertAlmostEqual(TOTAL, 32358.7)        # n2's 500 cache reads on Fable: 12.5, not 25
 
     def test_totals(self):
         t = self.s['totals']
         self.assertEqual(t['requests'], 17)
         self.assertEqual(t['tokens'], {'input': 260, 'output': 2382, 'cache_write': 8703, 'cache_read': 55904,
-                                       'cache_write_1h': 8703})        # every write in the made-up tree is a 1-hour one
+                                       'cache_write_1h': 8703,      # every write in the made-up tree is a 1-hour one
+                                       'cache_read_low': 500})      # n2's reads, on Fable 5.2
         self.assertAlmostEqual(t['weight'], TOTAL)
         self.assertAlmostEqual(t['weight'], usage.weight(t['tokens']))
         self.assertEqual((t['chats'], t['helper_agents'], t['workflows'], t['workflow_agents']), (3, 5, 1, 2))

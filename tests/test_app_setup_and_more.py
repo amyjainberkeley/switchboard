@@ -366,7 +366,7 @@ class MoreInThePage(test_app.ChromePage):
       Object.assign(got, {sent: sent.filter((x) => x[0] === '/api/links').map((x) => x[1]), said: $('#toasts').textContent});
       done(got);
 """
-    FOUR = ['Keep Mac awake', 'Notifications', 'Claude in Chrome', 'Status line', 'Sonnet for helpers']
+    FOUR = ['Keep Mac awake', 'Notifications', 'Claude in Chrome', 'Status line', 'Models by the job']
 
     def test_links_have_no_switch_and_their_rows_are_under_chrome_setup(self):
         # Opening links as their owner is always on: no switch for it anywhere on the page. Where other links open
@@ -374,7 +374,8 @@ class MoreInThePage(test_app.ChromePage):
         v = self.run_page(self.LINKS_ROWS)
         self.assertEqual(v['main'], self.FOUR)
         self.assertIn('Replaces yours', v['replaces'])                    # the demo's own status line is there
-        self.assertEqual(v['more'], ['Status line', 'Sonnet for helpers', 'House rules', 'Code map', 'claude-mem'])
+        self.assertEqual(v['more'], ['Status line', 'Models by the job', 'Sonnet for helpers', 'House rules',
+                                     'Code map', 'claude-mem'])
         self.assertFalse(any('Open links as their owner' in r for r in v['more']), v['more'])
         self.assertNotIn('Open links as their owner', v['switches'])
         self.assertEqual(v['items'], ['switching', 'working', 'code', 'links', 'keys', 'accounts'])

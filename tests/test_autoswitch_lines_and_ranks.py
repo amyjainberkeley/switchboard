@@ -261,24 +261,40 @@ def model_reading(aid, five, week, models):
 
 
 class SeveralModels(unittest.TestCase):
+    # Each model named counts as asked for: its own week decides where its chats can run (a move of kind 'model'),
+    # never whether an account can work at all. The chats here ask for no model, so only the setting counts.
     def test_each_model_is_judged_against_the_model_line(self):
         r = {'a': model_reading('a', 10, 10, {'Fable 5.2': 20, 'Opus 5': 96}),
              'b': model_reading('b', 5, 5, {'Fable 5.2': 5, 'Opus 5': 5})}
         accts = ACCTS[:2]
-        self.assertEqual(said(policy.decide(snap(r, accounts=accts, settings=on(model='Fable')))), ('stay', None, None))
-        d = policy.decide(snap(r, accounts=accts, settings=on(model='Fable', models=('Fable', 'Opus 5'))))
-        self.assertEqual(said(d), ('switch', 'forced', 'b'))
-        self.assertIn('Opus 5 weekly at 96% (line 95%)', d.reason)
+        none = frozenset()
+        self.assertEqual(said(policy.decide(snap(r, accounts=accts, settings=on(model='Fable'), asked=none))),
+                         ('stay', None, None))
+        d = policy.decide(snap(r, accounts=accts, settings=on(model='Fable', models=('Fable', 'Opus 5')), asked=none))
+        self.assertEqual(said(d), ('switch', 'model', 'b'))
+        self.assertIn('Opus 5.5 is at 96% on a@acct.example (line 95%)', d.reason)
         r['a'] = model_reading('a', 10, 10, {'Fable 5.2': 97, 'Opus 5': 20})
         d = policy.decide(snap(r, accounts=accts, settings=policy.settings_from({'enabled': True,
-                                                                                 'model': ['Fable', 'Opus 5']})))
-        self.assertEqual(said(d), ('switch', 'forced', 'b'))
-        self.assertIn('Fable 5.2 weekly at 97%', d.reason)
+                                                                                 'model': ['Fable', 'Opus 5']}),
+                               asked=none))
+        self.assertEqual(said(d), ('switch', 'model', 'b'))
+        self.assertIn('Fable is at 97% on a@acct.example (line 95%)', d.reason)
 
-    def test_a_target_over_any_counted_model_line_is_no_landing_place(self):
-        r = {'a': model_reading('a', 92, 10, {}), 'b': model_reading('b', 5, 5, {'Opus 5': 92})}
+    def test_a_target_over_any_counted_model_line_is_still_a_landing_place(self):
+        # Over a model's own line an account still works, on the next model: a forced move may land there, and says so
+        r = {'a': model_reading('a', 92, 10, {}), 'b': model_reading('b', 5, 5, {'Opus 5': 96})}
         s = on(models=('Fable', 'Opus 5'), model='Fable')
-        self.assertEqual(policy.decide(snap(r, accounts=ACCTS[:2], settings=s)).hold, 'no account has room')
+        d = policy.decide(snap(r, accounts=ACCTS[:2], settings=s, asked=frozenset()))
+        self.assertEqual(said(d), ('switch', 'forced', 'b'))
+        # at 96 Opus still works there (refused at 100): the words say so, Keep running on or off
+        for keep in (False, True):
+            d = policy.decide(snap(r, accounts=ACCTS[:2], settings=s, asked=frozenset(), keep_running=keep))
+            self.assertIn('(Opus 5.5 is at 96% there, line 95%: chats stay on it until it is used up)', d.reason)
+        r['b'] = model_reading('b', 5, 5, {'Opus 5': 100})
+        d = policy.decide(snap(r, accounts=ACCTS[:2], settings=s, asked=frozenset()))
+        self.assertIn('(no room for Opus 5.5 there until ', d.reason)          # Keep running off: no step-down said
+        d = policy.decide(snap(r, accounts=ACCTS[:2], settings=s, asked=frozenset(), keep_running=True))
+        self.assertIn('no room for Opus 5.5 there: chats run on Sonnet 5.5', d.reason)
 
 
 class Best(unittest.TestCase):
@@ -388,7 +404,8 @@ def made_up(rng, extra=True, orders=None, calm=False):
 
 
 def snapshot(sk, kw):
-    return policy.Snapshot(settings=policy.Settings(**sk), **kw)
+    # the chats ask for no model: these snapshots are about lines and ranks (the models named in the settings count)
+    return policy.Snapshot(settings=policy.Settings(**sk), **dict({'asked': frozenset()}, **kw))
 
 
 def landing_places(s):
@@ -439,7 +456,7 @@ class ManySnapshots(unittest.TestCase):
             s = snapshot(sk, kw)
             d = policy.decide(s)
             if d.action == 'switch':
-                self.assertEqual(d.kind, 'forced', (n, d))
+                self.assertIn(d.kind, ('forced', 'model'), (n, d))     # a model's own week moves under any order
                 moved += 1
             if d.kind == 'forced':
                 refills = dataclasses.replace(s, settings=dataclasses.replace(s.settings, strategy='refills-first'))
@@ -448,7 +465,7 @@ class ManySnapshots(unittest.TestCase):
 
     def test_no_rule_is_ever_broken(self):
         rng = random.Random(4104)
-        seen = dict.fromkeys(('forced', 'optional', 'escape', 'ranked', 'own', 'best', 'best none'), 0)
+        seen = dict.fromkeys(('forced', 'optional', 'escape', 'ranked', 'own', 'best', 'best none', 'model'), 0)
         for n in range(26000):
             sk, kw = made_up(rng, calm=n % 4 == 0)
             s = snapshot(sk, kw)
@@ -470,7 +487,9 @@ class ManySnapshots(unittest.TestCase):
                     self.assertIsNotNone(t, where)               # never at or past its own line, with the margin
                     seen[d.kind] += 1
                     seen['own'] += bool(policy.own_of(s.settings, d.target))
-                    if d.kind == 'forced':
+                    if d.kind == 'model':                       # room for the models named: not every landing has it
+                        pass
+                    elif d.kind == 'forced':
                         group = [v for v in places if rule(v.id) != 'last'] or places
                         self.assertIn(t, group, where)          # used last only when nothing else has room
                         self.assertEqual(rank_key(t), min(rank_key(v) for v in group), where)
@@ -500,7 +519,8 @@ class ManySnapshots(unittest.TestCase):
                 self.assertEqual(places, [], (n, b))
                 seen['best none'] += 1
         for k, v in seen.items():
-            self.assertGreater(v, 30, (k, seen))
+            if k != 'model':                            # counted, not aimed at
+                self.assertGreater(v, 30, (k, seen))
 
 
 def agreeing(seed, count):

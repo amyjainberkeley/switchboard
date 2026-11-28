@@ -110,6 +110,36 @@ def in_use_words(email, apart):
             'was started.' % email)
 
 
+NO_RUN_ACCOUNT = ('No account can take a run: each is kept out of auto-switch, needs a fresh sign-in, or is held by '
+                  'another run.')
+
+
+def roomiest(snap, strict=False):
+    """`switchboard run --roomiest`: the account with the most room that auto-switch is not about to leave, as a
+    Decision ('switch' with its target, or 'stay' with why there is none). It is policy.best's landing for a move a
+    person asks for, with every rule that keeps (signed in, not held by another run, never one kept out, one used last
+    only when no other has room, a lower rank first, its own lines, at least LAND_MARGIN under each line on numbers
+    at most 15 minutes old), ranked by room whatever order auto-switch uses, and with the account Claude Code is on
+    among the candidates (a run as it runs on the default login). With strict (--strict or --no-history), that account
+    is left out, since a strict run as it starts nothing (in_use_words)."""
+    from dataclasses import replace
+    from . import policy
+    d = policy.best(replace(snap, active=snap.active if strict else None,
+                            settings=replace(snap.settings, strategy='most-room')))
+    if d.action == 'switch':
+        return d
+    counted = 'No account but the one Claude Code is on' if strict else 'No account'
+    if d.hold == 'no other account':
+        return replace(d, reason=NO_RUN_ACCOUNT.replace('No account', counted, 1))
+    return replace(d, reason=d.reason.replace('No other account', counted, 1))
+
+
+def roomiest_now(strict=False):
+    """roomiest() on a snapshot gathered now, as api.best gathers one (no network)."""
+    from . import autoloop
+    return roomiest(autoloop.gather(activity={}), strict=strict)
+
+
 def _claim_and_seed(ctx, target, email, shared=(), cwd=None, bare=True):
     with vault.switch_lock(ctx, timeout=30.0):
         try:

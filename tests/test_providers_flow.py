@@ -386,7 +386,9 @@ class Story(unittest.TestCase):
             'Added Codex. Your order: Claude, then Codex.',
             'Switchboard will run Codex 0.169.1 (your PATH). Codex keeps its own sign-in; Switchboard never reads or '
             'keeps it.',
-            'It looks signed in.'])
+            'It looks signed in.',
+            "Pressing the Codex row asks no more: it sends your folder's newest chat,",   # what a press sends, once
+            "your words and files, to OpenAI under your ChatGPT plan and OpenAI's terms."])
         self.assertEqual(w.term.asked, [])
         last = history.read()[-1]
         self.assertEqual((last['kind'], last['text']), ('setting', 'Added Codex to the providers you use'))
@@ -394,7 +396,9 @@ class Story(unittest.TestCase):
         self.assertEqual(mode(settings), 0o600)
         self.assertEqual(mode(os.path.dirname(settings)), 0o700)
         with open(settings) as f:
-            self.assertIn('codex', json.load(f)['added'])
+            kept = json.load(f)
+        self.assertIn('codex', kept['added'])
+        self.assertIn('codex', kept['notice'])
 
     # 3. ------------------------------------------------------------------------------------------------------------
     def test_03_the_board_with_both_then_one_ask(self):

@@ -1,8 +1,9 @@
 import _isolate  # noqa: F401  (first: it gives switchboard a throwaway data folder)
 # The menu bar item is Switchboard's S, drawn as shapes (menubar.item_ops), with a small dot at its top right only when
 # the person should look: orange when the account in use is at or over a switch line, red when something needs them.
-# Its menu is a row per account (the whole email, In use, Next or Use, the bars with their %), then Auto-switch, Add
-# account and Open Switchboard, and no Quit in any state. Made-up accounts only; nothing here draws or runs AppKit.
+# Its menu is a row per account (the whole email, In use, Next or Use, the bars with their %; a plan with no 5-hour
+# limit says "No 5-hour limit" in the 5-hour bar row's place), then Auto-switch, Add account and Open Switchboard, and
+# no Quit in any state. Made-up accounts only; nothing here draws or runs AppKit.
 import os
 import sys
 import unittest
@@ -184,6 +185,7 @@ class TheRows(unittest.TestCase):
             words += [run[0] for op in ops if op[0] == 'pair' for piece in op[6] for run in piece]
             bars = [x for x in (r['five'], r['week']) if x]
             want = [x['label'] for x in bars] + [menubar.pct_text(x) for x in bars]
+            want += [r['no_five']] if r['no_five'] else []                    # words in the 5-hour place
             self.assertEqual(sorted(words), sorted(want + [email] + [m[0] for m in r['marks']]), email)
             self.assertEqual(len([op for op in ops if op[0] == 'pair']), 1)                  # no reset line under it
 
@@ -199,7 +201,10 @@ class TheRows(unittest.TestCase):
     def test_the_rows_height_is_its_email_and_its_bars(self):
         self.assertEqual(menubar.ROW_H, 72.0)
         self.assertEqual(menubar.row_height(row_of(view(), 'ana@harbor.example')), 72.0)       # 5-hour and weekly
-        self.assertEqual(menubar.row_height(row_of(view(), 'ana@lab.example')), 54.0)          # weekly alone
+        self.assertEqual(menubar.row_height(row_of(view(), 'ana@lab.example')), 72.0)          # no 5-hour limit: words
+        never = view()
+        find(never, 'ana@lab.example')['usage'] = None
+        self.assertEqual(menubar.row_height(row_of(never, 'ana@lab.example')), 54.0)          # never read: weekly alone
 
     def test_an_ended_sign_in_keeps_its_words_and_its_action(self):
         s = view()
@@ -216,10 +221,12 @@ class TheRows(unittest.TestCase):
         self.assertIn(('do', 'Sign in again as ana@lab.example', 'signin'), items)
 
     def test_what_voiceover_says_for_a_row(self):
-        self.assertEqual(menubar.row_label(row_of(view(), 'ana@lab.example')), 'Use ana@lab.example, next, weekly 65%')
+        self.assertEqual(menubar.row_label(row_of(view(), 'ana@lab.example')),
+                         'Use ana@lab.example, next, no 5-hour limit, weekly 65%')
         self.assertEqual(menubar.row_label(row_of(view(), 'ana@harbor.example')),
                          'Use ana@harbor.example, 5-hour 0%, weekly 17%')
-        self.assertEqual(menubar.row_label(row_of(view(), 'ana@mail.example')), 'ana@mail.example, in use, weekly 27%')
+        self.assertEqual(menubar.row_label(row_of(view(), 'ana@mail.example')),
+                         'ana@mail.example, in use, no 5-hour limit, weekly 27%')
 
 
 class TheMenu(unittest.TestCase):

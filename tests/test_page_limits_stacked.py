@@ -14,7 +14,9 @@ import _isolate  # noqa: F401  (first: it gives switchboard a throwaway data fol
 #   two sentences there (the red note: tests/test_page_rows_two_limits.py);
 # - an old reading says its age under its numbers, from where the bars start;
 # - the email keeps at least the room it had beside the old columns, and no refill time is cut short;
-# - "Auto-switch at [90 %] 5-hour [95 %] weekly" reads as one line (no model's field: it is set in Settings).
+# - "Auto-switch at [90 %] 5-hour [95 %] weekly" reads as one line (no model's field: it is set in Settings);
+# - another assistant's row after the accounts (the demo's Codex) is drawn the same way: 5-hour over weekly, its bars
+#   at the accounts' one left edge and one width, at every one of these widths and on a phone.
 #
 # Headless Chrome (a throwaway profile, no window) on the demo's made-up accounts.
 import os
@@ -40,25 +42,28 @@ REFILLS = re.compile(r'^Refills ((Mon|Tue|Wed|Thu|Fri|Sat|Sun) )?\d{1,2}(:\d\d)?
 LOOK = r"""
     const box = (el) => { const r = el.getBoundingClientRect(); return {left: Math.round(r.left), right: Math.round(r.right), top: Math.round(r.top), bottom: Math.round(r.bottom), width: Math.round(r.width)}; };
     const out = {};
+    const linesOf = (b) => [...b.querySelectorAll('.c-five, .c-week, .note[data-kind="model"]')].map((c) => {
+      const kind = c.classList.contains('none') ? 'none' : c.dataset.kind;
+      const own = (q) => [...c.children].find((x) => x.matches(q));
+      return {kind, name: own('.ml').textContent, nameAt: box(own('.ml')), pct: own('.pct, .dash').textContent, pctAt: box(own('.pct, .dash')),
+        bar: own('.bar') ? box(own('.bar')) : null, refill: own('.rf') ? own('.rf').textContent : null, refillAt: own('.rf') ? box(own('.rf')) : null,
+        refillCut: own('.rf') ? own('.rf').scrollWidth > own('.rf').clientWidth : false};
+    });
     for (const f of frames) {
       const d = doc(f), w = f.contentWindow.innerWidth, rows = {};
       for (const b of d.querySelectorAll('#acc .arow')) {
-        const em = b.querySelector('.em'), sub = b.querySelector('.sub'), lines = [];
-        for (const c of b.querySelectorAll('.c-five, .c-week, .note[data-kind="model"]')) {
-          const kind = c.classList.contains('none') ? 'none' : c.dataset.kind;
-          const own = (q) => [...c.children].find((x) => x.matches(q));
-          lines.push({kind, name: own('.ml').textContent, nameAt: box(own('.ml')), pct: own('.pct, .dash').textContent, pctAt: box(own('.pct, .dash')),
-            bar: own('.bar') ? box(own('.bar')) : null, refill: own('.rf') ? own('.rf').textContent : null, refillAt: own('.rf') ? box(own('.rf')) : null,
-            refillCut: own('.rf') ? own('.rf').scrollWidth > own('.rf').clientWidth : false});
-        }
+        const em = b.querySelector('.em'), sub = b.querySelector('.sub'), lines = linesOf(b);
         const plan = sub.cloneNode(true);                 // the plan alone, without a count of chats after it
         plan.querySelectorAll('.chn').forEach((x) => x.remove());
         rows[em.textContent] = {em: box(em), cut: em.scrollWidth > em.clientWidth, sub: box(sub), plan: plan.textContent.replace(/ · $/, ''), planSize: getComputedStyle(sub).fontSize,
           planColour: getComputedStyle(sub).color, muted: getComputedStyle(d.querySelector('.strip .w')).color, ink: getComputedStyle(em).color,
           state: box(b.querySelector('.c-state')), lines, row: box(b), room: Math.round(em.parentNode.getBoundingClientRect().width)};
       }
+      // another assistant's rows, after the accounts: by provider and name (the demo's Codex shares an email with an account)
+      const others = [...d.querySelectorAll('#acc-other .arow')].map((b) => ({provider: b.dataset.provider, name: b.querySelector('.em').textContent,
+        cut: b.querySelector('.em').scrollWidth > b.querySelector('.em').clientWidth, lines: linesOf(b), row: box(b), state: box(b.querySelector('.c-state'))}));
       const head = d.querySelector('.ahead');
-      out[w] = {rows, wide: d.documentElement.scrollWidth > w, planColumn: !!d.querySelector('.c-plan'), refillsColumn: !!d.querySelector('.c-reset'),
+      out[w] = {rows, others, wide: d.documentElement.scrollWidth > w, planColumn: !!d.querySelector('.c-plan'), refillsColumn: !!d.querySelector('.c-reset'),
         head: [...head.querySelectorAll('[role="columnheader"]')].map((x) => x.textContent), headSize: [box(head).width, box(head).bottom - box(head).top]};
     }
     done(out);
@@ -106,6 +111,26 @@ class OneUnderAnother(framed.FramedPage):
                         if x['bar']:
                             self.assertLessEqual(x['pctAt']['right'], x['bar']['left'])  # then its bar on the same line
                             self.assertLess(abs((x['bar']['top'] + x['bar']['bottom']) - (x['pctAt']['top'] + x['pctAt']['bottom'])), 4)
+
+    def test_another_assistants_row_is_stacked_on_the_accounts_bars(self):
+        for w, page in self.frames():
+            accounts = [x['bar'] for row in page['rows'].values() for x in row['lines'] if x['bar']]
+            with self.subTest(width=w):
+                self.assertEqual([(o['provider'], o['name']) for o in page['others']], [('codex', WORK)])
+                lines = page['others'][0]['lines']
+                self.assertEqual([(x['kind'], x['name'], x['pct']) for x in lines],
+                                 [('five', '5-hour', '8%'), ('week', 'Weekly', '21%')])
+                self.assertGreaterEqual(lines[1]['nameAt']['top'], lines[0]['nameAt']['bottom'])     # under it
+                self.assertLessEqual(lines[1]['nameAt']['top'] - lines[0]['nameAt']['bottom'], 12)
+                self.assertEqual(lines[1]['nameAt']['left'], lines[0]['nameAt']['left'])
+                bars = [x['bar'] for x in lines]
+                self.assertEqual(set((b['left'], b['width']) for b in bars),
+                                 set((b['left'], b['width']) for b in accounts))      # the accounts' one edge, one width
+                for x in lines:
+                    self.assertRegex(x['refill'], REFILLS)
+                    self.assertFalse(x['refillCut'])
+                    self.assertGreaterEqual(x['refillAt']['left'], x['bar']['right'])
+                self.assertFalse(page['others'][0]['cut'])
 
     def test_the_plan_is_under_the_email_small_and_grey(self):
         plans = {WORK: 'Team', MAIL: 'Max 20x', FERN: 'Team', HARBOR: 'Enterprise', IVY: 'Max 5x'}
@@ -181,10 +206,17 @@ class WhereTheLayoutChanges(framed.FramedPage):
         got = self.in_frames(LOOK, widths=(521, 901, 1181, 1400))
         for w in (521, 901, 1181, 1400):
             page = got[str(w)]
-            bars = [x['bar'] for row in page['rows'].values() for x in row['lines'] if x['bar']]
+            bars = [x['bar'] for row in list(page['rows'].values()) + page['others'] for x in row['lines'] if x['bar']]
             with self.subTest(width=w):
                 self.assertFalse(page['wide'])
+                self.assertEqual(len(bars), 11)                      # the accounts' 9 and the demo Codex's two
                 self.assertEqual(len(set((b['left'], b['width']) for b in bars)), 1, bars)
+                for other in page['others']:                         # its 5-hour over its weekly, uncut
+                    self.assertFalse(other['cut'])
+                    self.assertEqual([x['kind'] for x in other['lines']], ['five', 'week'])
+                    self.assertGreaterEqual(other['lines'][1]['nameAt']['top'], other['lines'][0]['nameAt']['bottom'])
+                    self.assertEqual(other['lines'][1]['nameAt']['left'], other['lines'][0]['nameAt']['left'])
+                    self.assertFalse([x for x in other['lines'] if x['refillCut']])
                 self.assertGreaterEqual(bars[0]['width'], 96)
                 self.assertRegex(page['rows'][IVY]['lines'][1]['refill'], r'^Refills (Mon|Tue|Wed|Thu|Fri|Sat|Sun) 10:5\d PM$')
                 for email, row in page['rows'].items():
@@ -206,9 +238,10 @@ class OnAPhone(framed.FramedPage):
     def test_a_refill_goes_under_its_bar_and_the_lines_stay_stacked(self):
         got = self.in_frames(LOOK, widths=(390,))['390']
         self.assertFalse(got['wide'])
-        bars = [x['bar'] for row in got['rows'].values() for x in row['lines'] if x['bar']]
+        bars = [x['bar'] for row in list(got['rows'].values()) + got['others'] for x in row['lines'] if x['bar']]
+        self.assertEqual(len(bars), 11)                              # the demo Codex's two among them
         self.assertEqual(len(set((b['left'], b['width']) for b in bars)), 1, bars)
-        for email, row in got['rows'].items():
+        for email, row in list(got['rows'].items()) + [(o['provider'], o) for o in got['others']]:
             with self.subTest(account=email):
                 self.assertFalse(row['cut'])
                 for above, below in zip(row['lines'], row['lines'][1:]):
@@ -236,10 +269,10 @@ class WhatALineSays(test_app.ChromePage):
 
     def test_no_five_hour_limit_has_no_5_hour_line(self):
         # (it was a dash with no bar, why on hover: now no line at all, why on the weekly line's hover)
-        got = self.run_page(self.ROWS + "done(Object.assign(of('%s'), {hidden: row('%s').querySelector('.c-gone').textContent}));"
+        got = self.run_page(self.ROWS + "done(Object.assign(of('%s'), {hidden: row('%s').querySelector('.c-nofive').textContent}));"
                             % (MAIL, MAIL))
         self.assertIsNone(got['five'])
-        self.assertEqual(got['hidden'], 'No 5-hour limit')                      # for a screen reader
+        self.assertEqual(got['hidden'], 'No 5-hour limit on this plan')         # said in words, in the 5-hour place
         self.assertEqual(got['week']['title'].split('\n')[-1], 'Anthropic reports no 5-hour limit for this account')
         self.assertTrue(got['week']['bar'])
 

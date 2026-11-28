@@ -70,7 +70,11 @@ class Live:
     in), UNREADABLE (the Keychain did not answer; why says how), 'wiped' (Claude Code emptied its login after
     Anthropic refused it; account_id is the account its settings name) or 'other' (no account login: an API key, MCP
     logins only). proof: 'fingerprint', 'refresh_expiry', 'token_account', 'profile', 'label' (only the config's
-    email) or 'none'. disagree: the config's identity block and the credential belong to different accounts."""
+    email) or 'none'. disagree: the config's identity block and the credential belong to different accounts.
+    from_file: the login was read from Claude Code's plaintext login file because the Keychain said "no such item"
+    (Claude Code works from that file; the put-back's look puts it back in the Keychain).
+    expires_ms, rx_ms: an account login's access expiry (expiresAt) and sign-in end (refreshTokenExpiresAt), epoch
+    milliseconds, as read with it; None when the login has none or is not an account login."""
     state: str
     account_id: Optional[str]
     email: Optional[str]
@@ -79,6 +83,9 @@ class Live:
     degraded: bool = False
     why: Optional[str] = None
     bearer: Optional[str] = None        # state 'other' because Claude Code is on a kept one-year token: its id
+    from_file: bool = False
+    expires_ms: Optional[int] = None
+    rx_ms: Optional[int] = None
 
 
 @dataclass(frozen=True)
@@ -145,13 +152,24 @@ class PutBack:
     """What one look for a lost sign-in did (putback.py). action: 'put_back' (the saved login was written and read
     back), 'wait' (seen missing; looking again), 'failed' (the write did not land; tried again at the next look),
     'limit' (stopped for now) or 'leave'. account: the account's email. reason: plain words for why. line: what was
-    said this time, None when nothing new. watch: the next look should come soon. at: when the put-back was made."""
+    said this time, None when nothing new. watch: the next look should come soon. at: when the first put-back of this
+    episode was made (one notification per episode).
+    Also 'promote' (the login Claude Code kept only in its plaintext file was put back in the Keychain) and, from
+    watch_look, 'kept' (the saved copy was brought up to Claude Code's newer login). next_s: seconds until the caller
+    should look again, or None. seen: plain facts for a record (words, booleans, 16-hex fingerprints; no token, email
+    or account id). account_id: the saved account the settings name (account is its email), or None. key: the rule's
+    key for what it found ('refused', 'ended', ... for the saved login's marks, 'limit', 'switched', 'file',
+    'file_owner', 'file_limit', 'record', 'sealed'), None when there is none (a put-back, a wait, ...)."""
     action: str
     account: Optional[str] = None
     reason: str = ''
     line: Optional[str] = None
     watch: bool = False
     at: Optional[float] = None
+    next_s: Optional[float] = None
+    seen: Optional[Dict[str, object]] = None
+    account_id: Optional[str] = None
+    key: Optional[str] = None
 
 
 class AccountsError(Exception):
@@ -301,14 +319,84 @@ def keep_pass() -> Optional[str]:
 
 def put_back_pass() -> PutBack:
     """One look for a sign-in Claude Code lost while its settings still name a saved account, and the put-back when
-    the rule says so (putback.py): one Keychain read while a login is there. Never writes over an account login, never
-    undoes a sign-out the person chose."""
+    the rule says so (putback.py): one Keychain read while a login is there. A put-back or a promote forgets the cached
+    live read. Never writes over an account login, never undoes a sign-out the person chose."""
     from . import context, putback, roster
     ctx = context.current()
     res = putback.look(ctx)
-    if res.action == 'put_back':
+    if res.action in ('put_back', putback.PROMOTE):
         roster.forget_live(ctx)
     return res
+
+
+def watch_look(hint: Optional[Dict[str, object]] = None) -> PutBack:
+    """One look for the sign-in watch and the page, at once when something changed. hint: what changed
+    ({'keychain': bool, 'login_file': 'appeared'|'gone'|'changed'|None, 'settings': bool, 'tick': bool}) or None.
+    In order, each only when needed: note evidence of the fault, look, then put the login in Claude Code's plaintext
+    file back in the Keychain, or put the saved login back, or keep Claude Code's newer login. A put-back made here is
+    told as the loop tells it: one notification per episode; one History line per episode that saw proof of the fault
+    (its first put-back says it, the later ones are counted in the log), else one per put-back (at most four an hour).
+    Returns PutBack with next_s and seen.
+    Never writes over an account login, never undoes a sign-out the person chose."""
+    from . import context, putback, roster
+    ctx = context.current()
+    res = putback.watch_look(ctx, hint)
+    if res.action in ('put_back', putback.PROMOTE, 'kept'):
+        roster.forget_live(ctx)
+    if res.action == 'put_back':
+        try:
+            from . import autoloop
+        except ImportError:
+            autoloop = None
+        tell = getattr(autoloop, 'notify_put_back', None)
+        if tell is not None:
+            tell(res)
+    return res
+
+
+def watch_hold(event: str) -> Dict[str, object]:
+    """The sign-in watch's call at the moment Claude Code's plain login file 'appeared', 'changed' or 'gone', or its
+    settings changed ('settings'), after each of its looks ('looked'), and once at its start ('start'): keeps what
+    Claude Code's fallback wrote in that file for a few seconds and puts it back the moment it goes, within the bounds
+    written above putback.HOLD_FOR_S (putback.hold_seen); says when a removal it could not answer from memory is owed
+    a look at once, which answers it from the Keychain item ('late'); takes a file the hold put there away again when
+    the settings name nobody or another account, and at the start (putback.hold_tidy), and says when a look is due
+    that takes one away ('look_in'). After a look, what that look did with the file when the tidy did nothing (a
+    spare copy of the sign-in made, a file brought up to the item, or taken away: putback.hold_spared). No Keychain
+    call, no network. Returns plain facts for the record: {'did': 'kept', 'held', 'removed', 'spare', 'followed' or
+    None, 'made', 'failed', ...}; no secret."""
+    from . import context, putback
+    ctx = context.current()
+    if event in ('appeared', 'changed', 'gone'):
+        return putback.hold_seen(ctx, event)
+    if event in ('settings', 'start', 'looked'):
+        out = putback.hold_tidy(ctx, start=event == 'start')
+        if event == 'looked' and not out.get('did'):
+            out.update(putback.hold_spared(ctx))
+        return putback._hold_facts(ctx, out)
+    return {'did': None}
+
+
+def hold_on() -> bool:
+    """Whether the sign-in watch puts Claude Code's plain login file back when it goes right after a failed save: the
+    setting auto_policy -> hold_signin_file in Switchboard's settings.json (on unless it is false). For doctor."""
+    from . import context, putback
+    return putback.hold_on(context.current())
+
+
+def mirror_on() -> bool:
+    """Whether Claude Code's plain login file is kept as a standing copy of its Keychain item: the setting
+    auto_policy -> keep_signin_file in Switchboard's settings.json (on unless it is false), with hold_signin_file on.
+    For doctor and the page."""
+    from . import context, putback
+    return putback.mirror_on(context.current())
+
+
+def last_put_back() -> Optional[Dict[str, object]]:
+    """When Claude Code's login was last put back or promoted, for doctor: {'at': wall seconds, 'account': email,
+    'how': 'put_back' or 'promote' (absent for one noted before promotes existed)}, or None."""
+    from . import context, putback
+    return putback.last_put_back(context.current())
 
 
 def upkeep_pass(budget_s: float = 60.0) -> List[str]:
@@ -317,11 +405,28 @@ def upkeep_pass(budget_s: float = 60.0) -> List[str]:
     return tokens.upkeep_pass(context.current(), budget_s)
 
 
-def resolve_journal() -> Optional[str]:
-    """Finish or roll back a switch that was cut off, from what the live login really holds. Run at start."""
-    from . import context, roster, switcher
+def resolve_journal(older_than: Optional[float] = None) -> Optional[str]:
+    """Finish or roll back a switch that was cut off, from what the live login really holds. Run at start.
+    older_than (the loop, at each pass): only a journal last written more than that many seconds ago, judged while
+    holding the switch lock, so a switch under way (it holds that lock, and settles a journal itself first) is never
+    raced; the lock is waited for a second at most. Then nothing is said here: the caller says the note once."""
+    import os
+    from . import context, roster, switcher, vault
     ctx = context.current()
-    note = switcher.resolve_journal(ctx)
+    if older_than is None:
+        note = switcher.resolve_journal(ctx)
+    else:
+        note = None
+        try:
+            with vault.switch_lock(ctx, timeout=1.0):
+                try:
+                    age = ctx.wall() - os.stat(switcher.journal_path(ctx)).st_mtime
+                except OSError:
+                    age = None                  # no journal (settled meanwhile)
+                if age is not None and age > older_than:
+                    note = switcher._resolve_locked(ctx)
+        except vault.LockBusy:
+            pass
     if note:
         roster.forget_live(ctx)
     return note
@@ -400,20 +505,22 @@ def auto_settings() -> Dict[str, object]:
     """{'enabled', 'session_at', 'weekly_at', 'model_at', 'model', 'strategy'}, and 'rules' while an account has one:
     {account id: 'last' (used last) or 'out' (kept out of auto-switch)}, an account with no rule not in it. Likewise
     'own_lines' ({account id: {'session_at', 'weekly_at'}}, each only when the account has its own), 'ranks' ({account
-    id: 1 to 99}) and 'models' (every model counted, only when there are several)."""
+    id: 1 to 99}) and 'models' (every model counted, only when there are several); 'pick_hold' and 'sign_lines'
+    only when they are not their defaults."""
     from . import autoloop
     return autoloop.settings_dict()
 
 
 def set_auto(enabled=None, session_at=None, weekly_at=None, model_at=None, model=None, strategy=None,
-             rule=None, line=None, rank=None) -> Dict[str, object]:
+             rule=None, line=None, rank=None, pick_hold=None, sign_lines=None) -> Dict[str, object]:
     """Change automatic switching; returns the new settings. rule: (account id, 'in' | 'last' | 'out') for one saved
     account ('in' takes its rule away). line: (account id, {'session_at': N, 'weekly_at': N} or None), that account's
     own lines (None, or a key with None, puts it back on the shared line). rank: (account id, 1 to 99 or None). model:
     a name, names with commas between them, or a list. Unknown values raise AccountsError (not_found for an account
     not saved)."""
     from . import autoloop
-    more = dict((k, v) for k, v in (('line', line), ('rank', rank)) if v is not None)
+    more = dict((k, v) for k, v in (('line', line), ('rank', rank), ('pick_hold', pick_hold),
+                                    ('sign_lines', sign_lines)) if v is not None)
     return autoloop.save_settings(enabled=enabled, session_at=session_at, weekly_at=weekly_at, model_at=model_at,
                                   model=model, strategy=strategy, rule=rule, **more)
 

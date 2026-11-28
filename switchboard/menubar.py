@@ -14,16 +14,28 @@ use is at or over a switch line; red when something needs them (the page is not 
 account has room, no account in use, no account yet). Numbers that are not current draw the S dimmed, never coloured.
 
 The menu: a row per account in slot order (its whole email; In use, Next or Use, or Sign in again; when its sign-in
-ends, a week ahead, or ended, its short words; its 5-hour and weekly limits with their %, no 5-hour one for an account
-that has none), with "Sign in again as …" under a row whose sign-in is about to end, and "Sign in to all" once under the
-rows (the page's queue), then a line for each other assistant added (the page's board), then Auto-switch, with a line
-under it only when something is off ("Auto-switch last decided 14 minutes ago.", a page that keeps restarting), Add
-account (the page, at its Add form) and Open Switchboard. When it was checked, the reset times and a model's own week
-are the page's. While another program holds the page's port, a line at the top says which port and what to do. While
-the page is not running: one line, "Switchboard isn't running", and Start. No menu has Quit: the item is turned off in
-the terminal, `switchboard menubar off` (menubar_keep.py), and anything else that stops it is started again.
+ends, a week ahead, or ended, its short words; its 5-hour and weekly limits with their %; an account with no 5-hour
+limit says "No 5-hour limit" in the 5-hour place), with "Sign in again as …" under a row whose sign-in is about to
+end, and "Sign in to all" once under the rows (the page's queue). Then a row for each seat of another provider (the
+state's 'provider_rows'), drawn the same way
+under its maker's heading ("Claude" heads the accounts then), with no reset line under its bars, its last cell one
+thing: In use, why it cannot be continued to here, Out until a time, or Next and Continue here (POST /api/continue: the
+page opens that provider's own app on the chat, and its answer, in the page's words, shows in the note at the top
+of the menu). Then what those rows do not say, from the page's board: an added assistant with no row and why, the
+line that adds one on this Mac, and the line to carry a chat on only when no provider has a row. Then Auto-switch,
+with a line under it only when something is off ("Auto-switch last decided 14 minutes ago.", a page that keeps
+restarting), Add account (the page, at its Add form) and Open Switchboard. When an account was checked, its reset
+times and a model's own week are the page's. While another program holds the page's port, a line at the top says which
+port and what to do. While the page is not running: one line, "Switchboard isn't running", and Start. No menu has
+Quit: the item is turned off in the terminal, `switchboard menubar off` (menubar_keep.py), and anything else that stops
+it is started again.
 
 It reads the state every 15 s while the menu is closed and every 2 s while it is open, never more often.
+
+Another provider's row is its name and two bars at most, as an account's: 5-hour only with a number (the same words
+when it has no 5-hour window: term.no_five, the one rule for every row), then the first other window it gives, by its
+own name. Its reset times are the page's, as an account's are; a line under its bars says only what no bar can: "Not
+known" for a window with no number, "Numbers not known" with no window known (and no bar).
 
 Everything above the AppKit part is plain Python that imports on 3.9 with no PyObjC: the page, the terminal and
 the tests never need PyObjC. The drawing is worked out here too, as lists of shapes and words in points (item_ops,
@@ -37,13 +49,14 @@ import os
 import socket
 import subprocess
 import sys
+import textwrap
 import threading
 import time
 import traceback
 import urllib.error
 import urllib.request
 
-from . import core, menubar_keep, spend, term
+from . import core, menubar_keep, pagekey, spend, term
 
 AGENT = 'io.github.amyjainberkeley.switchboard.menubar'     # the menu bar's LaunchAgent (the installer adds it)
 PAGE_AGENT = 'io.github.amyjainberkeley.switchboard'         # the page's
@@ -51,12 +64,16 @@ EVERY_CLOSED = 15.0     # seconds between readings while the menu is closed
 EVERY_OPEN = 2.0        # and while it is open; never more often than this
 STARTING = 20.0         # after Start, the page is looked for this long at the open pace
 NOTE_FOR = 60.0         # a failed click's line stays at the top of the menu this long
+NOTE_W = 72             # characters in one line of that note: a failed click's line is cut to it, others wrap
 LOCK_WAIT = 2.0         # a menu bar starting waits this long for the lock (doctor's look holds it for an instant)
 FOREVER = 365 * 86400.0     # and one under its job this long: it waits for the lock another one holds
 MODEL_LINE = term.MODEL_LINE        # a model's own week (Fable) is red from 90%
 DEFAULT_LINE = 90.0                 # the 5-hour switch line when the state names none
 DEFAULT_WEEKLY = 95.0               # the weekly one
 NOT_RUNNING = "Switchboard isn't running"
+NO_NUMBERS = 'Numbers not known'      # the line under another provider's row with no window yet
+NOT_KNOWN = 'Not known'               # and under one whose window other than the 5-hour one has no number
+FIVE = '5-hour'                     # the name of a provider's 5-hour window (providers/view.py)
 UNREADABLE = "the page's answer could not be read"     # cut off, or another program answered on the page's port
 NOT_HERE = 'The menu bar is not set up here. Add it with: switchboard update --menu-app'
 HOPPED = 'SWITCHBOARD_MENUBAR_HOPPED'   # set before handing over to the menu bar's launcher, so it never loops
@@ -75,6 +92,7 @@ ROW_W, ROW_H = 360.0, 72.0
 INSET, PAD, HOVER_R = 6.0, 16.0, 8.0
 LABEL_W, PCT_W, SPACE = 48.0, 32.0, 8.0
 ROW_BAR_H, BAR_ROW = 4.0, 18.0
+FOOT_H = 16.0           # another provider's reset line, under its bars
 
 
 def _num(v):
@@ -142,6 +160,99 @@ def pct_text(lim):
     return '—' if lim['unknown'] else '%d%%' % lim['pct']
 
 
+def provider_limits(prow, now):
+    """(5-hour, other) of another provider's row (the state's 'provider_rows') in limits()'s shape, two bars at most as
+    an account has, each against the line the provider set for it: the 5-hour window only when it has a number (an
+    account's rule), then the first other window the provider gives, by its own name ('Weekly', '3-day'), not known
+    when it has no number. A window whose reset has passed has refilled: 0%, not started. Either is None when the
+    provider gives no such window."""
+    from datetime import datetime, timezone
+    five = other = None
+    for w in prow.get('windows') or []:
+        label = term._plain(w.get('label')) if isinstance(w, dict) else ''
+        if not label or (five if label == FIVE else other) is not None:
+            continue
+        t, used = term.a_time(w.get('resets_at')), w.get('used_pct')   # a reset time that is not a time: not known
+        if label == FIVE and not _num(used):        # no 5-hour number, no 5-hour bar, also once its reset has passed
+            continue
+        if _num(t) and t <= now:
+            reading = {'used': 0, 'started': False, 'resets': None}
+        else:
+            iso = datetime.fromtimestamp(t, timezone.utc).isoformat() if _num(t) else None
+            reading = {'used': used if _num(used) else None, 'started': True, 'resets': iso}
+        lim = _limit('five' if label == FIVE else 'week', label[:1].upper() + label[1:], reading,
+                     w['line'] if _num(w.get('line')) else MODEL_LINE)
+        five, other = (lim, other) if label == FIVE else (five, lim)
+    return five, other
+
+
+def provider_rows(state, tz=None):
+    """Each row of the state's 'provider_rows' (one per seat of another provider) as a menu row after the Claude
+    accounts, numbered on from them by the list's one rule (term.provider_numbers), in the shape rows() gives with
+    'provider' (its id), 'maker' (its heading, 'OpenAI'), 'plan' ('Plus', in grey after the name) and 'chat' ({'name',
+    'mark'}: the chat a press carries) added. Named by the account's email when the app told it, else by the app. Its
+    last cell says one thing (last_cell), after its age when it has room by numbers that are not fresh; 'cell' holds
+    its words when they say why no press goes (its reason, Out until a time), for the row's label. The line under its
+    bars says only what no bar can (provider_foot). Numbers not known yet are grey (stale)."""
+    now = _now(state)
+    shown = state.get('provider_rows') if isinstance(state.get('provider_rows'), list) else []
+    out = []
+    for p, slot in zip(shown, term.provider_numbers(state.get('accounts'), shown)):
+        if slot is None:
+            continue
+        pid = term._plain(p.get('provider'))
+        five, week = provider_limits(p, now)
+        marks, action = last_cell(p, now, tz)
+        nf = '' if five else term.no_five('menu', row=p)       # no 5-hour limit on this plan: words in its place
+        on, age = p.get('in_use') is True, term.age(p.get('read_at'), now)
+        cell = marks[0][0] if marks and action is None and not on else None     # its reason, or Out until a time
+        if age and p.get('state') == 'room' and p.get('fresh') is not True:
+            marks = [(age, 'next')] + marks     # room by old numbers says how old, as a Claude row's age mark
+        out.append({'slot': slot, 'email': term._plain(p.get('email')) or term._plain(p.get('name')) or pid,
+                    'provider': pid, 'plan': term._plain(p.get('plan')),
+                    'maker': term._plain(p.get('vendor')) or term._plain(p.get('name')) or pid,
+                    'in_use': on, 'live': False, 'age': age,
+                    'next': p.get('next') is True and not on, 'action': action, 'marks': marks,
+                    'five': five, 'week': week, 'models': [], 'signin': '', 'again': False, 'no_five': nf,
+                    'foot': provider_foot(five, week), 'cell': cell,
+                    'chat': p.get('chat') if isinstance(p.get('chat'), dict) else None,
+                    'stale': p.get('state') == 'unknown'})
+    return out
+
+
+def provider_foot(five, week):
+    """The line under another provider's bars, only when it says what no bar can: 'Numbers not known' when it gives no
+    window to show; 'Not known' when the window shown after the 5-hour one has no number (its % cell holds only the
+    dash). '' otherwise: its reset times are the page's, as an account's are, so the row is as tall as an account's
+    with as many bars. A 5-hour window with no number has no bar and no words, as on an account's row."""
+    if five is None and week is None:
+        return NO_NUMBERS
+    return NOT_KNOWN if week is not None and week['unknown'] else ''
+
+
+def last_cell(p, now, tz=None):
+    """(marks, action) of a provider row's last cell, the page's rule too, first match wins: In use; why it cannot be
+    continued to here (the folder's own reason); Out until a time, or Out with no time to come; Next and Continue
+    here while it can be continued to (a press: action 'continue'); else nothing."""
+    why = term._plain(p.get('why'))
+    if p.get('in_use') is True:
+        return [('In use', 'in-use')], None
+    if why:
+        return [(why[:1].upper() + why[1:], 'next')], None
+    if p.get('state') == 'out':
+        t = term.a_time(p.get('back_at'))
+        return [('Out until %s' % term.clock(t, now, tz) if t and t > now else 'Out', 'next')], None
+    if p.get('can') is True:
+        return ([('Next', 'next')] if p.get('next') is True else []) + [('Continue here', 'use')], 'continue'
+    return [], None
+
+
+def row_key(row):
+    """What names a menu row for its item and view: the email of a Claude account; another provider's id and number
+    (its email may be a Claude account's too, and two seats of one provider are two rows)."""
+    return 'provider:%s:%s' % (row['provider'], row['slot']) if row.get('provider') else row['email']
+
+
 def needs_setup(state):
     """Nothing to show yet: no accounts, no engine, or no account Switchboard holds (the page's first run)."""
     s = state.get('setup') or {}
@@ -150,10 +261,11 @@ def needs_setup(state):
 
 def next_email(state):
     """The account marked Next: the server's, only while automatic switching runs, never the one in use or one
-    that needs a fresh sign-in."""
+    that needs a fresh sign-in, and none while another provider's row is next (as the terminal's list has it)."""
     auto = state.get('auto') or {}
-    if not auto.get('enabled'):
-        return None
+    if not auto.get('enabled') or any(isinstance(p, dict) and p.get('next') is True and p.get('in_use') is not True
+                                      for p in state.get('provider_rows') or []):
+        return None                     # another provider's row is next: one row is next across providers
     n = state.get('next') if 'next' in state else (state.get('plan') or {}).get('next') if auto.get('on') else None
     a = next((x for x in state.get('accounts') or [] if x.get('email') == n), None) if n else None
     return n if a and n != state.get('active') and not a.get('needs_login') else None
@@ -183,6 +295,7 @@ def rows(state, tz=None):
         five, week, _ = split(limits(a, auto))
         cost = spend_row(a, five)
         five = None if cost else five       # two bar rows at most: the spend limit stands in for the 5-hour one
+        nf = '' if cost or five else term.no_five('menu', account=a)    # no 5-hour limit on this plan: said in words
         on = email == state.get('active')
         ends, need = a.get('signin_ends_at'), bool(a.get('needs_login'))
         signin = '' if a.get('unmanaged') else term.signin_words(ends, now, need, tz)
@@ -197,8 +310,8 @@ def rows(state, tz=None):
             marks, action = when + [('Next', 'next') if email == nx else ('Use', 'use')], 'use'
         out.append({'slot': a.get('slot'), 'email': email, 'in_use': on, 'next': email == nx and not on,
                     'action': action, 'marks': marks, 'five': five, 'week': week, 'spend': cost, 'signin': signin,
-                    'again': bool(signin) and (on or not need)})
-    return out
+                    'again': bool(signin) and (on or not need), 'no_five': nf})
+    return out + provider_rows(state, tz)
 
 
 def spend_row(a, five):
@@ -251,7 +364,7 @@ def menu(state, note=None, tz=None, status=None):
     ('auto', on, words, can), ('do', title, what). state None: the page is not running. status: Watch.status(), when
     the page has not answered lately: its line goes first; rows drawn from an old state are grey; Start when it is not
     running. No menu has Quit: the item is turned off with `switchboard menubar off`, a deliberate act."""
-    out = [('note', note)] if note else []
+    out = [('note', x) for x in note.split('\n') if x] if note else []     # a note line for each line of it
     if state is None:
         if status and status.get('kind') == 'busy':
             return out + [('line', status['line']), ('separator',), OPEN]
@@ -267,12 +380,18 @@ def menu(state, note=None, tz=None, status=None):
     grey = bool(status and status.get('stale'))
     out += start
     rs = rows(state, tz)
-    for r in rs:
+    mine, others = [r for r in rs if not r.get('provider')], [r for r in rs if r.get('provider')]
+    out += [('line', 'Claude')] if others else []      # a heading for each maker, only beside another provider
+    for r in mine:
         out.append(('row', dict(r, stale=True) if grey else r))
         if r['again']:                                  # beside the row's own action (it opens the page, as Sign in again)
             out.append(('do', 'Sign in again as %s' % r['email'], 'signin'))
-    out += signin_items(state, rs)
-    out += provider_items(state.get('providers'), _now(state))
+    out += signin_items(state, mine)
+    for i, r in enumerate(others):
+        if i == 0 or r['maker'] != others[i - 1]['maker']:
+            out.append(('line', r['maker']))
+        out.append(('row', dict(r, stale=True) if grey else r))
+    out += provider_items(state.get('providers'), _now(state), state.get('provider_rows'))
     said = auto_note(auto)
     return out + [('separator',), ('auto', bool(auto.get('enabled')), switch_words(state), can)] + \
         ([('line', said)] if said else []) + watch_lines(auto) + [('separator',)] + add + [OPEN]
@@ -295,21 +414,17 @@ def signin_items(state, rs):
     return [('do', term.SIGNIN_ALL, 'signinall')] if offered else []
 
 
-def provider_items(board, now):
-    """The other assistants after the account rows, from the state's `providers` (providers/view.py's board): a
-    separator, then a line for each added one but the one whose rows are the account rows above (its state, plan and
-    windows), the line to carry a chat on, and a line for each one on this Mac not added. Only 'line' items, which do
-    nothing when clicked. [] when there is nothing to say."""
+def provider_items(board, now, rows=()):
+    """What the provider rows do not say, under them, from the state's `providers` (providers/view.py's board, through
+    view.under_list): a separator, then a line for each added assistant that has no row and why ('Codex: not signed
+    in'), the line that adds one on this Mac that is not added, and the line to carry a chat on only when there is no
+    provider row at all (rows: the state's 'provider_rows'). Only 'line' items, which do nothing when clicked. []
+    when there is nothing to say."""
     from .providers import view as provider_view, words as provider_words
     out = []
-    shown = provider_view._listed(board, 'providers') if isinstance(board, dict) else []
-    for kind, name, text in provider_view.lines(board, now):
+    for kind, name, text in provider_view.under_list(board, now, rows=rows if isinstance(rows, list) else ()):
         if kind == 'provider':
-            p = next((x for x in shown if provider_words.one_line(x.get('name') or x.get('id') or '', 30) == name),
-                     None)
-            if p is not None and not p.get('account_list'):
-                out.append(('line', provider_words.MENU_PROVIDER.format(name=name,
-                                                                         words=provider_view.summary(p, now))))
+            out.append(('line', provider_words.MENU_PROVIDER.format(name=name, words=text)))
         elif kind == 'carry':
             out.append(('line', provider_words.MENU_CARRY))
         else:
@@ -429,7 +544,7 @@ class Watch(object):
 def shape(items):
     """What a menu is made of, without its numbers: a menu whose shape is the same is changed in place. A row's
     action and slot are part of it: they set its item's enabled state and its 1-9 key, which only a new item gets."""
-    return [(x[0], x[1]['email'], x[1]['action'], x[1]['slot'], row_height(x[1])) if x[0] == 'row'
+    return [(x[0], row_key(x[1]), x[1]['action'], x[1]['slot'], row_height(x[1])) if x[0] == 'row'
             else (x[0],) if x[0] in ('separator', 'auto') else x[:2] for x in items]
 
 
@@ -456,9 +571,12 @@ def no_room(state):
 def reading(state, status=None):
     """What the item shows: {email, dot, dim, label}. dot: None; 'orange' while the account in use is at or over a
     switch line; 'red' when something needs the person (the page is not running, a sign-in has ended, no account has
-    room, no account in use, no account yet). dim: the numbers are not current (no reading yet, the page is busy or
-    answers with old ones, or the reading of the account in use is not known): the S is drawn dimmed and never coloured, as numbers
-    that may be wrong never turn anything red. label: what VoiceOver and the tooltip say."""
+    room, no account in use, no account yet, or another assistant's row is Next: a press). dim: the numbers are not
+    current (no reading yet, the page is busy or answers with old ones, or the reading of the account in use is not
+    known): the S is drawn dimmed and never coloured, as numbers that may be wrong never turn anything red. label:
+    what VoiceOver and the tooltip say; while another assistant's row is Next (comeup.with_next: every usable Claude
+    account at its lines, that row with room), what the one notification says (comeup.press_words), in place of
+    "no account has room"."""
     down = bool(status and status.get('kind') == 'down')
     if state is None:                   # red only once the watch says down (DOWN_AFTER refusals): not at a login's start
         busy = bool(status and status.get('kind') == 'busy')
@@ -477,12 +595,16 @@ def reading(state, status=None):
         return {'email': a['email'], 'dot': 'red' if down else None, 'dim': not down,
                 'label': '%s \u00b7 %s' % (said, status['line'])}
     why = ['a sign-in has ended'] if ended_signins(state) else []
-    why += ['no account has room'] if no_room(state) else []
+    other = next((r for r in state.get('provider_rows') or [] if isinstance(r, dict) and r.get('next') is True), None)
+    why += ['no account has room'] if other is None and no_room(state) else []
     over = bool(five and five['over']) or week['over']
-    dot = 'red' if why else 'orange' if over else None
-    why = why or (['at its switch line'] if over else [])
-    return {'email': a['email'], 'dot': dot, 'dim': week['unknown'] and not dot,
-            'label': ', '.join([said] + why)}
+    dot = 'red' if why or other is not None else 'orange' if over else None
+    why = why or (['at its switch line'] if over and other is None else [])
+    label = ', '.join([said] + why)
+    if other is not None:                   # the one notification's words: where to type, what to press
+        from . import comeup
+        label = '%s. %s' % (label, comeup.press_words(state, other))
+    return {'email': a['email'], 'dot': dot, 'dim': week['unknown'] and not dot, 'label': label}
 
 
 def _grid(v):
@@ -528,8 +650,38 @@ def fill_width(used, width, height):
 # ---------- a row's drawing, in points, top-left origin ----------
 
 def row_height(row):
-    """72 pt: the email line and two bar rows; a bar row less with no 5-hour number to show."""
-    return ROW_H - (0.0 if row['five'] or row.get('spend') else BAR_ROW)
+    """72 pt: the email line and two bar rows; a bar row less for each of the two it does not have (no 5-hour number to
+    show; another provider's row with no window known); FOOT_H more for the line under another provider's bars, which
+    is there only for a number not known. A plan with no 5-hour limit keeps the 5-hour row's place, for its words
+    (no_five)."""
+    bars = len([lim for lim in (row['five'], row['week'], row.get('spend')) if lim is not None]) + _words_row(row)
+    return ROW_H - BAR_ROW * (2 - bars) + (FOOT_H if row.get('foot') else 0.0)
+
+
+def _words_row(row):
+    """1 when the row says in words, in its 5-hour bar row's place, that its plan has no 5-hour limit; else 0."""
+    return 1 if row.get('no_five') and row.get('five') is None else 0
+
+
+NARROW, WIDE = frozenset("fijlrt.,:;'!|()[] -"), frozenset('mwMW@')
+
+
+def label_width(words, size):
+    """About how wide words are in the menu's font at size, in points: enough to tell whether a row's email would be
+    cut short. The AppKit part measures and cuts for real."""
+    return size * sum(0.3 if c in NARROW else 0.85 if c in WIDE else 0.68 if c.isupper() else 0.52 for c in words)
+
+
+def shown_marks(row, width=ROW_W):
+    """The marks a row draws in its last cell. Another provider's row with room by old numbers starts with how old
+    they are; when that would cut its email short beside the rest, the age is left to its label (row_label says
+    'checked 3 hours ago'), so the email keeps its room."""
+    marks = row['marks']
+    if not (row.get('provider') and row.get('age') and marks and marks[0] == (row['age'], 'next')):
+        return marks
+    left = label_width(row['email'], 13.0) + (label_width('  ' + row['plan'], 12.0) if row.get('plan') else 0.0)
+    right = sum(label_width(words, 12.0) + SPACE for words, _ in marks)
+    return marks[1:] if left > width - 2 * PAD - right else marks
 
 
 def row_ops(row, hover=False, width=ROW_W):
@@ -544,13 +696,17 @@ def row_ops(row, hover=False, width=ROW_W):
     if hover and row['action']:
         ops.append(('box', INSET, 0.0, width - 2 * INSET, row_height(row), HOVER_R, 'hover'))
     right = [[(words, 12.0, 400 if style == 'next' else 500, 'ink2' if style == 'next' else 'accent')]
-             for words, style in row['marks']]
-    ops.append(('pair', PAD, 8.0, width - 2 * PAD, 20.0, [(row['email'], 13.0, 500, 'ink')], right, SPACE))
+             for words, style in shown_marks(row, width)]
+    left = [(row['email'], 13.0, 500, 'ink')] + ([('  ' + row['plan'], 12.0, 400, 'ink2')] if row.get('plan') else [])
+    ops.append(('pair', PAD, 8.0, width - 2 * PAD, 20.0, left, right, SPACE))
     bar_x = PAD + LABEL_W + SPACE
     bar_w = width - PAD - PCT_W - SPACE - bar_x
     bars = [lim for lim in (row['five'], row['week'], row.get('spend')) if lim is not None]     # two at most
+    top_row = _words_row(row)
+    if top_row:                             # no 5-hour limit on this plan: its words in the 5-hour bar row's place
+        ops.append(('text', PAD, 28.0, width - 2 * PAD, 18.0, [(row['no_five'], 12.0, 400, 'ink3')], 'left'))
     for i, lim in enumerate(bars):
-        y = 28.0 + BAR_ROW * i
+        y = 28.0 + BAR_ROW * (i + top_row)
         ops.append(('text', PAD, y, LABEL_W, 18.0, [(lim['label'], 12.0, 400, 'ink2')], 'left'))
         top = y + (18.0 - ROW_BAR_H) / 2
         ops.append(('box', bar_x, top, bar_w, ROW_BAR_H, ROW_BAR_H / 2, 'track'))
@@ -562,18 +718,29 @@ def row_ops(row, hover=False, width=ROW_W):
         ops.append(('text', width - PAD - PCT_W, y, PCT_W, 18.0,
                     [(pct_text(lim), 12.0, 400 if lim['unknown'] or stale else 500,
                       'ink3' if lim['unknown'] or stale else 'red' if lim['over'] else 'ink')], 'right'))
+    if row.get('foot'):                 # another provider's Not known / Numbers not known; reset times are the page's
+        ops.append(('pair', PAD, 28.0 + BAR_ROW * (len(bars) + top_row), width - 2 * PAD, FOOT_H,
+                    [(row['foot'], 11.0, 400, 'ink2')], [], SPACE))
     return ops
 
 
 def row_label(row):
     """What VoiceOver says for a row: 'Use maya@northwind.example, next, 5-hour 62%, weekly 70%', 'maya@… in use,
-    weekly 70%' (no 5-hour part with no 5-hour number to show): what the row shows."""
-    head = {'use': 'Use %s', 'signin': 'Sign in again as %s'}.get(row['action'], '%s') % row['email']
+    weekly 70%' (no 5-hour part with no 5-hour number to show): what the row shows. Another provider's row says its
+    maker and plan after the name, 'Continue here' first while a chat would go, then what else its last cell shows
+    (its reason, 'out until 7:15 PM'), when it was checked, its other window by its own name, and 'numbers not known'
+    with no window known."""
+    head = {'use': 'Use %s', 'signin': 'Sign in again as %s', 'continue': 'Continue here in %s'}.get(
+        row['action'], '%s') % ', '.join([row['email']] + [x for x in (row.get('maker'), row.get('plan')) if x])
     state = ', in use' if row['in_use'] else ', next' if row['next'] else ''
+    cell = ', %s%s' % (row['cell'][:1].lower(), row['cell'][1:]) if row.get('cell') else ''
+    when = ', checked %s' % row['age'] if row.get('age') else ''
     signin = ', %s' % row['signin'] if row.get('signin') else ''
-    five = '5-hour %s, ' % pct_text(row['five']) if row['five'] else ''
+    five = '5-hour %s' % pct_text(row['five']) if row['five'] else (row.get('no_five') or '').lower()
+    week = '%s %s' % (row['week']['label'].lower(), pct_text(row['week'])) if row['week'] else ''
     cost = ', spend %s' % pct_text(row['spend']) if row.get('spend') else ''
-    return '%s%s%s, %sweekly %s%s' % (head, state, signin, five, pct_text(row['week']), cost)
+    numbers = ', '.join(x for x in (five, week) if x) or NO_NUMBERS.lower()
+    return '%s%s%s%s%s, %s%s' % (head, state, cell, when, signin, numbers, cost)
 
 
 # ---------- when to read ----------
@@ -661,8 +828,7 @@ def get_state(timeout=5, why=None):
 def post(path, body, timeout=120):
     """POST to the page as the page itself does: JSON, with the X-Switchboard header its server asks for, from this
     Mac. Returns (True, answer) or (False, the page's own words). Never raises."""
-    req = urllib.request.Request(page_url(path), data=json.dumps(body).encode(),
-                                 headers={'Content-Type': 'application/json', 'X-Switchboard': '1'})
+    req = pagekey.request(page_url(), path, body)
     try:
         with direct().open(req, timeout=timeout) as r:
             return True, json.load(r)
@@ -700,14 +866,33 @@ def in_background(work, done, failed, call_after):
 
 
 def click(row):
-    """A click on a row: (path, body) to send, or None (the account in use, or one Switchboard does not hold)."""
+    """A click on a row: (path, body) to send, or None (the account in use, or one Switchboard does not hold).
+    Continue here on another provider's row asks the page to open that provider's own app on the chat
+    (POST /api/continue): it never starts anything in a terminal, and the person presses send there."""
+    if row['action'] == 'continue':             # with the mark of the chat the row shows: the press carries that one
+        return '/api/continue', {'provider': row['provider'], 'mark': (row.get('chat') or {}).get('mark')}
     return ('/api/switch', {'email': row['email']}) if row['action'] == 'use' else None
 
 
 def failed(what, words):
     """The line a failed click leaves at the top of the menu, short enough for one line."""
     text = '%s: %s' % (what, words)
-    return text if len(text) <= 72 else text[:71].rstrip() + '…'
+    return text if len(text) <= NOTE_W else text[:NOTE_W - 1].rstrip() + '…'
+
+
+def continue_note(ok, answer):
+    """The note the page's answer to Continue here leaves at the top of the menu, in the page's words: every line it
+    said, in its order (what to know first, such as the provider being out or only part of the chat read, then what
+    happened or why the app did not open), then the line to type when there is one; its own words when it said no.
+    The words wrap between words at NOTE_W characters, one note line each ('\n' between them); the line to type is
+    a line of its own, never wrapped or cut."""
+    words, run = (answer if not ok and isinstance(answer, str) else ''), ''
+    if ok and isinstance(answer, dict) and isinstance(answer.get('said'), list):
+        words = ' '.join(str(x) for x in answer['said'])
+        run = answer['run'] if isinstance(answer.get('run'), str) else ''
+    words = words.strip() or ('' if run else UNREADABLE)
+    lines = textwrap.wrap(words[:1].upper() + words[1:], NOTE_W, break_long_words=False, break_on_hyphens=False)
+    return '\n'.join(lines + [run] if run else lines)
 
 
 # ---------- starting the page, as its LaunchAgent does ----------
@@ -968,12 +1153,9 @@ def to_applications():
 
 
 def open_page():
-    """The page in the browser, as Open Switchboard in the menu opens it. True when macOS took it."""
-    try:
-        return subprocess.call(['/usr/bin/open', 'http://localhost:%d/' % core.port()], stdout=subprocess.DEVNULL,
-                               stderr=subprocess.DEVNULL, timeout=30) == 0
-    except (OSError, subprocess.SubprocessError):
-        return False
+    """The page in the browser, as Open Switchboard in the menu opens it: `open` is handed a private file that carries
+    a one-use ticket (pagekey.open_page). True when macOS took it."""
+    return pagekey.open_page(pagekey.launcher(True, quiet=True), None, wait=False)
 
 
 def opened():
@@ -1427,7 +1609,7 @@ def _ui():
             if shape(items) == shape(self.items):
                 for x in items:                         # the same menu: new numbers, in place
                     if x[0] == 'row':
-                        self.views[x[1]['email']].show(x[1])
+                        self.views[row_key(x[1])].show(x[1])
                     elif x[0] == 'auto':
                         self.show_auto(self.auto_item, x)
                 self.items = items
@@ -1448,12 +1630,12 @@ def _ui():
                     mi = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(row['email'], 'use:', key)
                     mi.setKeyEquivalentModifierMask_(0)
                     mi.setTarget_(self)
-                    mi.setRepresentedObject_(row['email'])
+                    mi.setRepresentedObject_(row_key(row))
                     mi.setEnabled_(bool(row['action']))
                     view = SwitchboardRow.alloc().initWithFrame_(NSMakeRect(0, 0, ROW_W, row_height(row)))
                     view.show(row)
                     mi.setView_(view)
-                    self.views[row['email']] = view
+                    self.views[row_key(row)] = view
                 elif x[0] == 'auto':
                     mi = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_('Auto-switch', 'auto:', '')
                     mi.setTarget_(self)
@@ -1513,11 +1695,17 @@ def _ui():
 
         @objc.python_method
         def sent(self, what, ok, said):
-            self.note = None if ok else (failed(what, said), time.monotonic() + NOTE_FOR)
+            self.say(None if ok else failed(what, said))
+
+        @objc.python_method
+        def say(self, words):
+            """words in the note line at the top of the menu for NOTE_FOR seconds (None: no note), and a reading as
+            soon as the floor allows: what was clicked may have changed something."""
+            self.note = (words, time.monotonic() + NOTE_FOR) if words else None
             self.pace.soon()
             if not self.reading:
                 self.schedule()
-            if not ok:
+            if words:
                 try:
                     self.redraw()
                 except Exception:  # noqa: BLE001
@@ -1525,15 +1713,21 @@ def _ui():
                     traceback.print_exc()
 
         def use_(self, sender):
-            email = sender.representedObject()
-            row = next((x[1] for x in self.items if x[0] == 'row' and x[1]['email'] == email), None)
+            key = sender.representedObject()
+            row = next((x[1] for x in self.items if x[0] == 'row' and row_key(x[1]) == key), None)
             if row is None:
                 return
             if row['action'] == 'signin':           # a fresh sign-in starts on the page
                 self.open_(sender)
                 return
             sent = click(row)
-            if sent:
+            if sent and row['action'] == 'continue':    # the provider's own app opens on the chat: the answer, here
+
+                def back(answer):
+                    ok, said = answer if isinstance(answer, tuple) and len(answer) == 2 else (False, UNREADABLE)
+                    self.say(continue_note(ok, said))
+                in_background(lambda: post(*sent), back, lambda e: (False, UNREADABLE), AppHelper.callAfter)
+            elif sent:
                 self.send("Couldn't switch", *sent)
 
         def auto_(self, sender):
@@ -1542,7 +1736,7 @@ def _ui():
                 self.send("Couldn't change Auto-switch", '/api/auto', {'enabled': not x[1]})
 
         def open_(self, sender):
-            NSWorkspace.sharedWorkspace().openURL_(NSURL.URLWithString_('http://localhost:%d/' % core.port()))
+            pagekey.open_in_workspace(NSWorkspace, NSURL, AppHelper.callAfter)    # a private file, a one-use ticket
 
         def signin_(self, sender):
             """Sign in again as …: a fresh sign-in starts on the page, as a row that needs one does."""
@@ -1572,7 +1766,7 @@ def _ui():
 
         def add_(self, sender):
             """Add account: the page, at its Add form, which asks for the email and starts the browser sign-in."""
-            NSWorkspace.sharedWorkspace().openURL_(NSURL.URLWithString_(add_url()))
+            pagekey.open_in_workspace(NSWorkspace, NSURL, AppHelper.callAfter, part='#' + add_url().partition('#')[2])
 
     def run():
         app = NSApplication.sharedApplication()

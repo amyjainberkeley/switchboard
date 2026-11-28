@@ -12,6 +12,14 @@ Three parts, none of which calls a model.
    size, change time or file id moved; a file whose last-read bytes changed is read again whole.
    Text of chats Claude Code has since deleted (cleanupPeriodDays) stays searchable.
 
+   Key-like text never reaches the index: every message and chat name goes through the log's filter
+   (core.redact: Anthropic keys and tokens, JSON web tokens, the value after bearer, token, secret, password
+   or api_key, runs of 40 or more key-like characters) before it is stored, so a key once pasted into a
+   prompt is not kept in a second file (private_text). An index made by an older build may hold such text:
+   the first thing of this build that opens it erases it, and search builds it again. erase() takes the
+   index away (its file and SQLite's files beside it, written over with zeros first); Claude Code's chats
+   are not touched.
+
    Ranking: the evidence is the best messages, not chat-wide word counts. Real chat lengths are very
    skewed (most chats are a scripted run of one or two messages, a few run to a thousand), so counting
    a word across a whole chat and dividing by its length would let a one-message run that names a word once
@@ -45,7 +53,7 @@ Three parts, none of which calls a model.
 
 Manual checks:
     python3 -m switchboard.packs.memory search "where did we fix the login loop"
-    python3 -m switchboard.packs.memory index | health | claude-mem
+    python3 -m switchboard.packs.memory index | erase | health | claude-mem
 """
 import argparse
 import calendar
@@ -55,15 +63,18 @@ import math
 import os
 import re
 import sqlite3
+import stat
 import sys
 import time
 import urllib.parse
 
+from switchboard import core
 from switchboard.packs import common
 
 INDEX_NAME = 'memory-index.sqlite3'
-SCHEMA = 1
+SCHEMA = 2                     # 2: key-like text is kept out (private_text); an index of 1 is erased and made again
 MAX_TEXT = 200000              # characters kept from one message (a pasted file can be larger)
+CUT_MARGIN = 8192              # read this much more, so a key at the cut is filtered whole before the cut (_store)
 TITLE_WEIGHT = 1.0
 SHARE = (0.5, 0.25, 0.125, 0.0625)  # what a chat's 2nd to 5th best messages add, as shares of their own scores
 COVER_POWER = 2.0              # a message's score: all query words' idf x (its words' share of that idf) ** this
@@ -143,7 +154,7 @@ def parse_ts(value):
 
 
 def _clean(text):
-    return _SPACE.sub(' ', _TAG.sub(' ', text)).strip()[:MAX_TEXT]
+    return _SPACE.sub(' ', _TAG.sub(' ', text)).strip()[:MAX_TEXT + CUT_MARGIN]
 
 
 def prompt_text(content):
@@ -262,6 +273,135 @@ def _take(out, buf, s, e, n, seen):
             out['last'] = ts if out['last'] is None else max(out['last'], ts)
 
 
+# ---------------------------------------------------------------- what the index never keeps
+#
+# core.redact() is the log's filter. Two of its shapes also take words a person searches for, so those pieces are
+# handed past it: a plain word after bearer, token, secret, password or api_key with only a space between ("token
+# authentication", "secret configuration"), and a long name of words and numbers joined by _ or - (a test's name,
+# "test_sign_in_after_2_tries_..."), which its 40-character rule would take. A value after ":" or "=" is always
+# hidden, word-shaped or not. Long hashes (a commit id) are still taken: they are not words.
+
+_KEY_WORD = r'(?i:\b(?:bearer|token|secret|password|api[_-]?key))'
+_WORD_AFTER = re.compile(_KEY_WORD + r'\s+([a-z]+|[A-Z][a-z]+)(?![A-Za-z0-9_\-+/=]|\.[A-Za-z0-9_\-+/=])')
+_ASSIGNED = re.compile(_KEY_WORD + r'["\']?\s*[:=]\s*["\']?([A-Za-z0-9_\-.+/=]{12,})')
+_LONG_RUN = re.compile(r'(?<![A-Za-z0-9_\-+/])[A-Za-z0-9_\-]{40,}(?![A-Za-z0-9_\-+/=])')
+_NAME_PART = re.compile(r'[A-Za-z]+[0-9]*|[0-9]+')
+_JOIN = re.compile(r'[_-]')
+_VALUE_JOIN = re.compile(r'[_.\-]')
+# For a quick look before core.redact(): each byte of a key-like character becomes "a", every other byte a space.
+_KEYISH = bytes(97 if chr(i).isascii() and (chr(i).isalnum() or chr(i) in '_-+') else 32 for i in range(256))
+
+
+# Well-known credential shapes a person's prompt can hold that the log's filter was not written for (the log only
+# ever holds Switchboard's own secrets). Each is hidden at index time, before core.redact() runs.
+_PRIVATE_KEY = re.compile(r'-----BEGIN [A-Z0-9 ]*PRIVATE KEY(?: BLOCK)?-----[\s\S]*?'
+                          r'(?:-----END [A-Z0-9 ]*PRIVATE KEY(?: BLOCK)?-----|\Z)')     # PEM, OpenSSH and PGP
+# scheme://user:PASSWORD@host, the password up to the last @ before a space (not a port: host:443/...)
+_URL_PASSWORD = re.compile(r'(\b[A-Za-z][A-Za-z0-9+.\-]*://[^\s:/@]+:)(?!\d+/)(\S+)(?=@[^\s@]*(?:\s|$))')
+_BASIC = re.compile(r'(?i)(authorization["\']?\s*[:=]\s*["\']?basic\s+)([A-Za-z0-9+/]{8,}={0,2})')
+_AWS_SECRET = re.compile(r'(?i)(secret_?access_?key["\']?(?:\s*[:=]\s*|\s+)["\']?)([A-Za-z0-9/+=]{40})'
+                         r'(?![A-Za-z0-9/+=])')
+# NAME=value, NAME: value, "NAME": "value", where NAME holds key, token, secret, password, passwd, passphrase, pw
+# or credential anywhere
+_NAMED = re.compile(r'(?<![A-Za-z0-9_.\-])(["\']?)([A-Za-z0-9_.\-]*?'
+                    r'(?i:key|token|secret|passw(?:or)?d|passphrase|pw|credentials?)'
+                    r'[A-Za-z0-9_.\-]*)\1(\s*(?::(?![:=])|=(?![=>]))\s*["\']?)([^\s"\'`]{8,})')
+_NAME_LOOKS_SET = re.compile(r'[_.\-]|[a-z][A-Z]|^[A-Z0-9]+$')     # DB_PASSWORD, apiKey, TOKEN: not a word in prose
+_PREFIXED = re.compile(r'(?<![A-Za-z0-9_\-])(?:(?:AKIA|ASIA)[A-Z0-9]{16}(?![A-Z0-9])|sk-[A-Za-z0-9_\-]{20,}'
+                       r'|hf_[A-Za-z0-9]{30,}|glpat-[A-Za-z0-9_\-]{20,}|npm_[A-Za-z0-9]{30,}'
+                       r'|gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|xox[bpars]-[A-Za-z0-9\-]{10,}'
+                       r'|AIza[0-9A-Za-z_\-]{35}|[spr]k_live_[0-9A-Za-z]{10,})')
+# Literal marks every pattern above or in core.redact() starts from (case as they match)
+_MARKS_ANY = ('sk-', 'eyJ', 'PRIVATE KEY', 'AKIA', 'ASIA', 'gh', 'github_pat_', 'xox', 'AIza', 'k_live_', 'hf_',
+              'glpat-', 'npm_')
+_STRICT = re.compile(r'(?i)token|secret|pass|pw|credential')    # a name with one of these: its value always goes
+
+
+def _named(m):
+    """One NAME=value match: the value hidden, unless it is code or a reference (a call, an index, $VAR, {...}), or
+    the colon form reads as prose ("the key: remember ..."): a plain lower-case name, no quotes, a value of letters."""
+    quote, name, op, value = m.groups()
+    if value[0] in '${' or '(' in value or '[' in value or value.startswith(('/', '~/', './')) or '://' in value:
+        return m.group(0)
+    if not _STRICT.search(name) and _is_name(value.rstrip(').,;]}'), _VALUE_JOIN):
+        return m.group(0)               # key=operator.itemgetter, Primary key: customer_id_and_order_id
+    if ':' in op and not quote and not _NAME_LOOKS_SET.search(name) and value.isalpha():
+        return m.group(0)
+    return m.group(0)[:m.start(4) - m.start(0)] + '[hidden]'
+
+
+def _is_name(run, join):
+    """run is a name a person types and searches for: words (letters, then digits if any) or numbers joined by the
+    characters of join, as test_login_with_oauth2_works or react-native-v2-plan; never a part of 20 or more
+    characters that mixes capitals and small letters (a random blob), and at least two parts or letters only."""
+    parts = join.split(run)
+    if not (len(parts) > 1 or run.isalpha()):
+        return False
+    for p in parts:
+        if not _NAME_PART.fullmatch(p):
+            return False
+        if len(p) >= 20 and any(c.isupper() for c in p[1:]) and any(c.islower() for c in p):
+            return False
+    return True
+
+
+def _may_hide(text):
+    """False when nothing below could change text: none of the marks or words the patterns (these and
+    core.redact()'s) start from, and no run of 40 key-like characters. Most messages are like that, and this look
+    costs far less than the patterns."""
+    if any(mark in text for mark in _MARKS_ANY) or ('://' in text and '@' in text):
+        return True
+    if b'a' * 40 in text.encode('utf-8', 'replace').translate(_KEYISH):
+        return True
+    low = text.casefold()
+    if any(w in low for w in ('bearer', 'token', 'secret', 'password', 'api')):
+        return True
+    if 'basic' in low and 'authorization' in low:
+        return True
+    return (':' in text or '=' in text) and any(w in low for w in ('key', 'pass', 'pw', 'credential'))
+
+
+def _words_kept(text):
+    """The pieces of text that core.redact() would take but that are words: [(start, end)], in order."""
+    spans = [m.span(1) for m in _WORD_AFTER.finditer(text)]
+    for m in _LONG_RUN.finditer(text):
+        run = m.group()
+        if 'sk-ant-' not in run and _is_name(run, _JOIN):
+            spans.append(m.span())
+    if not spans:
+        return spans
+    values = [m.span(1) for m in _ASSIGNED.finditer(text)]
+    return sorted(s for s in spans if not any(a < s[1] and s[0] < b for a, b in values))
+
+
+def private_text(text):
+    """text as the index keeps it: [hidden] where a key, token or password was (_hide_all), after a quick look
+    (_may_hide) that lets most messages pass untouched."""
+    if not text or not _may_hide(text):
+        return text
+    return _hide_all(text)
+
+
+def _hide_all(text):
+    """The well-known credential shapes above, then core.redact(), except the word-shaped pieces _words_kept()
+    finds, which pass as they are."""
+    text = _PRIVATE_KEY.sub('[hidden]', text)
+    text = _URL_PASSWORD.sub(lambda m: m.group(1) + '[hidden]', text)
+    text = _AWS_SECRET.sub(lambda m: m.group(1) + '[hidden]', text)
+    text = _BASIC.sub(lambda m: m.group(1) + '[hidden]', text)
+    text = _NAMED.sub(_named, text)
+    text = _PREFIXED.sub('[hidden]', text)
+    out, at = [], 0
+    for a, b in _words_kept(text):
+        if a < at:
+            continue
+        out.append(core.redact(text[at:a]))
+        out.append(text[a:b])
+        at = b
+    out.append(core.redact(text[at:]))
+    return ''.join(out)
+
+
 # ---------------------------------------------------------------- the index
 
 def _connect(path, write):
@@ -347,6 +487,7 @@ def update_index(root=None, index=None, fts=None):
     root = root or projects_root()
     index = index or index_path()
     want_fts = fts5_available() if fts is None else fts
+    drop_old_index(index)
     con = _connect(index, True)
     st = {'files': 0, 'read': 0, 'unchanged': 0, 'reread_whole': 0, 'bytes_read': 0, 'messages_added': 0,
           'bad_lines': 0, 'vanished': 0, 'fts5': None}
@@ -425,6 +566,7 @@ def _store(con, chat, project, got, fts):
     custom, ai, folder, first_prompt, first_ts, last_ts, prompts, replies = cur
     rows = []
     for role, ts, text in got['msgs']:
+        text = private_text(text)[:MAX_TEXT]
         if role == 'you':
             prompts += 1
             if first_prompt is None:
@@ -437,8 +579,8 @@ def _store(con, chat, project, got, fts):
             con.executemany('INSERT INTO msgs(text, tag, chat, role, ts) VALUES (?, ?, ?, ?, ?)', rows)
         else:
             con.executemany('INSERT INTO msgs(text, low, chat, role, ts) VALUES (?, ?, ?, ?, ?)', rows)
-    new_custom = got['custom'] or custom
-    new_ai = got['ai'] or ai
+    new_custom = private_text(got['custom']) or custom
+    new_ai = private_text(got['ai']) or ai
     new_folder = folder or got['cwd']
     if got['first'] is not None:
         first_ts = got['first'] if first_ts is None else min(first_ts, got['first'])
@@ -535,7 +677,7 @@ def search(query, limit=5, index=None, marks=('[', ']')):
     the best of them, with alike = how many others were folded into it and alike_last = the newest date among
     those (None when there are none)."""
     index = index or index_path()
-    if not os.path.exists(index):
+    if not os.path.exists(index) or drop_old_index(index):
         return []
     words = terms_of(query)
     if not words:
@@ -1227,7 +1369,8 @@ def cm_status(claude_dir=None, state_path=None, environ=None, home=None):
 
 def cm_measure(since, until, claude_dir=None, environ=None, home=None, cache_path=None):
     """claude-mem's observer use as a share of all Claude Code use in [since, until), by weighted tokens
-    (switchboard.usage.WEIGHT_FORMULA: the same weights as the total it is divided by, 1-hour writes included)."""
+    (switchboard.usage.WEIGHT_FORMULA: the same weights as the total it is divided by, 1-hour writes and each
+    model's own cache-read weight included)."""
     from switchboard import usage
     root = projects_root(claude_dir)
     paths = cm_paths(environ, home)
@@ -1255,7 +1398,9 @@ def cm_measure(since, until, claude_dir=None, environ=None, home=None, cache_pat
                         if r[0] in seen or r[1] is None or not since <= r[1] < until:
                             continue
                         seen.add(r[0])
-                        w += usage.weight(list(r[3:7]) + [r[10] if len(r) > 10 else 0])     # with its 1-hour writes
+                        # With its 1-hour writes, and its cache reads at its own model's weight.
+                        low = r[6] if usage.cache_read_weight(r[2]) != usage.WEIGHTS['cache_read'] else 0
+                        w += usage.weight(list(r[3:7]) + [r[10] if len(r) > 10 else 0, low])
                         reqs += 1
         return w, reqs, dirs
 
@@ -1470,7 +1615,7 @@ def _agent_and_tool(event, eff, tool):
 
 def search_status(index=None):
     index = index or index_path()
-    if not os.path.exists(index):
+    if not os.path.exists(index) or drop_old_index(index):
         return {'on': False, 'index': index}
     con = _connect(index, False)
     try:
@@ -1491,13 +1636,92 @@ def search_on(root=None, index=None):
 
 def search_off(index=None):
     """Turn search off: delete the index (Switchboard's own file; Claude Code's history is not touched)."""
+    return erase(index)
+
+
+def erase(index=None):
+    """Erase the search index: its file and SQLite's -journal, -wal and -shm beside it, each written over with zeros
+    and then removed, so its text is not left behind in the file's old space. Claude Code's chats are not touched;
+    search builds the index again the next time it is used. {'removed': [paths], 'bytes': the size of what was
+    erased}. A link in place of any of them is refused (common.Refused) before anything changes: what it points to is
+    not Switchboard's to write or remove. A file that cannot be removed raises OSError."""
     index = index or index_path()
-    gone = []
-    for p in (index, index + '-journal', index + '-wal', index + '-shm'):
-        if os.path.exists(p):
-            os.unlink(p)
-            gone.append(p)
-    return {'removed': gone}
+    paths = (index, index + '-journal', index + '-wal', index + '-shm')
+    for p in paths:
+        if os.path.islink(p):
+            raise common.Refused('The search index at %s is a link, so Switchboard leaves it and the file it points '
+                                 'to as they are; remove them yourself.' % p)
+    gone, size = [], 0
+    for p in paths:
+        try:
+            st = os.lstat(p)
+        except OSError:
+            continue
+        if stat.S_ISDIR(st.st_mode):
+            continue
+        if stat.S_ISREG(st.st_mode):
+            size += st.st_size
+            _zero(p, st.st_size)
+        os.unlink(p)
+        gone.append(p)
+    return {'removed': gone, 'bytes': size}
+
+
+def _zero(path, size):
+    """Write zeros over a file's bytes, in place, and wait for the disk. Never follows a link."""
+    try:
+        fd = os.open(path, os.O_WRONLY | getattr(os, 'O_NOFOLLOW', 0))
+    except OSError:
+        return
+    try:
+        block = b'\0' * min(size, 1 << 20)
+        left = size
+        while left > 0:
+            left -= os.write(fd, block[:min(left, len(block))])
+        os.fsync(fd)
+    except OSError:
+        pass                        # removed all the same
+    finally:
+        os.close(fd)
+
+
+def drop_old_index(index=None):
+    """Erase an index made by an older build (another schema number): it may hold text this build keeps out. Safe
+    when the page starts: a missing, part-made or busy file is left as it is, it waits at most a fraction of a second
+    for another process, and it never raises. True when it was erased."""
+    index = index or index_path()
+    try:
+        if not os.path.isfile(index):
+            return False
+        con = _connect(index, False)
+        try:
+            con.execute('PRAGMA busy_timeout = 200')
+            got = dict(con.execute('SELECT k, v FROM meta'))
+        finally:
+            con.close()
+    except (sqlite3.Error, OSError, ValueError, TypeError):
+        return False                # no meta table yet (a first build part-way), not a database, or held by another
+    if got.get('schema') == str(SCHEMA):
+        return False
+    try:
+        erase(index)
+    except (OSError, common.Refused):
+        return False                # the next one to open it tries again; a link is never followed
+    return True
+
+
+def _size_words(n):
+    if n >= 1000000:
+        return '%.1f MB' % (n / 1e6)
+    return '%d KB' % max(1, round(n / 1e3))
+
+
+def erase_line(got):
+    """The one line `erase` prints for erase()'s answer."""
+    if got['removed']:
+        return ('Erased the search index of your past chats (%s). Search builds it again the next time you use it.'
+                % _size_words(got['bytes']))
+    return 'There is no search index of your past chats to erase. Search builds it the next time you use it.'
 
 
 # ---------------------------------------------------------------- command line
@@ -1531,6 +1755,8 @@ def main(argv=None, out=None):
     i = sub.add_parser('index', help='bring the search index up to date')
     i.add_argument('--index', default=None, help=argparse.SUPPRESS)
     i.add_argument('--root', default=None, help=argparse.SUPPRESS)
+    e = sub.add_parser('erase', help='erase the search index (your chats are not touched)')
+    e.add_argument('--index', default=None, help=argparse.SUPPRESS)
     h = sub.add_parser('health', help="check Claude Code's memory index files (reads only)")
     h.add_argument('--json', action='store_true')
     sub.add_parser('claude-mem', help='what claude-mem would watch here (reads only)')
@@ -1546,6 +1772,17 @@ def main(argv=None, out=None):
         return 0
     if a.cmd == 'index':
         out.write(json.dumps(update_index(a.root, a.index), indent=1) + '\n')
+        return 0
+    if a.cmd == 'erase':
+        try:
+            out.write(erase_line(erase(a.index)) + '\n')
+        except common.Refused as e:
+            out.write('%s\n' % e)
+            return 1
+        except OSError as e:
+            out.write('Could not remove the search index of your past chats (%s): %s.\n'
+                      % (getattr(e, 'filename', None) or a.index or index_path(), e.strerror or e))
+            return 1
         return 0
     if a.cmd == 'health':
         h = health()

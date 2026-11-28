@@ -26,7 +26,8 @@ times; never what a message said.
   average    {hour, day}: an average hour with use (the hour so far never in it) and an average full day with use (today
              never in it): the one average the chart's line, its multiples and every spike word are measured against
   peak       {hour {at, weight, times}, day {day, weight, times}}: the busiest hour and day against that average
-  tokens     {input, output, cache_write, cache_read, cache_write_1h}: the week's (cache_write_1h: the 1-hour part)
+  tokens     {input, output, cache_write, cache_read, cache_write_1h, cache_read_low}: the week's (cache_write_1h:
+             the 1-hour part; cache_read_low: the reads on a model whose cache read is 0.025, usage.CACHE_READ_BY_MODEL)
   workflows  the week's 10 biggest {name, chat, share (whole percent of the week), weight, agents, phases}
   events     switches and limits reached, from the first day on, oldest first:
                {at, kind ('switch' or 'limit'), from, to, account, why, by, window, pct}
@@ -552,7 +553,9 @@ def _limit(page):
 # place it takes in a new reading) and only when a number changed since that account's last line. Only you can read
 # it (0600). Each tick's lines go in one append; the file is rewritten whole (temp file, then rename) when it is
 # pruned: lines older than 8 days go every few hours, and past READINGS_CAP bytes only the newest half of the cap
-# stays. A line that can't be read is skipped, and goes at the next prune. Writing never waits (another writer
+# stays. One line stays however old: for each account the tick still reads, its newest line with a 5-hour number
+# (five_seen: an account at rest writes no line, and its plan must not lose its 5-hour limit by resting). A line
+# that can't be read is skipped, and goes at the next prune. Writing never waits (another writer
 # holding the log means this tick's lines are written at the next) and never raises. `uninstall --all` removes it
 # with ~/.switchboard.
 
@@ -674,7 +677,7 @@ def _note(took, now):
         READINGS['last'] = cur
         due = READINGS['pruned_at'] is None or not 0 <= now - READINGS['pruned_at'] < READINGS_PRUNE_EVERY
         if size > READINGS_CAP or (due and size):
-            _prune(path, now)
+            _prune(path, now, [x[0] for x in took])
         return len(lines)
     finally:
         os.close(lock)
@@ -699,22 +702,26 @@ def _append(path, lines):
         os.close(fd)
 
 
-def _prune(path, now):
-    """Keep the readable lines of the last 8 days; past three quarters of the cap, only the newest that fit in half."""
-    keep = []
-    for raw in _lines(path):
-        row = _row(raw)
-        if row is not None and row['t'] >= now - READINGS_KEEP:
-            keep.append(raw)
-    if sum(len(x) + 1 for x in keep) > READINGS_CAP * 3 // 4:
+def _prune(path, now, accounts=()):
+    """Keep the readable lines of the last 8 days; past three quarters of the cap, only the newest that fit in half.
+    And, for each of `accounts` (the ones the tick still reads), its newest line with a 5-hour number however old, in
+    its place in the file (five_seen). A removed account is not among them: its lines go after 8 days, as before."""
+    rows = [(raw, _row(raw)) for raw in _lines(path)]
+    keep = [i for i, (raw, row) in enumerate(rows) if row is not None and row['t'] >= now - READINGS_KEEP]
+    if sum(len(rows[i][0]) + 1 for i in keep) > READINGS_CAP * 3 // 4:
         kept, size = [], 0
-        for raw in reversed(keep):
-            if size + len(raw) + 1 > READINGS_CAP // 2:
+        for i in reversed(keep):
+            if size + len(rows[i][0]) + 1 > READINGS_CAP // 2:
                 break
-            kept.append(raw)
-            size += len(raw) + 1
+            kept.append(i)
+            size += len(rows[i][0]) + 1
         keep = kept[::-1]
-    core.write_bytes(path, b''.join(raw + b'\n' for raw in keep))
+    named, five = set(accounts or ()), {}
+    for i, (raw, row) in enumerate(rows):
+        if row is not None and row['five'] is not None and row['account'] in named:
+            five[row['account']] = i            # the newest, as lines are written in time order
+    keep = sorted(set(keep) | set(five.values()))
+    core.write_bytes(path, b''.join(rows[i][0] + b'\n' for i in keep))
     READINGS['pruned_at'] = now
 
 
@@ -734,6 +741,36 @@ def read_readings(since, until=None):
     for rows in out.values():
         rows.sort(key=lambda r: r['t'])
     return out
+
+
+FIVE_SEEN = {'key': None, 'who': frozenset()}       # the log as last read (its path, time and size) and what it said
+
+
+def five_seen():
+    """The accounts whose kept readings (the log's 8 days) ever held a 5-hour number, 0 included: plans that have a
+    5-hour limit. A row says "no 5-hour limit" only for an account that is not among them, so one reading with no
+    5-hour window (a reset passed, nothing used since) never makes that sentence false. The log is read again only
+    when it changed (its time and size), so this is right in a process that does not write it too. Never raises: no
+    log, or one that can't be read, is nobody. Nobody in the demo."""
+    if core.DEMO:
+        return frozenset()
+    try:
+        path = core.data_path(READINGS_FILE)
+        try:
+            st = os.stat(path)
+        except FileNotFoundError:
+            return frozenset()
+        key = (path, st.st_mtime_ns, st.st_size)
+        if key != FIVE_SEEN['key']:
+            who = set()
+            for raw in _lines(path):
+                row = _row(raw)
+                if row is not None and row['five'] is not None:
+                    who.add(row['account'])
+            FIVE_SEEN.update(key=key, who=frozenset(who))
+        return FIVE_SEEN['who']
+    except Exception:  # noqa: BLE001 - the log only draws the page's lines: a row then follows its last reading alone
+        return frozenset()
 
 
 def _drops(a, b):

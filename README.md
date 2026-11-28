@@ -4,9 +4,9 @@
 
 A telephone switchboard put every call through on an open line. This one does it for your coding agents: every session lands on a subscription with room.
 
-- **Every subscription, used.** Claude Code moves between your accounts on its own, before a limit stops you. It uses up the one that resets soonest first, so less of what you paid for goes to waste. No `/login`.
-- **Model-agnostic.** Some people swear by Codex, some by Claude. Switchboard doesn't care: both sit on one board, and one command carries a chat from one to the other.
-- **Bang for your buck.** Not every job needs your most expensive model. One switch runs your helper agents on a cheaper model, so your best model's quota goes to the work that needs it. Your week shows where the tokens went.
+- **Every subscription, used.** Claude Code moves between your accounts on its own, at a line you set. It uses up the one that resets soonest first, so less of what you paid for goes to waste. No `/login`.
+- **Model-agnostic.** Some people swear by Codex, some by Claude. Switchboard doesn't care: both sit in one list, and pressing Codex's number carries your chat on there.
+- **Bang for your buck.** Not every job needs your most expensive model. You say which model and effort each kind of work gets, and your helpers run on it, with nothing new to type. Your week shows where the tokens went.
 
 ```sh
 brew install amyjainberkeley/apps/switchboard
@@ -18,9 +18,7 @@ macOS, with Claude Code. Codex is optional. No admin password. Then type `switch
 
 https://github.com/user-attachments/assets/5f6777d8-38f3-4380-81a6-9b7d1ae51000
 
-One scene in the film, Models by the job (lookups on Haiku, reviews on Sonnet), comes in the next update.
-
-<picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshot-dark.png"><img src="docs/screenshot.png" alt="Switchboard with made-up accounts: each account with its limits one under the other, each marked at its switch line, the account Claude Code is on and the next, and under them Claude and Codex on one board"></picture>
+<picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshot-dark.png"><img src="docs/screenshot.png" alt="Switchboard's page with made-up accounts: five Claude accounts with their 5-hour and weekly limits, each marked at its switch line (one in use, one next, two that need a sign-in, one at 97% of its Fable week), Codex under them with its own limits and Continue here, and the week's chart below"></picture>
 
 ## Why
 
@@ -52,18 +50,19 @@ Your other accounts sign in through your browser, on Anthropic's own page, one a
 <picture><source media="(prefers-color-scheme: dark)" srcset="docs/switch-dark.svg"><img src="docs/switch.svg" alt="A switch, start to finish: at a line you set, Switchboard picks an account with room, makes the switch and checks it, tells open chats, and work goes on."></picture>
 
 - **It watches every limit.** Each account's 5-hour and weekly numbers are read from Anthropic every 5 to 15 minutes. In a terminal, the account you're on is live, straight from Claude Code.
-- **It moves at a line you set.** 90% of the 5-hour limit or 95% of the week, until you change them. In a terminal that takes about a minute. A move that isn't urgent waits until Claude Code is idle.
+- **It moves at a line you set.** 90% of the 5-hour limit or 95% of the week, until you change them. In a terminal that takes about a minute. A move that isn't urgent waits until Claude Code is idle. A model's own weekly limit, such as Fable's, only decides whether an account can run that model, never whether it can work.
 - **Every switch is a transaction.** It writes a journal, writes the new login, reads it back, and puts the old one back if anything doesn't match. Kill it halfway and it finishes or undoes the switch at the next start.
 - **Your sessions come along.** New ones start on the new account and open ones follow in about 30 seconds. An artifact still opens as the account that made it.
-- **When Claude is out, you keep going.** `switchboard continue` hands the chat to Codex, with a note written on your Mac. `switchboard claude` runs Claude Code on your own API keys. If nothing has room, it tells you when the first account resets.
+- **When Claude is out, you keep going.** If every Claude account is at its line and Codex has room, one notification says so. Type `switchboard`, press Codex's number, and the chat carries on there from a note written on your Mac. `switchboard claude` runs Claude Code on your own API keys. If nothing has room, it tells you when the first account resets.
+- **Helpers run on the model you route them to.** A route says, for one kind of work (build, fix, review, plan, find, write), which model and effort it gets. In Claude Code, helpers and workflow agents of that kind then start on it, with nothing new to type; Codex gets a helper for each kind on its route's model. Your own chat keeps the model and effort you chose. With no routes, nothing changes.
 
-Every switch and its reason is in `switchboard log`. `switchboard auto why` says what it would do right now. More in [how it works](docs/how-it-works.md#auto-switch).
+Every switch and its reason is in `switchboard log`. `switchboard auto why` says what it would do right now, and `switchboard routing` shows the last routing decisions and why. More in [how it works](docs/how-it-works.md#auto-switch).
 
 ## Your week
 
 <picture><source media="(prefers-color-scheme: dark)" srcset="docs/week-dark.png"><img src="docs/week.png" alt="Your week in Switchboard, with made-up numbers: seven days of use by the hour, split into workflows, helpers and your own chat, with each limit reached and each switch marked under the hours, and the busiest hour named"></picture>
 
-Seven days by the hour, split into you, your helpers and your workflows, with every limit and every switch marked. Then by project, by agent and by model, and a line like "48% of the use was re-reading context" when that is the biggest share. `switchboard usage` prints the shares in the terminal, and ends with how much of the week would move to a cheaper model if your helpers ran there. `switchboard models on` moves them.
+Seven days by the hour, split into you, your helpers and your workflows, with every limit and every switch marked. Then by project, by agent and by model, and a line like "48% of the use was re-reading context" when that is the biggest share. `switchboard usage` prints the shares in the terminal, and ends with how much of the week would move to a cheaper model if your helpers ran there. `switchboard models sonnet on` moves them.
 
 It's all worked out on your Mac, from files already on it.
 
@@ -73,15 +72,15 @@ Switchboard holds the logins to your AI plans, so here is exactly what it does w
 
 | | What happens | Check it yourself |
 |---|---|---|
-| **Keeps** | Your logins, in your macOS login Keychain. Its own files hold fingerprints of them, not the logins. The exceptions are in the list below. | `security find-generic-password -s "Switchboard login"` |
+| **Keeps** | Your logins, in your macOS login Keychain. Claude Code's sign-in is also kept in Claude Code's own login file, which only you can read. Switchboard's own files hold fingerprints of logins, not the logins. The exceptions are in the list below. | `security find-generic-password -s "Switchboard login"` |
 | **Sends** | Each login's tokens to the company that issued them, and nowhere else. For a Claude account that means Anthropic: to renew the login and to read that account's limits. | The addresses are in `switchboard/accounts/facts.py` |
-| **Your prompts and code** | They don't pass through Switchboard. Claude Code talks to Anthropic directly; Switchboard changes which of your logins it finds. The two exceptions are commands you start yourself: `switchboard claude` (your own API keys, through a gateway on this Mac) and `switchboard continue` or `hand` (a note of the chat, or the job, goes to Codex after your yes for that folder). | `switchboard/accounts/switcher.py` |
-| **Listens** | On `127.0.0.1` only. A web page can't read it or change anything. A program already running on your Mac can use it. | `curl -i -H "Host: example.com" http://127.0.0.1:7799/` answers 403 |
+| **Your prompts and code** | Claude Code and Codex talk to their makers directly, each on its own sign-in. Switchboard isn't in the path; it changes which of your logins Claude Code finds. Two things go to Codex, both only once you have added it (`switchboard add codex` says what goes to OpenAI): a note of a chat you carry on there, and a job you start there yourself (`switchboard hand` or `switchboard do`). `switchboard claude` is the one other exception: your own API keys, through a gateway on this Mac. | `switchboard log` lists each one |
+| **Listens** | On `127.0.0.1` only. A web page can't read it or change anything. The page opens only for you, through a link that works once. Another program on your Mac can still read its first screen and ask for two small things (below). | `curl -i -H "Host: example.com" http://127.0.0.1:7799/` answers 403 |
 | **Never** | No telemetry, no analytics, no crash reports. Nothing updates by itself. Nothing asks for an admin password. | `switchboard about` |
 
-The account engine is 25 files of standard-library Python, and its tests run on made-up accounts in throwaway folders. `switchboard about` prints what your install is and what it put on your Mac. `switchboard demo` shows the real page with made-up accounts and changes nothing.
+The account engine is 26 files of standard-library Python, and its tests run on made-up accounts in throwaway folders. `switchboard about` prints what your install is and what it put on your Mac. `switchboard demo` shows the real page with made-up accounts and changes nothing.
 
-Not done yet, and written down: the curl install isn't checked against a checksum (Homebrew's is), and the apps aren't signed with a Developer ID. [SECURITY.md](SECURITY.md) has the full list.
+Not done yet, and written down: the curl install isn't checked against a checksum (Homebrew's is), the apps aren't signed with a Developer ID, and routing's files for Codex follow Codex's published formats but haven't been seen working in a running Codex yet. [SECURITY.md](SECURITY.md) has the full list.
 
 <details>
 <summary>Every address it contacts</summary>
@@ -91,7 +90,7 @@ Not done yet, and written down: the curl install isn't checked against a checksu
 - `github.com` and `raw.githubusercontent.com`: when you install or update. A look for a newer version is off until you turn it on (`switchboard config set update_check daily`); it, and `switchboard update --check`, ask only the place an update would come from, for its version number.
 - `pypi.org` and `files.pythonhosted.org`: at install, for the two PyObjC packages of the menu bar item, pinned by hash. When the Mac has no Python it can use, Switchboard's own Python comes from a GitHub release and is checked against a pinned SHA-256.
 - The code and font sites claude.ai allows (`cdnjs.cloudflare.com`, `cdn.jsdelivr.net`, `unpkg.com`, `cdn.tailwindcss.com`, `code.jquery.com`, `fonts.googleapis.com`, `fonts.gstatic.com`): a preview of a page you published loads that page's own scripts and fonts, as your browser does when you open it.
-- Only when you turn them on: the provider address of each API key you add; OpenAI, through Codex, after your yes for a folder; the download sites of claude-mem and the Code map (`registry.npmjs.org`, `nodejs.org` and `github.com` releases), which the page lists before you say yes.
+- Only when you turn them on: the provider address of each API key you add; OpenAI, through Codex, once you have added Codex; the download sites of claude-mem and the Code map (`registry.npmjs.org`, `nodejs.org` and `github.com` releases), which the page lists before you say yes.
 
 Signing in and opening an artifact happen in your browser and in Claude Code, which make their own requests.
 
@@ -101,15 +100,15 @@ Signing in and opening an artifact happen in your browser and in Claude Code, wh
 <summary>What it keeps and reads on your Mac</summary>
 
 - Logins and API keys stay in your Keychain, except in a file you ask for: `switchboard export` writes your accounts' logins to one file protected with a passphrase, to carry to another Mac. Switchboard's own files keep only each key's name and last four characters, and no login, unless the Keychain refuses one: then a recovery copy goes in a file only you can read.
-- The Keychain also keeps up to two earlier logins for each account, so a login replaced by a stale copy can be put right.
-- When Claude Code keeps its own login in the plain file `~/.claude/.credentials.json`, a switch writes the new login there too, and Switchboard reads that file when Claude Code's Keychain item is empty. It never creates the file.
-- Its own folder, `~/.switchboard`, which only you can read, also holds each account's email and organization, 8 days of limit readings, History, browser profile names, artifact links, and a small picture of each of your artifact pages.
-- It sends nothing of yours off your Mac except to Anthropic, to key providers you add, and, when you use another assistant through it, to that assistant's maker: a note of a chat you carry on, or a job you hand over, goes to OpenAI through Codex only after your yes for that folder, and `switchboard providers --ask` has Codex ask OpenAI for its own limits.
+- The Keychain also keeps up to two earlier logins for each account, so a login replaced by a stale copy can be put right. It keeps one more record: the parts of Claude Code's Keychain item that belong to the Mac and not to one account, such as your connectors' logins, so a sign-in put back into an empty Keychain comes back whole.
+- Claude Code's sign-in is also kept in its plain login file, `~/.claude/.credentials.json`, so a chat that finds the Keychain slow reads it from there. Only you can read the file, and it holds exactly what Claude Code's Keychain item holds. It goes when you sign out, and removing Switchboard takes it away unless it is the only sign-in Claude Code has. `"keep_signin_file": false` under `"auto_policy"` in `~/.switchboard/settings.json` turns it off. It is a plain file, so a backup of your home folder copies it as it is.
+- Its own folder, `~/.switchboard`, which only you can read, also holds each account's email and organization, 8 days of limit readings, History, browser profile names, artifact links, and a small picture of each of your artifact pages. Each routing decision is kept there too: the agent, the kind of work, the model and effort, and the reason. Never a word of a prompt or a task.
+- It sends nothing of yours off your Mac except to Anthropic, to key providers you add, and, when you use another assistant through it, to that assistant's maker: a note of a chat you carry on, or a job you start there yourself, goes to OpenAI through Codex only once you have added Codex. Pressing its row in the list asks no more: adding Codex says so. `switchboard continue` and `hand` ask for your yes once for each folder. `switchboard providers --ask` has Codex ask OpenAI for its own limits.
 - It never shows a login form. Signing in is Claude Code's own, on claude.ai.
 - The chat search keeps an index of your chats' words on this Mac, readable only by you. History keeps no prompt, chat text, login or key.
 - To show each chat's account and title, and for the chat search, it reads Claude Code's chat files on this Mac. For Codex's numbers it reads Codex's session files. It never opens Codex's login file.
 - To learn which browser profile is signed in to which account, it reads the names of your Chrome profiles (Brave or Edge if that is the browser it uses) and searches each profile's stored site data (Local Storage, and claude.ai's IndexedDB) for your organization ids, keeping only those. With macOS's Automation permission it also reads the address and title of your open claude.ai tabs when it opens an artifact for you, and once a day it opens one of your artifact pages in the background and closes it again, to check each profile still belongs to its account. It never opens cookies, saved passwords or history.
-- The page's server answers any program on this Mac, including one run by another user of this Mac, and lets it do what the page does. Other websites cannot reach it. [SECURITY.md](SECURITY.md) has this and the other known gaps.
+- The page opens only for you: Switchboard sends your browser to it with a link that works once. Another program on this Mac can read what its first screen shows (your accounts, their limits), ask it to open a claude.ai artifact link, or set up a browser profile for an account, and nothing else. Other websites cannot reach it. [SECURITY.md](SECURITY.md) has the details.
 
 More: [what it keeps and what it downloads](docs/how-it-works.md#privacy).
 
@@ -134,42 +133,46 @@ Check that using several accounts fits Anthropic's terms. Switchboard makes no c
 <details>
 <summary>What does it do to Claude Code?</summary>
 
-It doesn't change Claude Code's program. To move it, Switchboard changes which login Claude Code finds in your Keychain and the account named in `~/.claude.json`. It adds a status line and hooks to Claude Code's settings and a skill to its skills folder, never over your own, and one command takes each out again: [what it changes on your Mac](#what-it-changes-on-your-mac).
+It doesn't change Claude Code's program. To move it, Switchboard changes which login Claude Code finds in your Keychain and the account named in `~/.claude.json`. It adds a status line, hooks and the key that loads its routing plugin to Claude Code's settings, and a skill to its skills folder, never over your own, and one command takes each out again: [what it changes on your Mac](#what-it-changes-on-your-mac).
 
 </details>
 
 <details>
 <summary>Does it work with Codex?</summary>
 
-Yes. Once Codex is added (setup offers it, or `switchboard add codex`), its limits sit on the same board as your Claude accounts, read from Codex's own files with no network call. `switchboard continue` carries this folder's chat on in Codex, from a note Switchboard writes on your Mac: what you asked, the plan, where it got to and the files named. The note leaves out the assistant's private reasoning, pages it fetched, and anything that looks like a secret, as well as it can. `switchboard back` brings a note back to the chat you left, and `switchboard hand codex -- JOB` runs one job there and prints the answer. Codex keeps its own sign-in, which Switchboard never opens.
+Yes. Add it once (setup offers it, or `switchboard add codex`) and it is a row in the same list as your Claude accounts, with its plan and its limits, read from Codex's own files with no network call. Press its number and this folder's newest chat carries on in Codex, from a note Switchboard writes on your Mac: what you asked, the plan, where it got to and the files named. The note leaves out the assistant's private reasoning, pages it fetched, and anything that looks like a secret, as well as it can. `switchboard back` brings a note back to the chat you left. Codex keeps its own sign-in, which Switchboard never opens.
 
 </details>
 
 <details>
-<summary>Does it pick the model for each task?</summary>
+<summary>Does it route work to different models?</summary>
 
-One switch does today: `switchboard models on` runs helper agents that name no model on Sonnet, where they would have run on your chat's model. Helpers picked by the job (lookups on Haiku, reviews on Sonnet) are next, and so is routing by the kind of task: [coming next](#coming-next).
+Yes, by routes you set. A route says, for one kind of work, which model and effort it gets. `switchboard routes set review claude:sonnet:high` runs review helpers on Sonnet at high effort. The kinds are build, fix, review, plan, find and write, and the kind is read from the task's first sentence by fixed rules, not by a model. In Claude Code, helpers and workflow agents of that kind then start on the route's model and effort, with nothing new to type, and Codex gets a helper for each kind on its route's model. Your own chat keeps the model and effort you chose; `switchboard routing set chat.effort on` lets a route set your chat's effort too. The first run turns routing on; an update from an earlier version leaves it off until `switchboard routing on`. `switchboard routing` shows the last decisions, each with its reason, and `switchboard routing off` turns it all off.
+
+Two shortcuts. `switchboard routes preset by-the-job` puts lookups on each app's small model and writing on its middle one. `switchboard models on` gives Claude Code four helpers on smaller models: lookups on Haiku, and reading, reviews and checks on Sonnet.
+
+Switchboard doesn't claim one model is better than another. It runs work the way you said. Handing work from one app to the other is not in this version: a route that names the other app is passed, and Switchboard starts nothing there.
 
 </details>
 
 <details>
 <summary>What happens when every account is out?</summary>
 
-Switchboard stays where it is and tells you when the first account resets. From there, `switchboard continue` carries the chat on in Codex, and `switchboard claude` runs Claude Code on your own API keys (add one with `switchboard keys add`, and turn the gateway on in the page's Settings).
+Switchboard stays where it is and tells you when the first account resets. If you added Codex and it has room, one notification says so: type `switchboard` and press its number to carry the chat on there. `switchboard claude` runs Claude Code on your own API keys (add one with `switchboard keys add`, and turn the gateway on in the page's Settings).
 
 </details>
 
 <details>
 <summary>Is it any use with one account?</summary>
 
-Yes. You still get your limits in the menu bar and the terminal, your week by the hour, every chat and artifact in one place, and the date a sign-in ends, a week ahead.
+Yes. You still get your limits in the menu bar and the terminal, your week by the hour, every chat and artifact in one place, and the date a sign-in ends, a week ahead. Routes and helpers work the same with one account.
 
 </details>
 
 <details>
 <summary>How do I open the page?</summary>
 
-`switchboard page` opens it, and so does the S in the menu bar. It is at `http://127.0.0.1:7799`, on your own Mac.
+`switchboard page` opens it, and so does the S in the menu bar: each gives your browser a link that works once. The page is at `http://127.0.0.1:7799`, and a browser that never came in that way sees one line that says how to open it. `switchboard page --new-key` makes a new key, and every browser then opens the page again from Switchboard.
 
 </details>
 
@@ -190,7 +193,7 @@ Most likely that account is at one of its lines, or its login was refused. Auto-
 <details>
 <summary>Half my usage is re-reading context. How do I make that smaller?</summary>
 
-Switchboard shows the number. It doesn't change it for you yet, and it hasn't measured what a fresh chat saves. A long chat is read again on every turn, so starting a fresh one with a short summary may help. `switchboard models on` runs helpers that name no model on Sonnet.
+Switchboard shows the number, and has one switch for the part your helpers cause. `switchboard routing cache` counts how often your helpers stored their whole context again after a wait, and `switchboard routing cache on` sets an hour cache for them in Claude Code's settings. A long chat of your own is read again on every turn, so starting a fresh one with a short summary may help; Switchboard hasn't measured what that saves.
 
 </details>
 
@@ -245,7 +248,9 @@ switchboard run 2 -- …   run one Claude Code command as account 2; other sessi
 switchboard resume CHAT  reopen a chat as the account it started under
 switchboard continue     carry this folder's chat on in the next assistant with room
 switchboard open LINK    open a claude.ai artifact as the account that made it
-switchboard models on    run helper agents on a cheaper model
+switchboard routes       which agent, model and effort each kind of work goes to
+switchboard routing      is routing on, and the last decisions with their reasons
+switchboard models on    helpers for Claude Code, each on the model that fits its job
 switchboard usage        the week's shares: by project, agent and model
 switchboard signin       sign in again to every account whose sign-in is ending
 switchboard log          each switch and why (-f follows it)
@@ -261,7 +266,7 @@ Most commands take `--json` and have exit codes a script can read. Every command
 
 ## How fresh the numbers are
 
-In a terminal, the account in use is live while you work. The rest are read from Anthropic every 5 to 15 minutes, whether auto-switch is on or off, and each account shows when it was last checked.
+In a terminal, the account in use is live while you work. The rest are read from Anthropic every 5 to 15 minutes, whether auto-switch is on or off, and the page shows when each was last checked.
 
 <details>
 <summary>The exact schedule</summary>
@@ -303,7 +308,7 @@ Then run `switchboard setup` and `switchboard`, and tell me what they print.
 
 ## What it changes on your Mac
 
-In short: its own folder, `~/.switchboard`; the `switchboard` command; two small apps; two background jobs; your accounts' logins, in your Keychain; and a status line, notifications, hooks and a skill for Claude Code. [Update and remove](#update-and-remove) says what removing takes out.
+In short: its own folder, `~/.switchboard`; the `switchboard` command; two small apps; three background jobs; your accounts' logins, in your Keychain; and a status line, notifications, hooks, a skill and the routing plugin for Claude Code. [Update and remove](#update-and-remove) says what removing takes out.
 
 <details>
 <summary>The full list</summary>
@@ -312,17 +317,18 @@ In short: its own folder, `~/.switchboard`; the `switchboard` command; two small
 - The `switchboard` command, in `~/.local/bin` (with Homebrew, in Homebrew's bin folder), and its short name beside it.
 - Switchboard.app, in /Applications, or in ~/Applications when /Applications needs a password. It is how macOS knows the menu bar item, the S beside the clock: opening it starts the item, or opens the page when the item is already running. The first time the item starts, it saves its place beside the clock in its own preferences. `switchboard menubar off` turns it off, and `on` brings it back.
 - Switchboard Links, the link app, in `~/Applications`. Once you say yes to macOS, it is your default browser: a claude.ai artifact you click opens as its owner, and every other link goes to the browser you used before. `switchboard links off` gives the seat back.
-- Two background jobs that start at login: one for the page, one for the menu bar item.
+- Three background jobs that start at login: one for the page, one for the sign-in watch, one for the menu bar item. The sign-in watch notices within a second when Claude Code's sign-in changes, and has Switchboard look at once.
 - Your accounts' logins, in your Keychain, and any one-year token or API key you add as an account.
-- At each switch, Claude Code's own login in your Keychain and the account named in `~/.claude.json`: that is how Claude Code moves. When Claude Code keeps its login in `~/.claude/.credentials.json`, that file too.
+- At each switch, Claude Code's own login in your Keychain, its copy in `~/.claude/.credentials.json`, and the account named in `~/.claude.json`: that is how Claude Code moves.
 - The page, which listens on this Mac only, at `127.0.0.1:7799` (`switchboard update --port N` moves it). With API keys and the keys gateway on, the gateway too, at port 7797.
 - Claude Code's settings: a status line and three notification hooks. Each goes in by itself at the first run, but never over a status line of your own. `switchboard statusline off` and `switchboard notify off` take them out.
 - Hooks that tell a Claude Code session which account owns an artifact it can't open, and what a switch means for it. They go in by themselves at the first run, beside hooks of your own. `switchboard hooks off` takes them out.
 - Switchboard's skill, which lets a coding agent answer questions about Switchboard: `skills/switchboard` in Claude Code's folder and, when Codex is on the Mac, `~/.agents/skills/switchboard`. It goes in by itself at the first run, never over a skill of your own with that name. `switchboard skill off` takes it out.
+- Routing: one key in Claude Code's settings, which makes it load Switchboard's plugin, and, once Codex is added, hooks and helper files in Codex's own folder (Codex runs a new hook only after you trust it there, with /hooks). The first run turns routing on; an update from an earlier version leaves it off until `switchboard routing on`. With no route set, it changes nothing. `switchboard routing off` takes all of it out, and `switchboard routing cache on` adds an hour cache for helpers to Claude Code's settings until `off` puts back what was there.
 - When Claude Code's `settings.json` is a symbolic link, such as one kept with your dotfiles, none of these goes in by itself. `switchboard statusline on`, `switchboard notify on` and `switchboard hooks on` put them in.
 - While Claude Code works, Switchboard keeps the Mac awake. `"awake": false` in `~/.switchboard/settings.json` turns that off.
 - `~/.switchboard-notes`, once you carry a chat on in another assistant or hand it a job: the notes and the answers, which only you can read. A note goes after 30 days, an answer after 7. Removing everything takes this folder too.
-- Only when you turn them on in the page's Settings: House rules and the Code map add a short block to `~/.claude/CLAUDE.md`; Sonnet for helpers changes a model setting in Claude Code's settings; claude-mem and the Code map download and install their own tools, which the page lists before you say yes. Turning one off, or removing Switchboard, takes it out again, except claude-mem's notes in `~/.claude-mem`.
+- Only when you turn them on in the page's Settings: House rules and the Code map add a short block to `~/.claude/CLAUDE.md`; Sonnet for helpers changes a model setting in Claude Code's settings; Models by the job adds four helper files to `~/.claude/agents/` and one note to `~/.claude/rules/`; claude-mem and the Code map download and install their own tools, which the page lists before you say yes. Turning one off, or removing Switchboard, takes it out again, except claude-mem's notes in `~/.claude-mem`.
 
 </details>
 
@@ -350,9 +356,7 @@ Still stuck? [Open an issue](https://github.com/amyjainberkeley/switchboard/issu
 
 ## Coming next
 
-- Models by the job: helpers for Claude Code, each on the model that fits its job.
-- Routing by the kind of work, across models and assistants, with nothing new to type.
-- Codex as a row in the same list: press its number and the chat carries on there.
+- Handing work from one app to the other, by its route.
 - Keep running: a chat that carries on with the next model when one is used up.
 
 ## Documentation

@@ -23,7 +23,9 @@ from switchboard import models as M
 FIX = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'fixtures', 'models')
 NEW = [{'where': '/opt/claude/bin/claude', 'version': '2.1.320', 'primary': True}]
 VAR = M.SUBAGENT_VAR
+EFFORT = M.SUBAGENT_EFFORT_VAR
 EXPLORE = M.EXPLORE_FILE
+BOTH = {VAR: 'sonnet', EFFORT: 'high'}       # Sonnet for helpers on a Claude Code that reads the effort line
 
 
 def fixture(name):
@@ -97,18 +99,20 @@ class Box(object):
         return out
 
 
-ADDED = ',\n    "CLAUDE_CODE_SUBAGENT_MODEL": "sonnet"'
+ADDED = ',\n    "CLAUDE_CODE_SUBAGENT_MODEL": "sonnet",\n    "CLAUDE_CODE_SUBAGENT_EFFORT": "high"'
 
 
 class TestPresets(unittest.TestCase):
 
     def test_presets_are_data(self):
         ids = [p['id'] for p in M.PRESETS]
-        self.assertEqual(ids, ['off', 'by-the-job'])
-        self.assertEqual([p['id'] for p in M.PRESETS if p['default']], ['by-the-job'])
-        self.assertEqual(M.preset('by-the-job')['settings'], {('env', VAR): 'sonnet'})
+        self.assertEqual(ids, ['off', 'helpers', 'sonnet', 'helpers-and-sonnet', 'by-the-job'])
+        self.assertEqual([p['id'] for p in M.PRESETS if p['default']], ['helpers'])
+        self.assertEqual(M.preset('by-the-job')['settings'], {('env', VAR): 'sonnet', ('env', EFFORT): 'high'})
+        self.assertEqual(M.preset('by-the-job')['agents'], {EXPLORE: M.EXPLORE_TEXT})
         self.assertEqual(M.preset('off')['settings'], {})
         self.assertEqual(M.preset('off')['agents'], {})
+        self.assertEqual(M.preset('off')['rules'], {})
 
     def test_everything_small_is_not_offered(self):
         with self.assertRaises(M.Refused) as e:
@@ -143,6 +147,7 @@ class TestPlanAndApply(unittest.TestCase):
         self.assertIsNone(p['blocked'])
         self.assertEqual([(e['what'], e['key'], e['old'], e['new'], e['op']) for e in p['edits']],
                          [('setting', 'env.' + VAR, None, 'sonnet', 'add'),
+                          ('setting', 'env.' + EFFORT, None, 'high', 'add'),
                           ('file', None, None, 'model: haiku', 'create')])
         self.assertTrue(all(e['says'] and '\n' not in e['says'] for e in p['edits']))
         self.assertEqual(b.read(), before)                  # planning writes nothing
@@ -154,7 +159,7 @@ class TestPlanAndApply(unittest.TestCase):
         self.assertEqual(after, before.replace(b'"sk-fake-not-a-real-key-000"',
                                                b'"sk-fake-not-a-real-key-000"' + ADDED.encode()))
         want = json.loads(before)
-        want['env'][VAR] = 'sonnet'
+        want['env'].update(BOTH)
         self.assertEqual(json.loads(after), want)
         self.assertEqual(list(json.loads(after)), list(json.loads(before)))     # key order kept
         self.assertEqual(b.read(b.explore).decode(), M.EXPLORE_TEXT)
@@ -169,7 +174,8 @@ class TestPlanAndApply(unittest.TestCase):
         self.assertEqual(p['fingerprints'][b.settings], None)
         self.assertTrue(p['edits'][0]['made_file'])
         M.apply(p)
-        self.assertEqual(b.read(), b'{\n  "env": {\n    "CLAUDE_CODE_SUBAGENT_MODEL": "sonnet"\n  }\n}\n')
+        self.assertEqual(b.read(), b'{\n  "env": {\n    "CLAUDE_CODE_SUBAGENT_MODEL": "sonnet",\n'
+                                   b'    "CLAUDE_CODE_SUBAGENT_EFFORT": "high"\n  }\n}\n')
         self.assertEqual(stat.S_IMODE(os.stat(b.settings).st_mode), 0o600)
         self.assertEqual(b.backups(), [])                   # nothing existed, nothing to back up
         b.undo()
@@ -185,28 +191,32 @@ class TestPlanAndApply(unittest.TestCase):
         self.assertFalse(os.path.exists(b.agents))
         self.assertTrue(all(x.startswith(os.path.dirname(b.state)) for x in r['backups']))
         b.undo()
-        self.assertEqual(json.loads(b.read()), {'env': {VAR: 'sonnet'}})    # and Off can still be undone
+        self.assertEqual(json.loads(b.read()), {'env': BOTH})               # and Off can still be undone
 
     def test_empty_object(self):
         b = Box('empty-object.json')
         b.apply()
-        self.assertEqual(b.read(), b'{\n  "env": {\n    "CLAUDE_CODE_SUBAGENT_MODEL": "sonnet"\n  }\n}\n')
+        self.assertEqual(b.read(), b'{\n  "env": {\n    "CLAUDE_CODE_SUBAGENT_MODEL": "sonnet",\n'
+                                   b'    "CLAUDE_CODE_SUBAGENT_EFFORT": "high"\n  }\n}\n')
         M.apply(b.plan('off'))
         self.assertEqual(b.read(), b'{}\n')                 # Off takes exactly our part back out
 
     def test_blank_file(self):
         b = Box('blank.json')
         b.apply()
-        self.assertEqual(json.loads(b.read()), {'env': {VAR: 'sonnet'}})
+        self.assertEqual(json.loads(b.read()), {'env': BOTH})
         b.undo()
         self.assertEqual(b.read(), b'')                     # undo is byte for byte, even for an empty file
 
     def test_formats_kept_and_off_is_exact(self):
         cases = {
-            'odd.json': ',"CLAUDE_CODE_SUBAGENT_MODEL":"sonnet"',            # compact env inside a CRLF file
-            'compact.json': ',"env":{"CLAUDE_CODE_SUBAGENT_MODEL":"sonnet"}',
-            'one-line-spaced.json': ', "env": {"CLAUDE_CODE_SUBAGENT_MODEL": "sonnet"}',
-            'four-space.json': ',\n    "env": {\n        "CLAUDE_CODE_SUBAGENT_MODEL": "sonnet"\n    }',
+            # compact env inside a CRLF file
+            'odd.json': ',"CLAUDE_CODE_SUBAGENT_MODEL":"sonnet","CLAUDE_CODE_SUBAGENT_EFFORT":"high"',
+            'compact.json': ',"env":{"CLAUDE_CODE_SUBAGENT_MODEL":"sonnet","CLAUDE_CODE_SUBAGENT_EFFORT":"high"}',
+            'one-line-spaced.json': ', "env": {"CLAUDE_CODE_SUBAGENT_MODEL": "sonnet", '
+                                    '"CLAUDE_CODE_SUBAGENT_EFFORT": "high"}',
+            'four-space.json': ',\n    "env": {\n        "CLAUDE_CODE_SUBAGENT_MODEL": "sonnet",\n'
+                               '        "CLAUDE_CODE_SUBAGENT_EFFORT": "high"\n    }',
             'unrelated.json': ADDED,
         }
         for name, piece in cases.items():
@@ -220,7 +230,7 @@ class TestPlanAndApply(unittest.TestCase):
                 self.assertEqual(after[:i] + after[i + len(piece.encode()):], before)
                 self.assertEqual(after[i:i + len(piece.encode())], piece.encode())
                 want = json.loads(before)
-                want.setdefault('env', {})[VAR] = 'sonnet'
+                want.setdefault('env', {}).update(BOTH)
                 self.assertEqual(json.loads(after), want)
                 M.apply(b.plan('off'))
                 self.assertEqual(b.read(), before)          # Off is the exact inverse here
@@ -231,7 +241,8 @@ class TestPlanAndApply(unittest.TestCase):
         before = b.read()
         b.apply()
         self.assertEqual(b.read(), before.replace(
-            b'"env": {}', b'"env": {\n    "CLAUDE_CODE_SUBAGENT_MODEL": "sonnet"\n  }'))
+            b'"env": {}', b'"env": {\n    "CLAUDE_CODE_SUBAGENT_MODEL": "sonnet",\n'
+                          b'    "CLAUDE_CODE_SUBAGENT_EFFORT": "high"\n  }'))
         M.apply(b.plan('off'))
         self.assertEqual(b.read(), before)
 
@@ -394,6 +405,8 @@ class TestPlanAndApply(unittest.TestCase):
     def test_write_between_check_and_swap(self):
         b = Box('unrelated.json')
         theirs = fixture('unrelated.json').replace(b'"dark"', b'"light"')
+        copy = b.settings + '.switchboard-backup'
+        b.write(b"the status line's copy\n", copy)
         real = M._backup_next_to
 
         def claude_code_writes_now(path, data, mode):
@@ -407,6 +420,7 @@ class TestPlanAndApply(unittest.TestCase):
         self.assertEqual(b.read(), theirs)                   # their write is kept
         self.assertFalse(os.path.exists(b.agents))           # the file written before it is taken back
         self.assertIsNone(b.state_bytes())
+        self.assertEqual(b.read(copy), b"the status line's copy\n")      # and the copy beside it put back
 
     def test_off_with_broken_settings_still_removes_the_agent_file(self):
         b = Box('empty-object.json')
@@ -420,7 +434,7 @@ class TestPlanAndApply(unittest.TestCase):
         self.assertFalse(os.path.exists(b.explore))
         self.assertEqual(b.read(), b'{ "env": { "CLAUDE_CODE_SUBAGENT_MODEL": "sonnet" }, }')     # untouched
         owned = json.loads(b.state_bytes())['dirs'][b.cd]['owned']
-        self.assertEqual(list(owned['settings']), ['env.' + VAR])     # still Switchboard's, to take out later
+        self.assertEqual(sorted(owned['settings']), ['env.' + EFFORT, 'env.' + VAR])     # still Switchboard's
         self.assertEqual(owned['agents'], {})
 
     def test_state_save_failure_puts_files_back(self):
@@ -443,7 +457,7 @@ class TestPlanAndApply(unittest.TestCase):
         self.assertIn('running', str(e.exception))
         self.assertEqual(b.read(), fixture('empty-object.json'))
         M.apply(p, busy_ok=True)
-        self.assertEqual(json.loads(b.read()), {'env': {VAR: 'sonnet'}})
+        self.assertEqual(json.loads(b.read()), {'env': BOTH})
         old = time.time() - 3600
         os.utime(chat, (old, old))
         self.assertEqual(M.busy(b.cd), 0)
@@ -526,7 +540,8 @@ class TestOwnership(unittest.TestCase):
         b.apply()
         b.write(b.read().replace(b'"sonnet"', b'"haiku"'))
         p = b.plan('off')
-        self.assertEqual([e['what'] for e in p['edits']], ['file'])      # the setting is theirs now
+        # the model setting is theirs now; the effort line is still Switchboard's
+        self.assertEqual([(e['what'], e['key']) for e in p['edits']], [('setting', 'env.' + EFFORT), ('file', None)])
         self.assertIn('yours now', p['forget'][0]['says'])
         M.apply(p)
         self.assertEqual(json.loads(b.read()), {'env': {VAR: 'haiku'}})
@@ -563,7 +578,7 @@ class TestOwnership(unittest.TestCase):
         b.apply()
         os.unlink(b.explore)
         p = b.plan('off')
-        self.assertEqual([e['what'] for e in p['edits']], ['setting'])
+        self.assertEqual([e['what'] for e in p['edits']], ['setting', 'setting'])
         self.assertIn('already gone', p['forget'][0]['says'])
         b2 = Box('empty-object.json')
         b2.apply()
@@ -583,7 +598,7 @@ class TestOwnership(unittest.TestCase):
         b.write(b.read().replace(b'"sonnet"', b'"sonnet",\n    "MINE": "1"'))
         M.apply(b.plan('off'))
         self.assertEqual(json.loads(b.read()), {'env': {'MINE': '1'}})
-        self.assertEqual(d, {'env': {VAR: 'sonnet'}})
+        self.assertEqual(d, {'env': BOTH})
 
 
 class TestExploreHelper(unittest.TestCase):
@@ -591,7 +606,7 @@ class TestExploreHelper(unittest.TestCase):
     def test_users_own_explore_wins(self):
         b = Box('empty-object.json', agents=['research/my-explore.md'])
         p = b.plan()
-        self.assertEqual([e['what'] for e in p['edits']], ['setting'])
+        self.assertEqual([e['what'] for e in p['edits']], ['setting', 'setting'])
         self.assertIn('your own Explore', p['skipped'][0]['why'])
         pic = b.current()
         self.assertEqual([(a['name'], a['model']) for a in pic['agents']], [('Explore', 'sonnet')])
@@ -608,7 +623,7 @@ class TestExploreHelper(unittest.TestCase):
         self.assertFalse(os.path.exists(b.explore))
         self.assertEqual(sorted(a['name'] for a in b.current()['agents']), ['Explore', 'reviewer'])
         self.assertEqual(b.plan()['edits'], [])                 # and it stays out
-        self.assertEqual(json.loads(b.read()), {'env': {VAR: 'sonnet'}})
+        self.assertEqual(json.loads(b.read()), {'env': BOTH})
 
     def test_explore_turned_off_or_denied(self):
         for kw, words in (({'environ': {M.NO_EXPLORE_PLAN_VAR: '1'}}, 'turned the built-in Explore off'),
@@ -617,26 +632,26 @@ class TestExploreHelper(unittest.TestCase):
                 kw.setdefault('settings', 'empty-object.json')
                 b = Box(**kw)
                 p = b.plan()
-                self.assertEqual([e['what'] for e in p['edits']], ['setting'])
+                self.assertEqual([e['what'] for e in p['edits']], ['setting', 'setting'])
                 self.assertIn(words, p['skipped'][0]['why'])
 
     def test_lookups_can_be_left_out(self):
         b = Box('empty-object.json')
         p = b.plan(lookups=False)
-        self.assertEqual([e['what'] for e in p['edits']], ['setting'])
+        self.assertEqual([e['what'] for e in p['edits']], ['setting', 'setting'])
         M.apply(p)
         self.assertFalse(os.path.exists(b.agents))
 
     def test_existing_agents_folder_is_kept(self):
         b = Box('empty-object.json', agents=['reviewer.md'])
         p = b.plan()
-        self.assertFalse(p['edits'][1]['made_dir'])
-        self.assertNotIn('restart', p['edits'][1]['says'])
+        self.assertFalse(p['edits'][2]['made_dir'])
+        self.assertNotIn('restart', p['edits'][2]['says'])
         M.apply(p)
         M.apply(b.plan('off'))
         self.assertEqual(os.listdir(b.agents), ['reviewer.md'])
         b2 = Box('empty-object.json')
-        self.assertIn('restart', b2.plan()['edits'][1]['says'])     # a new folder needs a restart
+        self.assertNotIn('restart', b2.plan()['edits'][2]['says'])  # Claude Code watches the folder: no restart
 
     def test_agent_backups_stay_out_of_the_agents_folder(self):
         b = Box('empty-object.json', agents=['reviewer.md'])
@@ -668,8 +683,8 @@ class TestVersions(unittest.TestCase):
     def test_explore_needs_omit_claude_md(self):
         b = Box('empty-object.json', versions=[{'where': '/x/claude', 'version': '2.1.260', 'primary': True}])
         p = b.plan()
-        self.assertEqual([e['what'] for e in p['edits']], ['setting'])
-        self.assertIn('omitClaudeMd', p['skipped'][0]['why'])
+        self.assertEqual([e['what'] for e in p['edits']], ['setting'])      # and no effort line: too old for it
+        self.assertIn('omitClaudeMd', [s['why'] for s in p['skipped'] if s['what'] == b.explore][0])
 
     def test_unknown_version_is_said(self):
         b = Box('empty-object.json', versions=[])
@@ -710,13 +725,14 @@ class TestCurrent(unittest.TestCase):
         self.assertEqual(pic['environ'], {'ANTHROPIC_MODEL': 'opus'})
         self.assertEqual(pic['agents'], [{'file': os.path.join('agents', 'reviewer.md'),
                                           'path': os.path.join(b.agents, 'reviewer.md'), 'name': 'reviewer',
-                                          'model': 'sonnet', 'effort': 'high', 'set_by': 'you'}])
+                                          'model': 'sonnet', 'effort': 'high', 'takes': ['reviewer'],
+                                          'set_by': 'you'}])
         self.assertEqual(pic['ours'], [])
         self.assertIn("your chat's model", pic['helpers_with_no_model_run'])
         b.apply()
         pic = b.current()
         self.assertEqual(pic['env'][VAR], {'value': 'sonnet', 'set_by': 'switchboard'})
-        self.assertEqual(sorted(o['what'] for o in pic['ours']), ['file', 'setting'])
+        self.assertEqual(sorted(o['what'] for o in pic['ours']), ['file', 'setting', 'setting'])
         self.assertEqual(pic['preset'], 'by-the-job')
         self.assertIn('sonnet', pic['helpers_with_no_model_run'])
         explore = [a for a in pic['agents'] if a['name'] == 'Explore'][0]

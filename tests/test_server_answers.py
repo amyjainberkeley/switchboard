@@ -15,6 +15,7 @@ sys.path.insert(0, os.path.join(HERE, '..'))
 
 from switchboard import server
 from test_server_cross_site import DIRECT, PageServer
+import pagekey_help  # noqa: E402  (the page key, as Switchboard's own programs send it)
 
 
 class ABodyThatIsNotJson(PageServer):
@@ -27,7 +28,8 @@ class ABodyThatIsNotJson(PageServer):
 
     def post(self, data):
         req = urllib.request.Request('http://127.0.0.1:%d/api/refresh' % self.port, data=data,
-                                     headers={'Content-Type': 'application/json', 'X-Switchboard': '1'})
+                                     headers=pagekey_help.with_key({'Content-Type': 'application/json',
+                                                                    'X-Switchboard': '1'}))
         try:
             with DIRECT.open(req, timeout=10) as r:
                 return r.status, json.load(r)
@@ -50,7 +52,7 @@ class ABodyThatIsNotJson(PageServer):
 class EveryAnswersHeaders(PageServer):
     def headers(self, path, data=None):
         req = urllib.request.Request('http://127.0.0.1:%d%s' % (self.port, path), data=data,
-                                     headers={'X-Switchboard': '1'} if data is not None else {})
+                                     headers=pagekey_help.with_key({'X-Switchboard': '1'} if data is not None else {}))
         try:
             with DIRECT.open(req, timeout=10) as r:
                 return r.status, r.headers

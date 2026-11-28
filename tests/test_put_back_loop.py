@@ -70,10 +70,11 @@ class RigLoop(unittest.TestCase):
         self.net = FakeNet(self.clock)
         self.told = []
         self.notes = []
+        self.moved = []                         # the notification of a move that keeps Claude Code signed in
         deps = autoloop.Deps(net=self.net, net_ready=lambda: True, load=lambda: 0.5, power=lambda: (True, 100),
                              procs=lambda: 1, disk_free=lambda: 10 ** 12,
                              history_note=lambda text, kind='info', **f: self.notes.append(text),
-                             notify=self.told.append)
+                             notify=self.told.append, notify_move=self.moved.append)
         self.loop = autoloop.Loop(deps=deps, clock=self.clock, rand=lambda: 0.5)
 
     def tearDown(self):

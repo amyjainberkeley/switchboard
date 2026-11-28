@@ -12,7 +12,9 @@ The counting rules it applies (the same rules, written again from scratch):
   - a tool call is a tool_use id inside a counted request, each id once;
   - "who": the copy in the chat file wins, else the agent copy with the lowest spawnDepth
     in its .meta.json (no meta counts as 1), then the first path in sort order. A chat file is
-    <root>/<project>/<session>.jsonl; an agent under a "workflows" folder is a workflow agent.
+    <root>/<project>/<session>.jsonl; an agent under a "workflows" folder is a workflow agent;
+  - a cache read weighs 0.05 of an input token, 0.025 on a model id that holds claude-fable-5-2 or
+    claude-mythos-5-2 not followed by a digit (any case).
 
 Run by hand:  python3 tests/hand_count.py --day 2026-11-12   (local day; prints numbers only)
 """
@@ -113,8 +115,8 @@ def count(root, since, until):
                     if (rank, path) < r['owner']:
                         r['owner'], r['who'] = (rank, path), who
 
-    out = {'requests': 0, 'input': 0, 'output': 0, 'cache_write': 0, 'cache_read': 0, 'cache_write_1h': 0, 'tool_calls': 0,
-           'family_weight': {}, 'who_weight': {}}
+    out = {'requests': 0, 'input': 0, 'output': 0, 'cache_write': 0, 'cache_read': 0, 'cache_write_1h': 0,
+           'cache_read_low': 0, 'tool_calls': 0, 'family_weight': {}, 'who_weight': {}, 'weight': 0}
     seen_tools = set()
     for r in requests.values():
         if r['time'] is None or not (since <= r['time'] < until):
@@ -126,14 +128,22 @@ def count(root, since, until):
         out['cache_write'] += cw
         out['cache_read'] += cr
         out['cache_write_1h'] += cw1h
-        w = i + 1.25 * (cw - cw1h) + 2 * cw1h + 0.05 * cr + 5 * o           # today's prices
+        # today's prices: a cache read is 0.05 of an input token, 0.025 on Fable 5.2 and Mythos 5.2 ($0.20 against $8)
+        read = 0.05
+        name = (r['model'] or '').lower()
+        for low in ('claude-fable-5-2', 'claude-mythos-5-2'):
+            at = name.find(low)
+            if at >= 0 and not name[at + len(low):at + len(low) + 1].isdigit():
+                read = 0.025
+        if read == 0.025:
+            out['cache_read_low'] += cr
+        w = i + 1.25 * (cw - cw1h) + 2 * cw1h + read * cr + 5 * o
+        out['weight'] += w
         fam = model_family(r['model'])
         out['family_weight'][fam] = out['family_weight'].get(fam, 0) + w
         out['who_weight'][r['who']] = out['who_weight'].get(r['who'], 0) + w
         seen_tools |= r['tools']
     out['tool_calls'] = len(seen_tools)
-    out['weight'] = (out['input'] + 1.25 * (out['cache_write'] - out['cache_write_1h']) + 2 * out['cache_write_1h']
-                     + 0.05 * out['cache_read'] + 5 * out['output'])
     return out
 
 

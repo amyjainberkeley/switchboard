@@ -253,6 +253,11 @@ class HookProgram(Base):
                     % (sys.executable, self.log))
         os.chmod(self.osa, 0o755)
         self.cmd = nh.command(python=sys.executable)
+        # "Done" turned on, as `switchboard notify done on` does: a data folder with no setting at all is a new
+        # install, where a turn's end is quiet (test_notify_done_choice.py).
+        os.makedirs(self.data, exist_ok=True)
+        with open(os.path.join(self.data, 'settings.json'), 'w') as f:
+            json.dump({'notify_done': True}, f)
 
     def hook(self, event, at, raw=None, cmd=None, cwd=None, **env):
         e = dict(os.environ, SWITCHBOARD_OSASCRIPT=self.osa, SWITCHBOARD_NOTIFY_NOW=repr(at), **env)
@@ -756,7 +761,7 @@ class Terminal(SwitchBase):
     def test_show_on_and_off(self):
         rc, text = self.say()
         self.assertEqual(rc, 0)
-        self.assertEqual(text.splitlines()[:2], ['Notifications: off', 'Done and needs you in Claude Code: off'])
+        self.assertEqual(text.splitlines()[:2], ['Notifications: off', 'Notification hooks in Claude Code: off'])
         self.assertIn('Settings file: %s' % self.path, text)
         rc, text = self.say('on')
         self.assertEqual(rc, 0)
@@ -766,12 +771,12 @@ class Terminal(SwitchBase):
         self.assertEqual(lines[-1], 'Notifications: on')
         self.assertTrue(nh.status()['in'])
         rc, text = self.say()
-        self.assertEqual(text.splitlines()[:2], ['Notifications: on', 'Done and needs you in Claude Code: on'])
+        self.assertEqual(text.splitlines()[:2], ['Notifications: on', 'Notification hooks in Claude Code: on'])
         rc, text = self.say('off')
         self.assertEqual((rc, text.splitlines()[0], text.splitlines()[-1]),
                          (0, "Switchboard's notification hooks go off, and the settings file it made goes too.", 'Notifications: off'))
         self.assertFalse(os.path.exists(self.path))
-        self.assertEqual(self.say('sideways'), (2, 'switchboard notify [on|off]\n'))
+        self.assertEqual(self.say('sideways'), (2, 'switchboard notify [on|off]\nswitchboard notify done on|off\n'))
 
     def test_show_says_when_claude_code_runs_no_hooks(self):
         with open(self.path, 'w') as f:

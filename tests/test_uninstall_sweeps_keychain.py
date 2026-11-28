@@ -1,7 +1,7 @@
 """The uninstaller's "remove everything" also finds Switchboard's Keychain items that no record names any more (an
 account list that was lost, a recovery copy whose manifest line was never written): after the pass over the records,
-every item left under "Switchboard login", "Switchboard login (previous)" and "Switchboard recovery" goes. Claude
-Code's own item and its per-folder items are never looked at."""
+every item left under "Switchboard login", "Switchboard login (previous)", "Switchboard recovery" and "Switchboard
+login (Mac-wide parts)" goes. Claude Code's own item and its per-folder items are never looked at."""
 import _isolate  # noqa: F401  (first: it gives switchboard a throwaway data folder)
 
 import dataclasses
@@ -15,7 +15,7 @@ import unittest
 from fakes_accounts import FakeKeychain, Rig
 from switchboard.accounts import api, context, keychain, tokens, uninstall, vault
 
-SERVICES = (vault.SERVICE_CURRENT, vault.SERVICE_PREVIOUS, vault.SERVICE_RECOVERY)
+SERVICES = (vault.SERVICE_CURRENT, vault.SERVICE_PREVIOUS, vault.SERVICE_RECOVERY, vault.SERVICE_SHARED)
 
 
 class SweepableKeychain(FakeKeychain):

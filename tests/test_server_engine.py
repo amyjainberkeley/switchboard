@@ -402,12 +402,20 @@ class Order(unittest.TestCase):
         ranked = plan.order(accts, self.lines(), self.NOW)
         self.assertEqual([(j['name'], j['usable']) for j in ranked], [('a', True), ('b', True)])
 
-    def test_a_counted_model_week_holds_an_account_back_and_an_uncounted_one_never(self):
+    def test_a_model_week_never_holds_an_account_back_and_a_counted_one_is_a_note_and_an_order(self):
+        # A model's own week says whether an account can serve that model, never whether it can work
+        # (policy.unusable_by_windows): b, with Fable at 93, is next whether Fable counts or not; counted, a note.
         accts = [self.acct('a', 50, 3 * D, active=True), self.acct('b', 10, 1 * D, models={'Fable': (93, 1 * D)})]
-        self.assertEqual(plan.next_account(accts, self.lines(), self.NOW)['account']['name'], 'b')
-        nxt = plan.next_account(accts, self.lines(models=['Fable']), self.NOW)
-        self.assertIsNone(nxt['account'])
-        self.assertEqual(plan.order(accts, self.lines(models=['fable']), self.NOW)[1]['blocked_by'], ['Fable'])
+        for lines, notes in ((self.lines(), []), (self.lines(models=['Fable']), ['no room for Fable']),
+                             (self.lines(models=['fable']), ['no room for Fable'])):
+            self.assertEqual(plan.next_account(accts, lines, self.NOW)['account']['name'], 'b')
+            b = plan.order(accts, lines, self.NOW)[1]
+            self.assertEqual((b['name'], b['usable'], b['reason'], b['blocked_by'], b['back_at'], b['notes']),
+                             ('b', True, None, [], None, notes))
+        # counted, it orders the landing places: c, with room for Fable, comes before b, whose week refills sooner
+        accts.append(self.acct('c', 20, 2 * D, models={'Fable': (10, 2 * D)}))
+        self.assertEqual(self.names(accts), ['a', 'b', 'c'])
+        self.assertEqual(self.names(accts, models=['Fable']), ['a', 'c', 'b'])
 
     def test_unknown_and_untrusted_readings_are_never_landed_on(self):
         accts = [self.acct('a', 50, 3 * D, active=True), self.acct('b', 10, 1 * D, trusted=False),

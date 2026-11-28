@@ -25,7 +25,10 @@ GET_KEYS = {'schema', 'key', 'value', 'default', 'refused'}
 # A value for each setting `config set` sets, as typed, and as `config get` says it back.
 VALUES = {'auto': ('on', 'on'), 'auto_policy.session_at': ('80', '80'), 'auto_policy.weekly_at': ('85.5', '85.5'),
           'auto_policy.model_at': ('70', '70'), 'auto_policy.model': ('Fable', 'Fable'),
-          'auto_policy.strategy': ('most-room', 'most-room'), 'awake': ('off', 'off')}
+          'auto_policy.strategy': ('most-room', 'most-room'), 'awake': ('off', 'off'),
+          'auto_policy.pick_hold': ('until_out', 'until_out'),
+          # the other way from its default, whichever that is
+          'auto_policy.sign_lines': ('off', 'off') if config.BY_KEY['auto_policy.sign_lines'].default else ('on', 'on')}
 
 
 def page_keys():
@@ -197,6 +200,9 @@ class SetAndUnset(Config):
                                  ('auto_policy.weekly_at', 'nan', week),
                                  ('auto_policy.strategy', 'fastest',
                                   'auto_policy.strategy takes refills-first, most-room or stay-then-refills.'),
+                                 ('auto_policy.pick_hold', 'always',
+                                  'auto_policy.pick_hold takes default, until_out or off.'),
+                                 ('auto_policy.sign_lines', 'maybe', 'auto_policy.sign_lines takes on or off.'),
                                  ('auto', 'maybe', 'auto takes on or off.')):
             with self.subTest(key=key, typed=typed):
                 self.assertEqual(self.run_cli('config', 'set', key, typed)[0], 'refused: %s' % said)

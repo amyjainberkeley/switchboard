@@ -10,7 +10,7 @@ Switchboard shows Codex (OpenAI's app) beside the Claude accounts, and can carry
 - `switchboard back`: brings a note of what was done there back to the chat that was left.
 - `switchboard hand PROVIDER -- JOB`: one read-only job for Codex in this folder, in a terminal, up to 15 minutes, with its answer printed. On its first run on a Mac it asks one question about OpenAI's terms.
 - `switchboard stay PROVIDER` keeps a folder's chats on one assistant; `switchboard order` sets the order `continue` follows.
-- The page, `switchboard`, the menu bar and `switchboard doctor` show Codex's room and limits beside the accounts once it is added.
+- Once it is added, Codex is a numbered row of the list `switchboard` prints, after the Claude accounts, with its plan and two bars: pressing its number carries this folder's newest chat on in Codex. The menu bar and the page show the same row; their Continue here opens Codex's own app with a note of the chat as a draft, for the person to send there. A Codex that is added but cannot be continued to has one line under the list saying why (`not signed in`, `not on this Mac`), and `switchboard doctor` gives its state with what to do.
 - This skill goes in for Codex too, in `~/.agents/skills/switchboard`, when Codex is on the Mac.
 
 Nothing moves on its own: every move starts with a command the person types, and no flag gives the yes. A command run from an agent's own shell, with no terminal, never gives the yes and starts nothing: it prints the line to run instead.

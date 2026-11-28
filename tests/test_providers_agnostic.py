@@ -80,6 +80,7 @@ class EachAdapterHoldsItsOwnFacts(unittest.TestCase):
         self.assertEqual(p.own_rules, '')
         self.assertIs(p.account_list, False)
         self.assertEqual((p.session_env, p.rule_files, p.rule_dirs), ('', (), ()))
+        self.assertEqual(p.plan_phrase, '')
 
     def test_claude(self):
         c = self.cls(providers.ids()[0])
@@ -93,6 +94,7 @@ class EachAdapterHoldsItsOwnFacts(unittest.TestCase):
         self.assertEqual(c.session_env, 'CLAUDE_CODE_SESSION_ID')
         self.assertEqual(c.rule_files, ('CLAUDE.md', 'CLAUDE.local.md', os.path.join('.claude', 'CLAUDE.md')))
         self.assertEqual(c.rule_dirs, (os.path.join('.claude', 'rules'),))
+        self.assertEqual(c.plan_phrase, 'Claude plan')
 
     def test_codex(self):
         c = self.cls(providers.ids()[1])
@@ -104,6 +106,7 @@ class EachAdapterHoldsItsOwnFacts(unittest.TestCase):
         self.assertEqual(c.own_rules, '')
         self.assertIs(c.account_list, False)
         self.assertEqual((c.session_env, c.rule_files, c.rule_dirs), ('', ('AGENTS.md', 'AGENTS.override.md'), ()))
+        self.assertEqual(c.plan_phrase, 'ChatGPT plan')
 
     def test_every_billing_prefix_starts_a_name_in_billing_env(self):
         for pid in providers.ids():
@@ -120,7 +123,7 @@ class EachAdapterHoldsItsOwnFacts(unittest.TestCase):
                                                  'AGENTS.md', 'AGENTS.override.md'), (os.path.join('.claude', 'rules'),)))
 
     def test_the_tables_keyed_by_id_are_gone_from_words(self):
-        for gone in ('APP_NAMES', 'SIGN_IN', 'PROVIDER_NAMES'):
+        for gone in ('APP_NAMES', 'SIGN_IN', 'PROVIDER_NAMES', 'PLAN_OF'):
             self.assertFalse(hasattr(words, gone), gone)
 
 

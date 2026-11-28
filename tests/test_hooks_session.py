@@ -7,6 +7,7 @@ import itertools
 import json
 import os
 import subprocess
+import sys
 import time
 import unittest
 from unittest import mock
@@ -14,7 +15,7 @@ from unittest import mock
 from fakes_links import A, B, C, G, ID1, ID2, ID3, LINK, Home
 
 from switchboard import notify_hooks, session_hooks, statusline
-from switchboard.accounts import api
+from switchboard.accounts import api, keychain
 
 NOW = 1_800_000_000.0
 FORBIDDEN = ('sign in', 'sign-in', 'may have been deleted', 'may be deleted', 'might have been deleted',
@@ -205,17 +206,18 @@ class HookSandbox(Home):
 
 
 class SessionStartSays(HookSandbox):
-    def test_the_accounts_move_items_are_not_deleted_and_the_exact_commands(self):
-        self.owners(chrome={'profiles': {'P1': {'extension': False, 'account': A}}, 'host': True})
+    def test_the_accounts_move_items_are_not_deleted_and_the_owner_command(self):
+        # Two short sentences and no address: Claude in Chrome's note comes when a Chrome tool is used (PreToolUse),
+        # and the open and run commands with the owner filled in come with a "not found" (not_found_context).
+        accounts = {A: {'opens': 'P1', 'profile_name': 'Work', 'slot': 1, 'plan': 'Max 20x'}, B: {'slot': 2}}
+        self.owners(accounts=accounts, chrome={'profiles': {'P1': {'extension': False, 'account': A}}, 'host': True})
         said = self.hook(self.event('SessionStart', source='startup'))
-        self.assertIn('now on %s' % A, said)
-        self.assertIn('now on %s; 2 other accounts)' % A, said)            # counted, never named
+        self.assertIn("now account 1 in `switchboard`'s list, Max 20x", said)
+        self.assertNotIn('@', said)
         self.assertIn('not deleted', said)
         self.assertIn('do not run /login or /logout', said)
-        for cmd in ('`switchboard owner <link>`', '`switchboard open <link>`', '`switchboard run <owner> -- -p'):
-            self.assertIn(cmd, said)
-        self.assertIn('Claude in Chrome follows the account Claude Code is on: for %s it is the Google Chrome profile '
-                      '"Work" (the Claude extension is not in that profile yet)' % A, said)
+        self.assertIn('`switchboard owner <link>`', said)
+        self.assertNotIn('Claude in Chrome', said)
         with open(os.path.join(self.data, 'hooks', 's-1.json')) as f:
             rec = json.load(f)
         self.assertEqual(rec['account'], A)
@@ -223,9 +225,10 @@ class SessionStartSays(HookSandbox):
     def test_after_a_compaction_it_is_said_again_and_a_resumed_session_hears_where_it_was(self):
         self.owners()
         self.hook(self.event('SessionStart', source='startup'))
-        self.owners(active=B, timeline=[[A, NOW - 7200], [B, NOW - 60]])
+        self.owners(active=B, timeline=[[A, NOW - 7200], [B, NOW - 60]],
+                    accounts={A: {'opens': 'P1', 'slot': 1}, B: {'opens': 'P2', 'slot': 2}})
         said = self.hook(self.event('SessionStart', source='resume'))
-        self.assertIn('This chat was on %s before; what it made then belongs to %s.' % (A, A), said)
+        self.assertIn('This chat was on account 1 before; what it made then belongs to account 1.', said)
         self.assertIsNone(self.hook(self.event('UserPromptSubmit')))    # already told at its start
 
     def test_a_session_on_its_own_login_is_told_so_and_nothing_else_moves_it(self):
@@ -233,7 +236,7 @@ class SessionStartSays(HookSandbox):
         env = {'CLAUDE_CONFIG_DIR': os.path.join(self.tmp, 'own-profile')}
         said = self.hook(self.event('SessionStart', source='startup'), env=env)
         self.assertIn('runs on its own login', said)
-        self.assertNotIn('now on', said)
+        self.assertNotIn('(now', said)
         self.owners(active=B, timeline=[[A, NOW - 7200], [B, NOW - 60]])
         self.assertIsNone(self.hook(self.event('UserPromptSubmit'), env=env))
         said = self.hook(self.event('PostToolUseFailure', tool_name='Artifact', tool_input={'url': LINK % ID1},
@@ -249,7 +252,7 @@ class SessionStartSays(HookSandbox):
     def test_nothing_without_the_page_s_map_but_still_the_commands(self):
         said = self.hook(self.event('SessionStart', source='startup'))
         self.assertIn('`switchboard owner <link>`', said)
-        self.assertNotIn('now on', said)
+        self.assertNotIn('(now', said)
 
 
 class OncePerSwitch(HookSandbox):
@@ -466,16 +469,30 @@ class TheRealCommand(HookSandbox):
         return r, time.monotonic() - began
 
     def test_session_start_and_a_not_found_through_the_shell(self):
-        self.owners(active=B)
+        self.owners(active=B, accounts={A: {'opens': 'P1', 'slot': 1}, B: {'opens': 'P2', 'slot': 2}})
         r, took = self.run_hook(self.event('SessionStart', source='startup'))
         self.assertEqual(r.returncode, 0)
         got = json.loads(r.stdout.decode())
-        self.assertIn('now on %s' % B, got['hookSpecificOutput']['additionalContext'])
+        self.assertIn("now account 2 in `switchboard`'s list", got['hookSpecificOutput']['additionalContext'])
+        self.assertNotIn('@', got['hookSpecificOutput']['additionalContext'])
         r, _ = self.run_hook(self.event('PostToolUseFailure', tool_name='Artifact', tool_input={'url': LINK % ID1},
                                         error='artifact not found'))
         self.assertIn('belongs to %s' % A, json.loads(r.stdout.decode())['hookSpecificOutput']['additionalContext'])
         r, _ = self.run_hook(self.event('UserPromptSubmit'))
         self.assertEqual((r.returncode, r.stdout), (0, b''))
+
+    def test_run_as_the_hook_it_reaches_the_one_test_fence(self):
+        # As Claude Code runs it (this file's folder on the path, -I -S, outside the package), the hook asks
+        # keychain.test_run: off without Switchboard's test mode, so a real chat's move to an item's owner is asked
+        # for; on in a test run, where only a stand-in is asked.
+        folder = os.path.dirname(os.path.abspath(session_hooks.__file__))
+        code = ('import sys; D = %s; sys.path[:] = [p for p in sys.path if p] + [D]; import session_hooks; '
+                'print(session_hooks._test_run())' % json.dumps(folder))
+        plain = dict((k, v) for k, v in os.environ.items() if k != keychain.TEST_RUN_VAR)
+        for env, said in ((plain, b'False'), (dict(os.environ), b'True')):
+            with self.subTest(test_mode=env is not plain):
+                r = subprocess.run([sys.executable, '-I', '-S', '-c', code], capture_output=True, env=env, timeout=60)
+                self.assertEqual((r.returncode, r.stdout.strip()), (0, said), r.stderr.decode())
 
     def test_a_broken_python_still_exits_zero(self):
         cmd = session_hooks.command(python='/nowhere/python3')

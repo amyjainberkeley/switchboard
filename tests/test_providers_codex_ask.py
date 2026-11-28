@@ -3,7 +3,8 @@ import _isolate  # noqa: F401  (first: it gives switchboard a throwaway data fol
 # Codex's numbers (DESIGN 8.2 and 8.3). Saved numbers come from the chat reader (a stand-in here) with no process and
 # no network. Asking Codex now starts nothing until the person's one yes (ask_ok); then exactly the four lines of 8.3
 # go to a stand-in fake-codex app server of each copied version, every answer fits that version's generated schema,
-# the email is never kept, a server request is answered -32601, and every way an ask can end is one of
+# the account's email is kept only to name Codex's row in the list (its ids never), a server request is answered
+# -32601, and every way an ask can end is one of
 # contract.ASK_OUTCOMES: an API-key account, a time-out, an overloaded server, a server that closes, a second ask while
 # one is running, an ask too soon after the last, a back-off that doubles to an hour, and a Codex folder that is not
 # the one expected.
@@ -13,6 +14,7 @@ import os
 import sys
 import time
 import unittest
+from unittest import mock
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, '..'))
@@ -145,28 +147,131 @@ class TheExchange(Base):
         self.assertIn('HOME', start['env'])
         self.assertEqual(self.fake.forbidden(), [])
 
-    def test_the_email_is_never_kept(self):
+    def test_the_email_is_kept_for_the_list_and_nothing_else(self):
+        # The account's email names Codex's row in the one list, as a Claude account's email names its row: it is
+        # kept in the readings file under 'codex' and nowhere else, and only account/read's answer may hold it. The
+        # account's ids are still dropped as each answer is parsed, and nothing of the login is ever read.
+        self.fake.spec(account={'account': {'type': 'chatgpt', 'email': EMAIL, 'planType': 'pro',
+                                            'userId': 'user-made-up-01', 'accountId': 'acct-made-up-01'},
+                                'requiresOpenaiAuth': True})
         answers = []
         p = self.p
 
         class Watching(CodexProvider):
-            def _await(self, pipe, want, deadline):
-                got = super()._await(pipe, want, deadline)
-                answers.append(repr(got))
+            def _await(self, pipe, want, deadline, keep=()):
+                got = super()._await(pipe, want, deadline, keep)
+                answers.append((want, repr(got)))
                 return got
         self.p = Watching(p.reach)
         self.p.facts, self.p.chatfiles, self.p.choices, self.p.locks = p.facts, p.chatfiles, p.choices, p.locks
         got = self.ask()
+        self.assertEqual(got.ask, contract.ASK_DONE)
         self.assertEqual(len(answers), 3)
-        self.assertIn("'planType': 'pro'", answers[1])
-        for text in answers:                    # dropped as each line is parsed, so no parsed answer ever held it
-            self.assertNotIn(EMAIL, text)
+        self.assertIn("'planType': 'pro'", answers[1][1])
+        for want, text in answers:
+            for gone in ('user-made-up-01', 'acct-made-up-01'):
+                self.assertNotIn(gone, text)
+            if want != 2:
+                self.assertNotIn(EMAIL, text)
         self.assertNotIn(EMAIL, repr(got))
         self.assertNotIn(EMAIL, repr(vars(self.p)))
+        self.assertEqual(self.p.account_email(), EMAIL)
+        readings = os.path.join(self.rig.data, contract.READINGS_FILE)
         for folder, _, names in os.walk(self.rig.data):
             for name in names:
-                with open(os.path.join(folder, name), 'rb') as f:
-                    self.assertNotIn(EMAIL.encode(), f.read(), name)
+                path = os.path.join(folder, name)
+                with open(path, 'rb') as f:
+                    held = EMAIL.encode() in f.read()
+                self.assertEqual(held, path == readings, name)
+        with open(readings) as f:
+            self.assertEqual(json.load(f)['codex']['email'], EMAIL)
+
+    def test_only_an_email_is_kept_as_one(self):
+        for said in ('not an email', 'a@b', 'x\x1b[31m@made-up.example', 'x' * 250 + '@made-up.example', 42, None):
+            with self.subTest(said=said):
+                os.makedirs(os.path.join(self.rig.data, 'providers'), exist_ok=True)
+                with open(os.path.join(self.rig.data, contract.ASK_FILE), 'w') as f:
+                    json.dump({}, f)                # no pacing: each ask runs
+                self.fake.spec(account={'account': {'type': 'chatgpt', 'email': said, 'planType': 'pro'},
+                                        'requiresOpenaiAuth': True})
+                self.assertEqual(self.ask().ask, contract.ASK_DONE)
+                self.assertIsNone(self.p.account_email())
+
+    def test_no_email_before_codex_was_asked(self):
+        self.assertIsNone(self.p.account_email())
+        self.assertEqual(self.p.seats(), (contract.Seat('codex', 'codex', 'ChatGPT Pro', 'pro', True),))
+
+
+class AKeptEmailThatMayBeOld(Base):
+    # A kept email is shown only while Codex's sign-in file is as it was when the email was read: its presence and its
+    # change time, looked at with os.stat alone (the file is never opened). Otherwise the row is named "Codex" until the
+    # next ask. An ask whose answer has no email keeps one that is still current.
+    def login(self):
+        return os.path.join(self.rig.home, '.codex', codex_facts.LOGIN_FILE)
+
+    def sign_in(self, at):
+        os.makedirs(os.path.dirname(self.login()), exist_ok=True)
+        with open(self.login(), 'w') as f:
+            f.write('{"made-up": true}')
+        os.utime(self.login(), (at, at))
+
+    def ask_with(self, email):
+        os.makedirs(os.path.join(self.rig.data, 'providers'), exist_ok=True)
+        with open(os.path.join(self.rig.data, contract.ASK_FILE), 'w') as f:
+            json.dump({}, f)                    # no pacing: each ask runs
+        account = {'type': 'chatgpt', 'planType': 'pro'}
+        if email:
+            account['email'] = email
+        self.fake.spec(account={'account': account, 'requiresOpenaiAuth': True})
+        self.assertEqual(self.ask().ask, contract.ASK_DONE)
+
+    def test_shown_while_the_sign_in_file_is_as_it_was(self):
+        self.sign_in(self.rig.clock() - 3600)
+        self.ask_with(EMAIL)
+        self.rig.clock.advance(86400 * 30)
+        self.assertEqual(self.p.account_email(), EMAIL)
+
+    def test_a_sign_in_file_changed_since_hides_it(self):
+        self.sign_in(self.rig.clock() - 3600)
+        self.ask_with(EMAIL)
+        self.sign_in(self.rig.clock() + 60)     # Codex was signed in again (perhaps as another account)
+        self.assertIsNone(self.p.account_email())
+        self.rig.clock.advance(120)
+        self.ask_with(EMAIL)                    # the next ask, after that, names it again
+        self.assertEqual(self.p.account_email(), EMAIL)
+
+    def test_a_sign_in_file_that_came_or_went_hides_it(self):
+        self.ask_with(EMAIL)                    # no file: the sign-in was elsewhere (the Keychain)
+        self.assertEqual(self.p.account_email(), EMAIL)
+        self.sign_in(self.rig.clock() - 3600)   # a file now, even an older one: not as it was
+        self.assertIsNone(self.p.account_email())
+        self.ask_with(EMAIL)
+        os.remove(self.login())                 # signed out
+        self.assertIsNone(self.p.account_email())
+
+    def test_an_ask_with_no_email_keeps_a_current_one_and_drops_an_old_one(self):
+        self.sign_in(self.rig.clock() - 3600)
+        self.ask_with(EMAIL)
+        self.ask_with(None)
+        self.assertEqual(self.p.account_email(), EMAIL)
+        self.sign_in(self.rig.clock() + 60)
+        self.ask_with(None)
+        self.assertIsNone(self.p.account_email())
+        self.sign_in(self.rig.clock() - 3600)   # even back to an older time, what was dropped stays dropped
+        self.assertIsNone(self.p.account_email())
+
+    def test_the_sign_in_file_is_never_opened(self):
+        self.sign_in(self.rig.clock() - 3600)
+        self.ask_with(EMAIL)
+        opened = []
+        real_open = open
+
+        def watching(path, *a, **k):
+            opened.append(str(path))
+            return real_open(path, *a, **k)
+        with mock.patch('builtins.open', watching):
+            self.assertEqual(self.p.account_email(), EMAIL)
+        self.assertFalse([p for p in opened if p.endswith(codex_facts.LOGIN_FILE)])
 
     def test_a_server_request_is_answered_unsupported(self):
         self.fake.spec(server_request_first=True, notify_first=True)
@@ -328,7 +433,31 @@ class KeptReadings(Base):
             self.assertEqual(got.windows, (Window('weekly', 42.0, 1800090000.0, 10080, 95.0),))
         self.assertEqual(self.readings()['claude'], {'made-up': 1})
         self.assertEqual(os.stat(path).st_mode & 0o777, 0o600)
-        self.assertNotIn(EMAIL, json.dumps(self.readings()))
+        # the email names Codex's row in the list (kept under 'codex' beside the numbers), with when it was read and
+        # whether Codex's sign-in file was there then; nothing else of the account
+        self.assertEqual(sorted(self.readings()['codex']),
+                         ['email', 'email_at', 'login', 'plan', 'reached', 'read_at', 'seat', 'windows'])
+        self.assertEqual(self.readings()['codex']['email'], EMAIL)
+        self.assertEqual((self.readings()['codex']['email_at'], self.readings()['codex']['login']),
+                         (1800000000.0, False))
+
+    def test_its_seat_takes_the_plan_from_the_numbers_already_read(self):
+        # One board build reads Codex's saved numbers once: the seat's plan comes from that same reading.
+        self.rig.chatfiles.calls.clear()
+        p = self.rig.make()
+        lim = p.limits()[0]
+        (seat,) = p.seats()
+        self.assertEqual(seat.plan, lim.plan)
+        self.assertEqual(len([c for c in self.rig.chatfiles.calls if c[0] == 'saved_limits']), 1)
+        self.assertEqual(self.rig.make().seats()[0].plan, lim.plan)     # alone, it reads them itself
+
+    def test_a_kept_email_says_codex_is_signed_in(self):
+        # Only Codex's own answer to an ask can have kept an account's email: with its sign-in in the Keychain (no
+        # sign-in file), that is the proof it is signed in. The missing file alone never says it is not.
+        self.assertIsNone(self.p.signed_in())
+        self.asked(42)
+        self.assertIs(self.p.signed_in(), True)
+        self.assertIs(self.rig.make().detect().signed_in, True)
 
     def test_a_newer_reading_in_codexs_own_files_wins(self):
         self.asked(42)
@@ -345,6 +474,15 @@ class KeptReadings(Base):
         got = self.p.limits()[0]
         self.assertEqual(got.source, 'ask')
         self.assertEqual((got.windows[0].used_pct, got.windows[0].resets_at), (None, 1800000060.0))
+
+    def test_a_kept_reached_word_is_dropped_once_its_window_has_refilled(self):
+        self.fake.spec(rate_limits={'rateLimits': snapshot(100, reached='rate_limit_reached', resets=1800000060)})
+        self.assertEqual(self.ask().reached, 'rate_limit_reached')
+        self.rig.clock.advance(30)
+        self.assertEqual(self.p.limits()[0].reached, 'rate_limit_reached')
+        self.rig.clock.advance(90)
+        got = self.p.limits()[0]
+        self.assertEqual((got.source, got.reached, got.windows[0].used_pct), ('ask', None, None))
 
     def test_a_reading_older_than_seven_days_is_not_used(self):
         self.asked(42)

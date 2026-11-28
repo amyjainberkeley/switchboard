@@ -103,8 +103,8 @@ EVENT_KINDS = (PERSON, ASSISTANT, TOOL_CALL, TOOL_RESULT, SUMMARY, BOUNDARY, PLA
 KEEP_TOOL_INPUT = 2000
 # The longest command that is split the shell's way, in characters (lines.shell_words()): as much of a command as a
 # note keeps. A longer one is a script or a file's text given in one command, and shlex reads it a character at a
-# time, slower still inside one long quoted word (2 s for 200,000 characters). Counted on one real 36 MB chat: 880
-# commands up to this length took 0.4 s to split, the 339 longer ones 20 s, of a read that has 5.
+# time, slower still inside one long quoted word (2 s for 200,000 characters). Counted on one real 36 MB chat
+# (Nov 26): 880 commands up to this length took 0.4 s to split, the 339 longer ones 20 s, of a read that has 5.
 SPLIT_MAX = KEEP_TOOL_INPUT
 KEEP_TOOL_RESULT = 4000
 KEEP_PERSON = 24000         # the person's newest message is kept to this (the head and the tail, the cut said)
@@ -286,12 +286,15 @@ class Program:
     'plugin' (a copy an app keeps for itself), 'extension' (an editor extension's private copy) or 'versions' (a
     folder of installed versions). where: a short plain name for the person ('ChatGPT.app', 'your PATH'). refused:
     None when the copy may be chosen, else a plain reason it never is ('a copy the app keeps for itself', 'its folder
-    can be changed by other users')."""
+    can be changed by other users'). unread: its version was never asked (no answer kept, and nothing ran to ask, as
+    when the board looks): it may still be chosen once asked. A refused copy that was never asked for that reason
+    (not trusted, the app's own) is never unread."""
     path: str
     version: Optional[str]
     source: str
     where: str
     refused: Optional[str] = None
+    unread: bool = False
 
 
 @dataclass(frozen=True)
@@ -316,12 +319,15 @@ class Window:
     """One limit, in the provider's own words. label: named from its real length ('5-hour', 'weekly', '3-day'), or
     a model's ('Opus'). used_pct: 0..100, None when not known (a window whose reset has passed since it was read is
     None: it has refilled and nothing has been read since). resets_at: epoch seconds or None. length_min: the
-    window's length in minutes when the app says it. line: the percent at which Switchboard counts it as full."""
+    window's length in minutes when the app says it. line: the percent at which Switchboard counts it as full.
+    seat_wide: False for a model's own week (Claude's Fable week): it says whether the seat can serve that model,
+    never whether the seat has room, so it never makes a seat out (policy.unusable_by_windows)."""
     label: str
     used_pct: Optional[float]
     resets_at: Optional[float]
     length_min: Optional[int] = None
     line: Optional[float] = None
+    seat_wide: bool = True
 
 
 @dataclass(frozen=True)
@@ -571,9 +577,15 @@ class Provider:
     session_env = ''                        # the name its app sets in its own shell to the chat that shell runs in
     rule_files: Tuple[str, ...] = ()        # a project's rule files its app reads, relative to a project folder
     rule_dirs: Tuple[str, ...] = ()         # folders of more rule files (*.md) its app reads, relative to one
+    plan_phrase = ''                        # its plans in a sentence ('ChatGPT plan'); '' says 'plan'
 
     def __init__(self, reach: Reach):
         self.reach = reach
+
+    def started_in(self, path: str) -> Optional[str]:
+        """The folder one of its chat files says the chat was started in (its own first lines), or None when the
+        file cannot tell (or this adapter's chats are never carried over from). Reads one file's head; runs nothing."""
+        return None
 
     def _unsupported(self, what: str, why: str = '') -> Unsupported:
         return Unsupported(self.id, what, why or '%s cannot do that in this version of Switchboard.' % self.name)

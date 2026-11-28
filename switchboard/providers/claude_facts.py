@@ -33,6 +33,11 @@ VERSION_PROBE_S = 10.0          # seconds a --version probe may take
 # A start: `claude "<first message>"` opens an interactive session with that first message; `claude --resume <id>
 # "<words>"` opens that chat again with them (2.1.309 help: "-r, --resume [value]", "prompt  Your prompt").
 RESUME_FLAG = '--resume'
+# On a new task (switchboard do), a start may also carry these options, each with its value and nothing else
+# (2.1.309 help: "--model <model>  Model for the current session", "--effort <level>  Effort level for the current
+# session").
+TASK_FLAGS = ('--model', '--effort')
+TASK_VALUE_RE = re.compile(r'^[A-Za-z0-9][A-Za-z0-9._\[\]-]{0,63}\Z')
 # Flags a start never carries: they loosen the person's own permission checks, or run without a person (-p, whose
 # runs use an API key from the settings file whenever one is there).
 NEVER_FLAGS = ('--dangerously-skip-permissions', '--allow-dangerously-skip-permissions', '--permission-mode',

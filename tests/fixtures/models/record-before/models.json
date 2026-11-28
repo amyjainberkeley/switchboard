@@ -1,0 +1,41 @@
+{
+ "dirs": {
+  "@CLAUDE@": {
+   "history": [
+    {
+     "at": 1795000000.0,
+     "files": [
+      {
+       "backup": "@CLAUDE@/settings.json.switchboard-backup",
+       "existed": true,
+       "made_dirs": [],
+       "mode": 420,
+       "path": "@CLAUDE@/settings.json",
+       "removed_dirs": [],
+       "sha_after": "53821279f277bfdb404cc3433982100e5a5bc6a3a948b80e08720946814e306e",
+       "sha_before": "9a75e9ed1e016c6c20882c2d2396a90b674dfdee7bebb9f671b832e5e837c278"
+      }
+     ],
+     "owned_before": {
+      "agents": {},
+      "settings": {}
+     },
+     "preset": "by-the-job",
+     "preset_before": null
+    }
+   ],
+   "owned": {
+    "agents": {},
+    "settings": {
+     "env.CLAUDE_CODE_SUBAGENT_MODEL": {
+      "made_env": false,
+      "made_file": false,
+      "value": "sonnet"
+     }
+    }
+   },
+   "preset": "by-the-job"
+  }
+ },
+ "version": 1
+}

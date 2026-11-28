@@ -25,7 +25,7 @@ import time
 from datetime import datetime, timezone
 
 from . import core
-from .accounts import api
+from .accounts import api, policy
 from .core import SwitchError, claude_json, data_path, home, log, read_json
 
 # ---------- automatic switching's choices, as the page offers them ----------
@@ -33,8 +33,13 @@ from .core import SwitchError, claude_json, data_path, home, log, read_json
 STRATEGIES = ('refills-first', 'most-room', 'stay-then-refills')    # what refills first (the default), the most
 # room, or stay on the account in use until a line and then go to what refills first
 DEFAULT_STRATEGY = 'refills-first'
+# An older build's word for an order, taken as the order it always meant (as policy.ORDER_ALIASES reads it). None
+# now: a stored word this build does not know reads as the default order, which is what the older word meant.
+ORDER_ALIASES = {}
 RULES = ('in', 'last', 'out')       # an account in auto-switch: used as usual, used last, kept out of auto-switch
 DEFAULT_SESSION, DEFAULT_WEEKLY, DEFAULT_MODEL_LINE = 90.0, 95.0, 95.0
+PICK_HOLDS, DEFAULT_PICK_HOLD = policy.PICK_HOLDS, policy.Settings.pick_hold   # an account picked by hand: how long
+DEFAULT_SIGN_LINES = policy.Settings.sign_lines     # moving before Claude Code's usage sign shows
 LINE_MIN, LINE_MAX = 50.0, 99.9
 MODEL_RE = re.compile(r'^[A-Za-z0-9][A-Za-z0-9 ._-]{0,39}$')
 GUARD = "Another program is also switching Claude Code's login (%s). Turn it off first."
@@ -393,10 +398,12 @@ def _health_known(key, v, said):
                       % checked)
     if key == 'keychain' and isinstance(v, dict) and ('searchable' in v or 'counts' in v):
         why = v.get('resting_all')
-        needs_you = ('locked', 'no_tool', 'dialog')     # a NO only for what needs the person: unlock the Mac, answer
-        if why:                                         # macOS's dialog, or the tool itself is gone
+        needs_you = ('locked', 'no_tool', 'test_run', 'dialog')     # a NO only for what needs the person: unlock the
+        if why:                                         # Mac, answer macOS's dialog, or the tool itself is gone
+            from .accounts import keychain as kc_words
             return (False if why in needs_you else None), "macOS's Keychain: %s" % {
                 'locked': 'locked (unlock the Mac)', 'no_tool': 'its tool, /usr/bin/security, is missing',
+                'test_run': 'not asked: %s' % kc_words.TEST_RUN_WORDS,
                 'dialog': 'waiting for you to answer its dialog',
                 'timeout': 'slow to answer just now', 'busy': 'busy just now',
                 'no_keychain': 'not reachable from here (a terminal on the Mac itself reaches it)'}.get(why, why)
@@ -471,13 +478,27 @@ def health_lines(h):
 
 # ---------- another program that switches Claude Code's login too ----------
 
-OUR_LABELS = ('io.github.amyjainberkeley.switchboard',)
+# Our launch agents' labels (a label that starts with one is ours): this build's ids first, then the ids an older
+# install used, so a Mac whose install has not moved to the new ids yet is never "another program" either.
+OUR_LABELS = ('io.github.amyjainberkeley.switchboard', 'io.github.amyjainberkeley.switchboard.watch',
+              'io.github.claude-switchboard', 'io.github.claude-switchboard.watch')
 SWITCH_WORDS = ('switch', 'swap', 'rotate', 'account')
+
+
+def job_words(label, job):
+    """The words a launch agent is judged by, in lower case: its label, then the basename of its program and of each
+    argument that is a path (one with a '/'), and each other argument as it is. Folder names never count: a job is
+    judged by what it is, not by where its files live (a folder named like a switcher holds many other programs)."""
+    args = job.get('ProgramArguments') if isinstance(job.get('ProgramArguments'), list) else []
+    program = [job['Program']] if isinstance(job.get('Program'), str) else []
+    said = [os.path.basename(a) if '/' in a else a for a in args + program if isinstance(a, str)]
+    return ' '.join([label] + said).lower()
 
 
 def foreign_switcher(folder=None):
     """The login item (launch agent label) of another program that switches Claude Code's login, or None. Known by
-    what it does: a job of the person's that names Claude and switching, swapping or accounts. Ours never counts."""
+    what it does: a job of the person's whose words (job_words) name Claude and switching, swapping or accounts. Ours
+    never counts."""
     folder = folder or os.path.join(home(), 'Library', 'LaunchAgents')
     try:
         names = sorted(os.listdir(folder))
@@ -496,9 +517,7 @@ def foreign_switcher(folder=None):
         label = job.get('Label') if isinstance(job.get('Label'), str) else name[:-len('.plist')]
         if label.startswith(OUR_LABELS) or job.get('Disabled') is True:
             continue
-        args = job.get('ProgramArguments') if isinstance(job.get('ProgramArguments'), list) else []
-        words = ' '.join([label] + [a for a in args if isinstance(a, str)] +
-                         ([job['Program']] if isinstance(job.get('Program'), str) else [])).lower()
+        words = job_words(label, job)
         if 'claude' in words and any(w in words for w in SWITCH_WORDS) and 'switchboard' not in words:
             return label
     return None
@@ -538,7 +557,8 @@ def auto_settings():
         wanted = HOST.running()
     host = HOST.status(wanted=wanted)
     model = a.get('model') if isinstance(a.get('model'), str) and a.get('model').strip() else None
-    strategy = a.get('strategy') if a.get('strategy') in STRATEGIES else DEFAULT_STRATEGY
+    strategy = order_word(a.get('strategy'))
+    strategy = strategy if strategy in STRATEGIES else DEFAULT_STRATEGY
     rules = a.get('rules') if isinstance(a.get('rules'), dict) else {}
     return {'available': available, 'enabled': enabled, 'service': host['running'], 'running': host['running'],
             'on': host['on'] and enabled, 'starting': host['starting'], 'problem': host['problem'] if enabled else None,
@@ -553,7 +573,9 @@ def auto_settings():
             'model_at': _num(a.get('model_at'), DEFAULT_MODEL_LINE), 'weekly_set': True,
             'strategy': strategy, 'model': model, 'models': counted_models(a, model),
             'rules': dict((k, v) for k, v in rules.items() if isinstance(k, str) and v in RULES[1:]),
-            'own_lines': own_lines_of(a), 'ranks': ranks_of(a)}
+            'own_lines': own_lines_of(a), 'ranks': ranks_of(a),
+            'pick_hold': a.get('pick_hold') if a.get('pick_hold') in PICK_HOLDS else DEFAULT_PICK_HOLD,
+            'sign_lines': a.get('sign_lines') if isinstance(a.get('sign_lines'), bool) else DEFAULT_SIGN_LINES}
 
 
 def counted_models(a, model):
@@ -607,6 +629,11 @@ def loop_wanted(enabled):
         return None
 
 
+def order_word(word):
+    """The order a word names: an older build's word (ORDER_ALIASES) as the order it always meant, any other as it is."""
+    return ORDER_ALIASES.get(word, word) if isinstance(word, str) else word
+
+
 def check_line(value):
     """A switch line as the person typed it: a finite number from 50 to 99.9, never clamped."""
     if value is None:
@@ -618,16 +645,18 @@ def check_line(value):
 
 
 def set_auto(enabled=None, session_at=None, weekly_at=None, model_at=None, model=None, strategy=None, rule=None,
-             line=None, rank=None):
+             line=None, rank=None, pick_hold=None, sign_lines=None):
     """Change automatic switching (every value checked before anything is set), then let the loop's host match it:
     the loop starts when it was not running (it is wanted while auto-switch is on, or while an account is kept), and
     a loop that runs already is left as it is, since it reads the setting again at each pass; a request for a read
     (request_read) starts that pass now. model '' counts no model's week; names with commas between them, or a list,
     count several. rule: (account, 'in' | 'last' | 'out'), the account named as everywhere (number, email, alias or
     id). line: (account, {'session_at': N, 'weekly_at': N}), that account's own lines (a key with None, or None in
-    place of the dict, puts it back on the shared line). rank: (account, 1 to 99 or None). Turning it on is refused
-    while another program switches Claude Code's login."""
+    place of the dict, puts it back on the shared line). rank: (account, 1 to 99 or None). pick_hold (default,
+    until_out, off) and sign_lines (on or off) are checked by the loop's own settings. Turning it on is refused while
+    another program switches Claude Code's login."""
     session_at, weekly_at, model_at = check_line(session_at), check_line(weekly_at), check_line(model_at)
+    strategy = order_word(strategy)
     if strategy is not None and strategy not in STRATEGIES:
         raise SwitchError('Unknown order.')
     if model is not None:
@@ -646,7 +675,8 @@ def set_auto(enabled=None, session_at=None, weekly_at=None, model_at=None, model
         other = foreign_switcher()
         if other:
             raise Refused(GUARD % other, 'guard')
-    more = dict((k, v) for k, v in (('rule', rule), ('line', line), ('rank', rank)) if v is not None)
+    more = dict((k, v) for k, v in (('rule', rule), ('line', line), ('rank', rank), ('pick_hold', pick_hold),
+                                    ('sign_lines', sign_lines)) if v is not None)
     got = _call(api.set_auto, enabled=None if enabled is None else bool(enabled), session_at=session_at,
                 weekly_at=weekly_at, model_at=model_at, model=model,
                 strategy=strategy, **more)

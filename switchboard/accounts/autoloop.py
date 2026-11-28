@@ -103,11 +103,26 @@ SKIPS_EXIT = 10              # passes in a row a stage is skipped because the la
                              # process is the only way to run the stage again. Its host starts one within seconds.
 JOURNAL = 'switch-journal.json'     # the engine's record of a switch under way (accounts/switcher.py)
 JOURNAL_AGAIN = 300.0        # a cut-off switch that could not be settled yet is tried again this often, not every pass
+LOST_UNREADABLE_S = 120.0    # a saved login unreadable this long, while Claude Code's sign-in is lost, counts as lost
+JOURNAL_STALE_S = 120.0      # a switch's journal last written longer ago than this is settled by the pass
+STAY_KEY = 'stay:'           # the need stamp of a move that kept Claude Code signed in, by the account moved off
+STAY_LEFT = 'stay_left'      # in the loop's state: {account id: its fingerprint} of accounts left for a lost sign-in
+MOVE_NOTE = 'move_note'      # in the loop's state: the notification of such a move, written before its switch begins
+MOVE_NOTE_FRESH = 600.0      # the page notices a switch at its next reading of the accounts (4 minutes apart when busy)
+# The put-back's marks (putback.MARKS) that mean the saved login can't be put back. Not 'renewing': that one passes.
+# With the put-back's limit (action and key 'limit', with or without evidence of the fault), these are the only keys of
+# api.PutBack that count as lost: never 'file', 'file_owner', 'file_limit', 'record', 'switched' or 'sealed',
+# and never an answer that wrote or waits ('put_back', 'promote', 'kept', 'wait', 'failed').
+LOST_MARKS = ('missing', 'unreadable', 'incomplete', 'refused', 'ended', 'conflict', 'unproven', 'claimed')
 
 EXIT_SWITCHED, EXIT_ERROR, EXIT_BLOCKED, EXIT_NOTHING, EXIT_BUSY = 0, 1, 3, 4, 5
 EXIT_STUCK_STAGE = 6         # the loop ended itself: a stage never came back (SKIPS_EXIT)
 DISK_FULL_WORDS = ('Your disk is almost full (under 50 MB free), so Switchboard switches accounts again once you free '
                    'some space.')
+PATIENT = ('optional', 'model', 'sign')     # switches that re-read both accounts first and go only on the same answer
+SIGNED_OUT = 'signed_out_said'  # in the loop's state: the lost sign-in with no account to move to, said once
+WANTED = 'wanted'            # in the loop's state: {kind: {'since': stamp, 'seen': stamp}} of the switches wanted
+WANT_GONE_S = 600.0          # a kind no pass has wanted for this long is forgotten (its calm-wait clock starts again)
 
 STAGE_DEADLINE = {'journal': 60, 'live': 35, 'accounts': 10, 'keeping': 30, 'status-line': 10, 'usage': 70,
                   'asked': 70, 'activity': 20, 'verifying': 30, 'switching': 120, 'upkeep': UPKEEP_BUDGET + 15,
@@ -186,6 +201,31 @@ def history_note(text, kind='info', **facts):
         core.log('auto: history note failed (%s)' % type(e).__name__)
 
 
+def _room():
+    from .. import room
+    return room
+
+
+def signed_out_words(email):
+    """The one sentence for a lost sign-in with no other account to move to (History and the notification)."""
+    return ('Claude Code is signed out of %s and no other account is signed in. Sign in on the Switchboard page.'
+            % email) if email else 'Claude Code is signed out and no other account is signed in. Sign in on the ' \
+        'Switchboard page.'
+
+
+def notify_signed_out(email, at):
+    """Send the one notification for a lost sign-in with no account to move to (notify.signed_out), unless
+    notifications are off or this is the demo. Never raises."""
+    try:
+        from .. import notify
+        if core.DEMO or core.settings().get('notify') is False:
+            return False
+        return notify.send(notify.signed_out(email, signed_out_words(email), at))
+    except Exception as e:  # noqa: BLE001 - the History line is said either way
+        core.log('auto: the signed-out notification failed (%s)' % type(e).__name__)
+        return False
+
+
 def put_back_note(res):
     """The notification for a put-back (api.PutBack): the account by its whole email. It promises nothing about open
     chats (Claude Code 2.1.329): a process that was only reading picks the login up when its cached read ends (30 s),
@@ -207,6 +247,70 @@ def notify_put_back(res):
         return notify.send(put_back_note(res))
     except Exception as e:  # noqa: BLE001 - the History line is said either way
         core.log('auto: the put-back notification failed (%s)' % type(e).__name__)
+        return False
+
+
+def signin_times(account_id, live=None):
+    """(access expiry, sign-in end), wall seconds, of the account's login, or (None, None); never reads the Keychain.
+    First from `live` (the pass's api.Live) when it is that account's login read whole: the very login Claude Code
+    holds. Else from the account's record in Switchboard's account list, the login as Switchboard last kept it, which
+    is a generation behind while the keep pass has not filed Claude Code's latest renewal. (Read with getattr: a Live
+    without these times falls back to the record rather than failing the look.)"""
+    expires, rx = _num(getattr(live, 'expires_ms', None)), _num(getattr(live, 'rx_ms', None))
+    if isinstance(live, api.Live) and live.state == api.PRESENT and live.account_id == account_id and \
+            not live.degraded and expires:
+        return expires / 1000.0, (rx / 1000.0 if rx else None)
+    from . import context, vault
+    a = (vault.load(context.current()).get('accounts') or {}).get(account_id) or {}
+
+    def seconds(key):
+        v = _num(a.get(key))
+        return v / 1000.0 if v else None
+    return seconds('expires_ms'), seconds('rx_ms')
+
+
+def _email_of(account):
+    """An account by its whole email, as the page's own state names the account in use: what the loop's note of a move
+    and the page's note of the same switch are matched by (move_body, move_note), so never the longer name
+    policy.label_of gives two accounts that share an email."""
+    return account.email or account.alias or account.id
+
+
+def move_note(text, frm, to, instance=None):
+    """The notification for a move that kept Claude Code signed in: titled as every switch's is, with the move's own
+    sentence. It shares the key of the page's note for the same switch and, with the move's instance (move_body), its
+    instance too, so the two are one notification whichever is sent first and however late."""
+    from .. import notify
+    a, b = notify.account_label(None, frm), notify.account_label(None, to)
+    return notify.Note('switch:%s>%s' % (a, b), 'Switched to %s' % b, text, instance,
+                       None if instance is not None else 60)
+
+
+def move_body(frm, to, now=None):
+    """(body, instance, written at) of the notification of a move that keeps Claude Code signed in from frm to to
+    (whole emails, in any case), as the loop wrote it before the switch began, when that was within MOVE_NOTE_FRESH
+    seconds before now; else None. The page gives its own note for that switch this body and instance."""
+    rec = load_state().get(MOVE_NOTE)
+    now = time.time() if now is None else now
+    if not isinstance(rec, dict) or not all(isinstance(rec.get(k), str) for k in ('frm', 'to', 'body')):
+        return None
+    t = usage.num(rec.get('t'))
+    if t is None or not -usage.AHEAD <= now - t <= MOVE_NOTE_FRESH or \
+            (rec['frm'].lower(), rec['to'].lower()) != (str(frm or '').lower(), str(to or '').lower()):
+        return None
+    return rec['body'], '%.3f' % t, t
+
+
+def notify_move(note):
+    """Send move_note the way every notification is sent, unless notifications are off or this is the demo. Never
+    raises."""
+    try:
+        from .. import notify
+        if core.DEMO or core.settings().get('notify') is False:
+            return False
+        return notify.send(note)
+    except Exception as e:  # noqa: BLE001 - the History line is said either way
+        core.log('auto: the notification of a move failed (%s)' % type(e).__name__)
         return False
 
 
@@ -351,6 +455,171 @@ def last_history_switch(path=None, tail=65536):
     return best
 
 
+def pick_age(email, now, path=None, tail=65536):
+    """Seconds since the person moved Claude Code onto the account in use themselves (the newest switch in
+    history.jsonl is 'by you', from the page, the menu bar or a terminal, onto this email), or None: the last move onto
+    it was automatic or Claude Code's own, or none is known."""
+    if not email:
+        return None
+    p = path or core.data_path('history.jsonl')
+    try:
+        with open(p, 'rb') as f:
+            f.seek(0, 2)
+            size = f.tell()
+            f.seek(max(0, size - tail))
+            data = f.read()
+    except OSError:
+        return None
+    newest = None
+    for line in data.split(b'\n'):
+        if b'"switch"' not in line:
+            continue
+        try:
+            d = json.loads(line)
+        except ValueError:
+            continue
+        t = usage.num(d.get('t')) if isinstance(d, dict) and d.get('kind') == 'switch' else None
+        if t is not None and (newest is None or t >= newest[0]):
+            newest = (t, d)
+    if newest is None:
+        return None
+    t, d = newest
+    to = d.get('to') or d.get('account')
+    if d.get('by') != 'you' or not isinstance(to, str) or to.lower() != email.lower() or t > now + usage.AHEAD:
+        return None
+    return max(0.0, now - t)
+
+
+def refusals_seen(accounts, active, activity, by_account, st, now):
+    """The refusals that count for the loop: ({account id: {family: (when seen, a newer number may clear it)}},
+    {account id: {family: refused.json's entry}}). A refusal counts only for the account it was seen on: refused.json's
+    entries under an account's id or email (never '?': with no account known it counts for nothing here), and the
+    transcripts' notices for the account in use. For the account in use, only one seen after the switch to it (the
+    live login's `t`) counts: a notice written just before, or by a chat still on the old login before the switch,
+    is the old account's. A notice counts LIMIT_FRESH seconds at most (a look that keeps failing keeps an old dict);
+    refused.json's entries for as long as room.refused_families says. still_refused() then drops what a newer number
+    or reply answered."""
+    from .. import room
+    live = st.get('live') or {}
+    since = usage.num(live.get('t')) if live.get('id') == active else None
+    times, entries = {}, {}
+    for a in accounts:
+        cur = a.id == active
+        mine = {}
+        for key in (a.id, a.email):
+            fams = by_account.get(key) if isinstance(key, str) and isinstance(by_account, dict) else None
+            if not isinstance(fams, dict):
+                continue
+            for fam, e in fams.items():
+                at = _num(e.get('at')) if isinstance(e, dict) else None
+                if at is None or (cur and since is not None and at < since):
+                    continue
+                if fam not in mine or at > _num(mine[fam].get('at')):
+                    mine[fam] = e
+        if mine:
+            for fam in room.refused_families({a.id: mine}, a, now, in_use=cur):
+                e = mine[fam]
+                times.setdefault(a.id, {})[fam] = (_num(e.get('at')), e.get('kind') != 'limit_credits')
+                entries.setdefault(a.id, {})[fam] = e
+        if cur:
+            notices = (activity or {}).get('refused') if isinstance(activity, dict) else None
+            for fam, t in (notices if isinstance(notices, dict) else {}).items():
+                t = _num(t)
+                if fam not in policy.FAMILIES or t is None or now - t > sessions.LIMIT_FRESH or t > now + usage.AHEAD:
+                    continue
+                if since is not None and t < since:
+                    continue
+                old = times.setdefault(a.id, {}).get(fam)
+                if old is None or t > old[0]:
+                    times[a.id][fam] = (t, True)
+    return times, entries
+
+
+def _room_read_after(reading, fam, t):
+    """The account's own window of `fam` was read after `t` and shows room (under 100)."""
+    for w in (reading.windows if reading is not None else ()) or ():
+        if not (isinstance(w.name, str) and w.name.startswith(policy.MODEL) and policy.family_of(w.name) == fam):
+            continue
+        at = w.read_at if w.read_at is not None else reading.read_at
+        if at is not None and at > t and w.pct is not None and w.pct < 100:
+            return True
+    return False
+
+
+def still_refused(times, readings, replies=None, active=None):
+    """{account id: families} still refused: of refusals_seen()'s, those that no newer reading of that family's own
+    window with room (under 100), and on the account in use no newer reply of that family in a chat's main loop
+    (the transcripts' 'asked' times), has answered."""
+    out = {}
+    replies = replies if isinstance(replies, dict) else {}
+    for aid, fams in (times or {}).items():
+        r = (readings or {}).get(aid)
+        left = set()
+        for fam, (t, by_numbers) in fams.items():
+            reply = _num(replies.get(fam)) if aid == active else None
+            if reply is not None and reply > t:
+                continue
+            if by_numbers and _room_read_after(r, fam, t):
+                continue
+            left.add(fam)
+        if left:
+            out[aid] = frozenset(left)
+    return out
+
+
+def model_facts(accounts, active, activity, st, now, where=None, readings=None):
+    """What a decision needs to follow the models the chats ask for: {'asked': families or None (not known),
+    'refused': {account id: families}, 'pick_age_s', 'by_account' (refused.json's entries that count, by account id,
+    for the plan), 'refused_at' and 'replies' (for still_refused() after a re-read)}. From the chats' files
+    (room.read_wants, room.read_refused), the transcripts' activity ('asked', 'refused': see refusals_seen), the
+    readings and history.jsonl, and 'keep_running' (room.is_on: Keep running is on, so the words may say a chat goes
+    on with another model). Never raises: anything that can't be read is not known. Her pick is read first and on
+    its own, so a fault in the chats' files never voids it."""
+    out = {'asked': None, 'refused': {}, 'pick_age_s': None, 'by_account': {}, 'refused_at': {}, 'replies': None,
+           'keep_running': False}
+    try:
+        email = next((a.email for a in accounts if a.id == active), None)
+        out['pick_age_s'] = pick_age(email, now)
+    except Exception as e:  # noqa: BLE001 - fail open: no pick known
+        core.log('auto: the pick by hand could not be read (%s)' % type(e).__name__)
+    try:
+        from .. import room
+        out['keep_running'] = room.is_on(where)
+    except Exception as e:  # noqa: BLE001 - not known: the words say what a chat does with it off
+        core.log('auto: whether Keep running is on could not be read (%s)' % type(e).__name__)
+    try:
+        from .. import room
+        wants = room.read_wants(now, where)
+        chat = (activity or {}).get('asked') if isinstance(activity, dict) else None
+        if wants or isinstance(chat, dict):
+            out['asked'] = frozenset(wants) | frozenset(chat or {})
+        out['replies'] = chat if isinstance(chat, dict) else None
+        times, entries = refusals_seen(accounts, active, activity, room.read_refused(where), st, now)
+        out['refused_at'] = times
+        out['refused'] = still_refused(times, readings, out['replies'], active)
+        out['by_account'] = plan_refused(entries, out['refused'])
+    except Exception as e:  # noqa: BLE001 - fail open: decide as before these files existed
+        core.log('auto: the chats\' models could not be read (%s)' % type(e).__name__)
+    return out
+
+
+def with_refused_asked(snap):
+    """A family refused on the account in use counts as asked: a refusal IS a chat asking for it, even when no reply
+    of it came in the last 6 hours (sessions.ASKED_KEEP). With nothing else known, the families policy.asked_families
+    falls back to count too."""
+    ref = (snap.refused or {}).get(snap.active) if snap.active else None
+    if not ref:
+        return snap
+    base = snap.asked if snap.asked is not None else frozenset(policy.asked_families(snap))
+    return dataclasses.replace(snap, asked=frozenset(base) | frozenset(ref))
+
+
+def plan_refused(entries, refused):
+    """refused.json's entries (refusals_seen) of the families still refused, keyed by account id: what the plan reads."""
+    return dict((aid, dict((f, e) for f, e in fams.items() if f in refused.get(aid, ())))
+                for aid, fams in (entries or {}).items() if refused.get(aid))
+
+
 def since_switch(st, clock, history_t=None):
     """Awake seconds since the last switch from any source: the loop's own and need switches, any change of the live
     login the loop saw, and the history's switch lines. None when none is known."""
@@ -364,9 +633,22 @@ def since_switch(st, clock, history_t=None):
     return min(ages) if ages else None
 
 
-def optional_recent(st, clock, within=policy.OPTIONAL_CAP_WINDOW):
-    return sum(1 for r in st.get('switches') or [] if r.get('kind') == 'optional'
+def optional_recent(st, clock, within=policy.OPTIONAL_CAP_WINDOW, kind='optional'):
+    """The loop's own switches of this kind ('optional', 'sign', 'model') within `within` awake seconds."""
+    return sum(1 for r in st.get('switches') or [] if r.get('kind') == kind
                and (usage.since_stamp(r, clock) or 0.0) <= within)
+
+
+def _cap_counts(st, clock):
+    """Snapshot.sign_recent and model_recent (the caps on sign and model moves), only when policy.Snapshot has those
+    fields: on a policy without them nothing is passed and nothing changes."""
+    try:
+        have = set(f.name for f in dataclasses.fields(policy.Snapshot))
+    except TypeError:
+        return {}
+    return dict((name, optional_recent(st, clock, kind=kind)) for name, kind in (('sign_recent', 'sign'),
+                                                                                  ('model_recent', 'model'))
+                if name in have)
 
 
 # ---------- settings ----------
@@ -382,6 +664,10 @@ def load_settings():
     s = core.settings()
     d = dict(s.get(POLICY_KEY)) if isinstance(s.get(POLICY_KEY), dict) else {}
     d['enabled'] = s.get('auto') is True
+    if not isinstance(d.get('sign_lines'), bool):
+        # not turned on or off by the person: policy.Settings' own default (off), whatever
+        # settings_from does with a missing key
+        d['sign_lines'] = policy.Settings().sign_lines
     return policy.settings_from(d)
 
 
@@ -389,7 +675,7 @@ def settings_dict(st=None):
     """The settings as a dict, with 'rules': {account id: 'last' | 'out'} only while an account has one (an account
     with no rule is not in it); likewise 'own_lines': {account id: {'session_at': N, 'weekly_at': N}} (each line only
     when the account has its own), 'ranks': {account id: N}, and 'models' (every model counted) only when there are
-    several ('model' is the first)."""
+    several ('model' is the first); 'pick_hold' and 'sign_lines' only when they are not their defaults."""
     st = st or load_settings()
     out = {'enabled': st.enabled, 'session_at': st.session_at, 'weekly_at': st.weekly_at, 'model_at': st.model_at,
            'model': st.model, 'strategy': st.strategy}
@@ -401,6 +687,9 @@ def settings_dict(st=None):
         out['ranks'] = dict(st.ranks)
     if st.models:
         out['models'] = list(st.models)
+    for k in ('pick_hold', 'sign_lines'):           # only when not their defaults, as the rules are only while set
+        if getattr(st, k) != getattr(policy.Settings, k):
+            out[k] = getattr(st, k)
     return out
 
 
@@ -524,20 +813,26 @@ def _policy_change(changes, keep=None, rule=None, line=None, rank=None):
 
 
 def save_settings(enabled=None, session_at=None, weekly_at=None, model_at=None, model=None, strategy=None, rule=None,
-                  line=None, rank=None):
+                  line=None, rank=None, stay_signed_in=None, pick_hold=None, sign_lines=None):
     """Change automatic switching. Every value is checked before anything is written (never clamped); model '' clears
     it, and names with commas between them (or a list) count several. rule: (account id, 'in' | 'last' | 'out') for
     one saved account; 'in' takes its rule away. line: (account id, {'session_at': N, 'weekly_at': N}) gives that
     account lines of its own (a key with None puts that line back on the shared one; None in place of the dict puts
     both back). rank: (account id, 1 to 99, or None to take it away). A stored rule, line or rank that is not one of
-    those, or whose account is no longer saved, is dropped whenever the policy is written. Returns the new settings as
-    a dict."""
+    those, or whose account is no longer saved, is dropped whenever the policy is written. stay_signed_in: keep
+    Claude Code signed in (policy.stay_why), stored in 'auto_policy' as 'stay_signed_in'; a missing key means on. An
+    older build's word for an order (policy.ORDER_ALIASES) is taken, and stored as the order it names. pick_hold
+    (policy.PICK_HOLDS) and sign_lines (on or off) are stored in 'auto_policy' too. Returns the new settings as a
+    dict."""
     lines = dict((k, _line_value(v)) for k, v in (('session_at', session_at), ('weekly_at', weekly_at),
                                                    ('model_at', model_at)) if v is not None)
+    strategy = policy.order_word(strategy)
     if strategy is not None and strategy not in policy.STRATEGIES:
         raise api.AccountsError('other', 'Pick %s or %s.' % (', '.join(policy.STRATEGIES[:-1]), policy.STRATEGIES[-1]))
     if enabled is not None and not isinstance(enabled, bool):
         raise api.AccountsError('other', 'Automatic switching is either on or off.')
+    if stay_signed_in is not None and not isinstance(stay_signed_in, bool):
+        raise api.AccountsError('other', 'Keeping Claude Code signed in is either on or off.')
     model = None if model is None else model_value(model) or ''
     ids = None
     if rule is not None:
@@ -554,7 +849,17 @@ def save_settings(enabled=None, session_at=None, weekly_at=None, model_at=None, 
         ids = set(a.id for a in api.accounts())                 # a list that can't be read refuses the change
         if not set(named) <= ids:
             raise api.AccountsError('not_found', 'That account is not saved in Switchboard.')
+    if pick_hold is not None and pick_hold not in policy.PICK_HOLDS:
+        raise api.AccountsError('other', 'Pick default, until_out or off.')
+    if sign_lines is not None and not isinstance(sign_lines, bool):
+        raise api.AccountsError('other', "Moving before Claude Code's usage sign shows is either on or off.")
     changes = dict(lines)
+    if stay_signed_in is not None:
+        changes['stay_signed_in'] = stay_signed_in
+    if pick_hold is not None:
+        changes['pick_hold'] = pick_hold
+    if sign_lines is not None:
+        changes['sign_lines'] = sign_lines
     if strategy is not None:
         changes['strategy'] = strategy
     if model is not None:
@@ -828,6 +1133,9 @@ class Deps(object):
         self.resolve_journal = api.resolve_journal
         self.put_back = api.put_back_pass
         self.notify = notify_put_back
+        self.signin_times = signin_times
+        self.notify_move = notify_move
+        self.notify_signed_out = notify_signed_out
         self.access_token = api.access_token
         self.net = usage.http_get
         self.net_ready = net_ready
@@ -840,6 +1148,9 @@ class Deps(object):
             if not hasattr(self, k):
                 raise TypeError('unknown dependency %r' % k)
             setattr(self, k, v)
+        if 'notify' in kw and 'notify_signed_out' not in kw:
+            # a caller that replaces the put-back's notification replaces this one too: one stand-in silences both
+            self.notify_signed_out = lambda email, at: None
 
 
 def _call(fn, default=None, deadline=None, clock=None):
@@ -911,9 +1222,13 @@ def gather(deps=None, clock=None, light=True, activity=None):
     hb = usage.read_json(core.data_path(HEARTBEAT)) or {}
     if activity is None:
         activity = _call(lambda: sessions.activity(timeline_of(st), now=clock.wall(), light=light), default=None)
-    return _snapshot(clock, load_settings(), accounts, active, ok, why, disagree, activity,
+    snap = _snapshot(clock, load_settings(), accounts, active, ok, why, disagree, activity,
                      settling=hb.get('settling') is True, offline=_num(hb.get('offline_since')) is not None,
                      load=_call(deps.load), power=(None, None), st=st, no_optional=None, live_refused=refused)
+    facts = model_facts(accounts, active, activity, st, clock.wall(), readings=snap.readings)
+    return with_refused_asked(dataclasses.replace(snap, asked=facts['asked'], refused=facts['refused'],
+                                                  pick_age_s=facts['pick_age_s'],
+                                                  keep_running=facts.get('keep_running') is True))
 
 
 def refused_now(activity, active, st, readings, now):
@@ -969,7 +1284,7 @@ def _snapshot(clock, settings, accounts, active, live_ok, why, disagree, activit
         optional_recent=optional_recent(st, clock), load_per_core=load, battery_pct=power[1], on_ac=power[0],
         settling=settling, offline=offline, claimed=frozenset(a.id for a in accounts if a.status == 'claimed'),
         no_optional=no_optional, rate_limited=refused_now(activity, active, st, readings, clock.wall()),
-        live_refused=bool(live_refused), left_forced=left_by_force())
+        live_refused=bool(live_refused), left_forced=left_by_force(), **_cap_counts(st, clock))
 
 
 def left_by_force():
@@ -1130,7 +1445,17 @@ class Loop(object):
         self.history_sig = None     # history.jsonl as last looked at (a switch from the page or a terminal)
         self.skips = {}             # stage -> passes in a row it was skipped because the last one is still running
         self.exit_code = 0          # what main() returns after run(): EXIT_STUCK_STAGE when a stage never came back
-        self.journal_at = None      # monotonic: when a pass last tried to settle a cut-off switch
+        self.journal_at = None      # monotonic: when a pass last tried to settle a cut-off switch (_settle_cut_off)
+        self.look = None            # what the last look for a lost sign-in answered (api.PutBack)
+        self.unreadable_since = None    # (email, monotonic): since the put-back said its saved login can't be read
+        self.move = None            # (body, instance) of the notification of the move under way (MOVE_NOTE)
+        self.busy_said = False      # a switch found Claude Code saving its login, and that was said
+        self.journal_said = None    # what settling a cut-off switch's journal last said, while that journal stays
+        self.wanted = self._load_wanted()   # kind -> {'since', 'seen'} stamps of a switch wanted (policy.calm_hold)
+        self.fams = ()              # the model families the last pass counted (the poller reads their windows too)
+        self.plan = None            # the last plan written (room.json): its step-up rule needs it
+        self.signed_out_said = None # the lost sign-in with no account to move to that was last said (once each)
+        self.signed_out_loaded = False  # and whether the one kept in the loop's state was read since it started
         self._take_request()        # one written before this loop started is old: never read for
         if after_restart:
             self.poller.wake()
@@ -1248,21 +1573,25 @@ class Loop(object):
         times = {}
         self._check_clock()
         settings = load_settings()
-        lines = policy.lines_for(settings)
         load = _call(self.d.load)
         pw = self._power()
         low_battery = self._battery_low(pw)
         settling = self._settling()
+        self._settle_journal()
 
         s0 = self.clock.mono()
+        self.look = None
         ok, live, err = self.stage('live', self.d.live)
         times['live'] = self.clock.mono() - s0
-        if ok and isinstance(live, api.Live) and live.state in (api.ABSENT, 'other'):
+        # a login Claude Code keeps only in its plaintext file is looked at too: the look puts it back in the Keychain
+        if ok and isinstance(live, api.Live) and (live.state in (api.ABSENT, 'other') or
+                                                  (live.state == api.PRESENT and getattr(live, 'from_file', False))):
             if self._put_back():                    # put back: the rest of the pass sees the account again
                 ok, live, err = self.stage('live', self.d.live)
         elif ok and isinstance(live, api.Live) and live.state == api.PRESENT:
             self.missing_watch = False
         active, live_ok, why, disagree, email, refused = interpret_live(live if ok else None, err, self.last_active)
+        live = live if ok and isinstance(live, api.Live) else None
         if active:
             self.last_active = active
         ok, accts, _ = self.stage('accounts', self.d.accounts)
@@ -1293,7 +1622,7 @@ class Loop(object):
         self.stage('status-line', lambda: usage.collect_status_lines(active, live_since, email, now=self.clock.wall()))
 
         ctx = usage.Context(active=active, order=[a.id for a in self.accounts if a.status not in ('needs_login', 'conflict')],
-                            lines=policy.lines_for(settings, active) if active else lines,   # its own, read near them
+                            lines=policy.read_lines(settings, self.fams, active),   # its own lines, read near them
                             busy=bool((self.activity or {}).get('busy')),
                             battery_factor=3.0 if low_battery else 1.0, settling=settling)
         asked, self.asked = self.asked or self._take_request(), None
@@ -1319,8 +1648,14 @@ class Loop(object):
         snap = _snapshot(self.clock, settings, self.accounts, active, live_ok, why, disagree, self.activity,
                          settling=settling, offline=offline, load=load, power=pw, st=st, no_optional=self.no_optional,
                          live_refused=refused)
+        snap = self._stay_facts(snap, self.look, st, live)
+        try:
+            snap = self._model_facts(snap, st)
+        except Exception as e:  # noqa: BLE001 - fail open: decide as before the chats' files existed
+            self.log.line('the chats\' models were not read: %s' % _err_words(e))
+            snap = dataclasses.replace(snap, waited=self._waited())
         decision = policy.decide(snap)
-        if decision.action == 'stay' and decision.kind == 'forced' and decision.hold == 'no fresh numbers':
+        if decision.action == 'stay' and decision.kind in ('forced', 'model') and decision.hold == 'no fresh numbers':
             decision, snap = self._read_candidates(snap, ctx)
         elif policy.on_older_numbers(decision, snap):   # older numbers only after one try at fresh ones for every account
             decision, snap = self._read_candidates(snap, ctx)
@@ -1329,8 +1664,13 @@ class Loop(object):
         switched = None
         if decision.action == 'switch' and not self.stop.is_set():
             switched = self._act(decision, snap, ctx, pw, taken)
+            if switched is not None and policy.stay_why(snap) is not None:
+                self._moved(snap, switched)
+        self._note_wanted(decision, switched)
         self._all_out(decision, snap)
         self._disk_room()
+        self._signed_out(decision, snap)
+        self._write_plan(snap, decision, switched)
         if not settling and self.no_optional and not offline and rep is not None:
             self.no_optional = None                  # the first full pass after a restart is done
         if not self.stop.is_set():
@@ -1398,16 +1738,19 @@ class Loop(object):
             self.log.line('disk almost full: no switch begins under 50 MB free')
             self._disk_full()
             return None
-        ids = [decision.target] + ([snap.active] if decision.kind == 'optional' and snap.active else [])
+        patient = decision.kind in PATIENT
+        ids = [decision.target] + ([snap.active] if patient and snap.active else [])
         ok, rep, err = self.stage('verifying', lambda: self.poller.poll(ctx, only=ids, fresh_within=VERIFY_FRESH))
-        snap2 = dataclasses.replace(snap, now=self.clock.wall(), readings=usage.readings(now=self.clock.wall()),
+        readings = usage.readings(now=self.clock.wall())
+        snap2 = dataclasses.replace(snap, now=self.clock.wall(), readings=readings,
+                                    refused=self._refused_on(readings, snap.active),
                                     settings=load_settings())       # the settings as they are now, a rule included
         again = policy.decide(snap2)
-        if decision.kind == 'optional':
+        if patient:
             target_fresh = self._fresh(decision.target, ctx, snap2)
             if again.action != 'switch' or again.target != decision.target or not target_fresh:
-                self.log.line('optional switch held after re-reading: %s' % _no_emails(
-                    again.hold or again.reason if target_fresh else 'its numbers could not be read again just now'))
+                self.log.line('%s switch held after re-reading: %s' % (decision.kind, _no_emails(
+                    again.hold or again.reason if target_fresh else 'its numbers could not be read again just now')))
                 return None
         elif again.action != 'switch':
             self.log.line('switch dropped on fresh numbers: %s' % _no_emails(again.reason))
@@ -1421,11 +1764,34 @@ class Loop(object):
             self.log.line('another switch was just made; this one is dropped')
             return None
         note = policy.switch_note(decision, snap2)
-        ok, res, err = self.stage('switching', lambda: self.d.switch(decision.target, kind=decision.kind,
-                                                                     source='auto', reason=note), abandon=False)
+        self._note_move(decision, snap2)
+        if self.plan is not None and _call(lambda: _room().is_on()):   # room.json says a switch is under way
+            _call(lambda: _room().write(dict(self.plan, switching=True, at=round(self.clock.wall(), 3))))
+
+        def switch():
+            try:
+                return self.d.switch(decision.target, kind=decision.kind, source='auto', reason=note)
+            except api.AccountsError as e:
+                if e.kind != 'claude_busy':
+                    raise
+                return e                            # Claude Code was saving its login: nothing was written
+        ok, res, err = self.stage('switching', switch, abandon=False)
+        if self.move is not None and not (ok and isinstance(res, api.SwitchResult) and res.ok):
+            self.move = None                        # not made: the page has no move to tell of
+            update_state(lambda s: s.pop(MOVE_NOTE, None))
         if not ok:
             self.log.line('switch failed: %s' % _no_emails(err))
             return None
+        if isinstance(res, api.AccountsError):
+            # not made and not counted as made: the next pass decides again and tries again; said once until a switch
+            # goes through
+            if not self.busy_said:
+                self.busy_said = True
+                self.log.line('switch waits: %s; nothing was changed. The next pass tries again.' % (
+                    'Claude Code was saving its login' if str(res).startswith('Claude Code') else
+                    'the saved login it was switching to was being renewed'))
+            return None
+        self.busy_said = False
         if not isinstance(res, api.SwitchResult) or not res.ok:
             self.log.line('switch not made%s' % (' (rolled back)' if getattr(res, 'rolled_back', False) else ''))
             return None
@@ -1448,14 +1814,37 @@ class Loop(object):
         self.log.line('moved on older numbers: the account it moved to is read the moment its wait for a read ends')
 
     def _read_candidates(self, snap, ctx, ids=None):
-        """A forced switch waits for numbers: read the accounts it could go to now (`ids`, else every one with no fresh
-        numbers), once, and decide again."""
+        """A forced or model switch waits for numbers: read the accounts it could go to now (`ids`, else every one with
+        no fresh numbers), once, and decide again. The accounts that could not be read (a failed read, or one a wait
+        held back) are said to the policy (Snapshot.read_failed): only on those may a move land on old numbers."""
         ids = policy.unread_candidates(snap) if ids is None else ids
+        failed = frozenset()
         if ids:
-            self.stage('verifying', lambda: self.poller.poll(ctx, only=ids, fresh_within=VERIFY_FRESH))
-            snap = dataclasses.replace(snap, now=self.clock.wall(), readings=usage.readings(now=self.clock.wall()),
-                                       settings=load_settings())
+            ok, rep, _ = self.stage('verifying', lambda: self.poller.poll(ctx, only=ids, fresh_within=VERIFY_FRESH))
+            if ok and rep is not None:
+                # a read held back (a wait, the hourly budget, read too recently) is not a read either: when the
+                # account still has no fresh numbers it counts as one that failed
+                held = frozenset(getattr(rep, 'held', ()) or ())
+                failed = frozenset(a for a in ids if a in (getattr(rep, 'failed', {}) or {}) or a in held)
+            else:
+                failed = frozenset(ids)                 # the stage overran or failed: none of them was read
+            readings = usage.readings(now=self.clock.wall())
+            snap = dataclasses.replace(snap, now=self.clock.wall(), readings=readings,
+                                       refused=self._refused_on(readings, snap.active), settings=load_settings())
+            by_id = dict((a.id, a) for a in snap.accounts)
+            failed = frozenset(a for a in failed if a not in by_id or not self._fresh_enough(snap, by_id[a]))
+        # even with nothing to read: a move that keeps Claude Code signed in then goes on what was last known
+        snap = dataclasses.replace(snap, candidates_read=True, read_failed=failed)
         return policy.decide(snap), snap
+
+    @staticmethod
+    def _fresh_enough(snap, account):
+        """The account's numbers are known and young enough for a landing (policy.FORCED_MAX_AGE)."""
+        try:
+            v = policy.view_of(snap, account)
+        except Exception:  # noqa: BLE001 - not known: it counts as not read
+            return False
+        return bool(v.known and v.age is not None and v.age <= policy.FORCED_MAX_AGE)
 
     def _fresh(self, aid, ctx, snap):
         r = snap.readings.get(aid)
@@ -1496,18 +1885,151 @@ class Loop(object):
     def _settle_cut_off(self, settling):
         """A switch cut off part-way whose record is still there (the start could not check it: the Keychain was locked,
         say) is settled by a later pass with the function the start uses, at most every JOURNAL_AGAIN seconds, and not
-        while the Mac settles after a wake. The engine waits for a switch under way to end before it looks."""
-        if settling or not os.path.exists(core.data_path(JOURNAL)):
+        while the Mac settles after a wake. Only a journal last written more than JOURNAL_STALE_S ago, by the measure
+        _settle_journal uses: a switch that ended on a Keychain write macOS did not confirm in time has let go of the
+        switch lock while that write can still land, so a younger journal is left for a later pass (it is not a try).
+        The engine judges the age again under the switch lock. What was done is said once, as _settle_journal says it
+        (the engine says nothing when it is given an age)."""
+        from . import context, switcher
+        if settling:
+            return
+        try:
+            age = self.clock.wall() - os.stat(switcher.journal_path(context.current())).st_mtime
+        except OSError:
+            return
+        if age <= JOURNAL_STALE_S:
             return
         now_m = self.clock.mono()
         if self.journal_at is not None and 0 <= now_m - self.journal_at < JOURNAL_AGAIN:
             return
         self.journal_at = now_m
-        ok, note, err = self.stage('journal', self.d.resolve_journal)
-        if ok and note:
-            self.log.line('journal: %s' % _no_emails(str(note)))
-        elif err:
+        ok, note, err = self.stage('journal', lambda: self.d.resolve_journal(older_than=JOURNAL_STALE_S))
+        if not ok:
             self.log.line('journal not checked: %s' % _no_emails(err))
+        elif note and note != self.journal_said:
+            self.journal_said = note
+            self.log.line('journal: %s' % _no_emails(str(note)))
+            self.stage('noting', lambda: self.d.history_note(note, 'info', h='repair', by='auto'))
+
+    def _model_facts(self, snap, st):
+        """The snapshot with the model families the chats ask for, what was refused where, the person's own pick of
+        the account in use, and how long each kind of switch has been wanted (model_facts, _waited)."""
+        facts = model_facts(self.accounts, snap.active, self.activity, st, self.clock.wall(), readings=snap.readings)
+        snap = dataclasses.replace(snap, asked=facts['asked'], refused=facts['refused'],
+                                   pick_age_s=facts['pick_age_s'], waited=self._waited(), read_failed=frozenset(),
+                                   keep_running=facts.get('keep_running') is True)
+        snap = with_refused_asked(snap)
+        self.fams = policy.asked_families(snap)
+        self.refused_at, self.replies = facts['refused_at'], facts['replies']
+        self.refused_entries = dict((aid, dict(fams)) for aid, fams in facts['by_account'].items())
+        return snap
+
+    refused_at = None
+    replies = None
+    refused_entries = None
+
+    def _refused_on(self, readings, active):
+        """Snapshot.refused again on newer readings (a re-read may answer a refusal: still_refused)."""
+        return still_refused(self.refused_at or {}, readings, self.replies, active)
+
+    @staticmethod
+    def _load_wanted():
+        """The calm-wait clocks kept in the loop's state, so a restarted loop goes on from them."""
+        try:
+            rec = load_state().get(WANTED)
+        except Exception:  # noqa: BLE001 - not known: every clock starts again
+            return {}
+        if not isinstance(rec, dict):
+            return {}
+        return dict((k, v) for k, v in rec.items() if isinstance(k, str) and isinstance(v, dict) and
+                    isinstance(v.get('since'), dict) and isinstance(v.get('seen'), dict))
+
+    def _waited(self):
+        out = {}
+        for k, rec in self.wanted.items():
+            seen = usage.since_stamp(rec.get('seen'), self.clock)
+            if seen is None or seen >= WANT_GONE_S:
+                continue                    # not wanted for that long (the loop was stopped): its clock starts again
+            age = usage.since_stamp(rec.get('since'), self.clock)
+            if age is not None:
+                out[k] = age
+        return out
+
+    def _note_wanted(self, decision, switched):
+        """Keep, across passes and restarts of the loop, since when a switch of each kind has been wanted (a target
+        named, made or held). A pass that wants it with no target (no fresh numbers) or wants nothing keeps the clock;
+        a kind is forgotten when a switch was made, or when no pass has wanted it for WANT_GONE_S."""
+        old = self.wanted
+        if switched is not None:
+            new = {}
+        else:
+            now = usage.stamp(self.clock)
+            new = {}
+            for k, rec in old.items():
+                age = usage.since_stamp(rec.get('seen'), self.clock)
+                if age is None or age >= WANT_GONE_S:
+                    continue                    # forgotten: if still wanted, its clock starts again below
+                new[k] = dict(rec, seen=now) if k == decision.kind else rec
+            if decision.kind and decision.target and decision.kind not in new:
+                new[decision.kind] = {'since': now, 'seen': now}
+        self.wanted = new
+        if new or old:
+            update_state(lambda s: s.update({WANTED: new}) if new else s.pop(WANTED, None))
+
+    def _signed_out(self, decision, snap):
+        """Claude Code's sign-in is lost or refused and no other account is signed in to move to: said once per
+        event, in History and in one notification, with the one step that is the person's."""
+        lost = snap.lost if policy.stay_why(snap) is not None and decision.hold == 'no other account' else None
+        key = '%s|%s' % (snap.active, lost) if lost else None
+        if key is None:
+            # forgotten only when this pass sees Claude Code signed in and working: a pass that did not look (the
+            # put-back stage skipped, overran or said wait) or could not read the login leaves the event said
+            fine = snap.live_ok and snap.lost is None and not snap.live_refused and policy.stay_why(snap) is None
+            if fine and self.signed_out_said is None and not self.signed_out_loaded:
+                self.signed_out_said = load_state().get(SIGNED_OUT)     # said before a restart of the loop
+                self.signed_out_loaded = True
+            if fine and self.signed_out_said is not None:
+                self.signed_out_said = None
+                update_state(lambda s: s.pop(SIGNED_OUT, None))
+            return
+        if self.signed_out_said is None:
+            self.signed_out_said = load_state().get(SIGNED_OUT)
+            self.signed_out_loaded = True
+        if self.signed_out_said == key:
+            return
+        self.signed_out_said = key
+        update_state(lambda s: s.update({SIGNED_OUT: key}))
+        who = dict((a.id, a) for a in snap.accounts).get(snap.active)
+        email = policy.label_of(snap, who) if who is not None else None
+        text = signed_out_words(email)
+        self.log.line('signed out with no other account to move to: said once')
+        self.stage('noting', lambda: self.d.history_note(text, 'problem', h='problem', account=email))
+        _call(lambda: self.d.notify_signed_out(email, round(self.clock.wall(), 3)))
+
+    def _write_plan(self, snap, decision, switched):
+        """The plan (room.json) at the end of the pass, while the chats' plugin is on; after a switch, for the
+        account switched to. Never stops the pass."""
+        try:
+            rm = _room()
+            if not rm.is_on():
+                self.plan = None
+                return
+            if self.plan is None:
+                self.plan = rm.read_plan()
+            # after a switch the plan is the new account's: the old one's refusal and lost sign-in are not carried
+            # over, and nothing seen before the switch to it counts (refusals_seen)
+            s = snap if switched is None else dataclasses.replace(snap, active=switched.to_id, rate_limited=False,
+                                                                  live_refused=False, lost=None)
+            refused = self._refused_on(usage.readings(now=self.clock.wall()), s.active)
+            if switched is not None:
+                refused.pop(switched.to_id, None)
+            plan = rm.build(dataclasses.replace(s, now=self.clock.wall(), refused=refused),
+                            None if switched else decision, refused=plan_refused(self.refused_entries, refused),
+                            put_back=rm.read_put_back(), prev=self.plan)
+            if rm.write(plan):
+                self.plan = plan
+        except Exception as e:  # noqa: BLE001 - fail open: the plan is only read by others
+            self.log.line('the plan was not written: %s' % _err_words(e))
 
     def _upkeep(self, settling, offline, load, low_battery):
         self._settle_cut_off(settling)
@@ -1549,8 +2071,8 @@ class Loop(object):
     # a sign-in Claude Code lost (putback.py)
 
     def _put_back(self):
-        """The put-back stage: one look at Claude Code's login, and the put-back when its rule says so. Logs only what
-        the look said; a put-back sends its one notification. True when the login was put back."""
+        """The put-back stage: one look at Claude Code's login, and the put-back (or the promote) when its rule says so.
+        Logs only what the look said; a put-back sends its one notification. True when a login was written."""
         if self.d.put_back is None:
             return False
         ok, res, err = self.stage('putting back', self.d.put_back)
@@ -1559,14 +2081,142 @@ class Loop(object):
             return False
         if not isinstance(res, api.PutBack):
             return False
-        self.missing_watch = bool(res.watch) and res.action != 'put_back'
+        self.look = res
+        # a promote (the login Claude Code kept only in its plaintext file, put back in the Keychain) is a write as a
+        # put-back is: the pass reads the login again and looks often for a while; nothing was lost, so it is not told
+        wrote = res.action in ('put_back', 'promote')
+        self.missing_watch = bool(res.watch) and not wrote
         if res.line:
             self.log.line('put back: %s' % _no_emails(res.line))
-        if res.action != 'put_back':
+        if not wrote:
             return False
         self.put_back_m = self.clock.mono()
-        _call(lambda: self.d.notify(res))
+        if res.action == 'put_back':
+            _call(lambda: self.d.notify(res))
         return True
+
+    # keeping Claude Code signed in when its sign-in is lost for good or ends (policy.stay_why)
+
+    def _stay_facts(self, snap, look, st, live=None):
+        """The snapshot with what keeping Claude Code signed in needs: `lost` from this pass's look for a lost sign-in,
+        or from a login Claude Code emptied after Anthropic refused it (then the account Claude Code's settings name is
+        the one in use), else `ends_at` of the login in use (from `live`, this pass's api.Live, first: signin_times);
+        the accounts left for a lost sign-in and not signed in again since; and the accounts moved off within
+        NEED_EVERY. Nothing changes while the setting is off."""
+        if not snap.settings.stay_signed_in:
+            self.unreadable_since = None
+            return snap
+        by_id = dict((a.id, a) for a in self.accounts)
+        lost, aid = self._lost(look)
+        if lost is None and snap.live_refused and snap.active in by_id:
+            # Claude Code emptied its login after Anthropic refused its renewal ('wiped'), and its settings name this
+            # account: the put-back leaves it (it never writes over a login Claude Code emptied itself), so it is
+            # lost the same way. The words say what is known: the sign-in was refused, not which copy of it
+            lost, aid = policy.LIVE_REFUSED, snap.active
+        changes = {}
+        if lost is not None:
+            changes.update(lost=lost, active=aid)
+        elif snap.live_ok and snap.active in by_id:
+            times = _call(lambda: self.d.signin_times(snap.active, live))
+            if isinstance(times, tuple) and len(times) == 2:
+                changes['ends_at'] = policy.ends_at(*times)
+        mem = st.get(STAY_LEFT) if isinstance(st.get(STAY_LEFT), dict) else {}
+        changes['left'] = frozenset(k for k, fp in mem.items()
+                                    if k in by_id and (by_id[k].fingerprint or '') == fp)
+        changes['moved_recently'] = frozenset(
+            k[len(STAY_KEY):] for k, v in (st.get('need') or {}).items()
+            if k.startswith(STAY_KEY) and (usage.since_stamp(v, self.clock) or 0.0) < NEED_EVERY)
+        return dataclasses.replace(snap, **changes)
+
+    def _lost(self, look):
+        """(the words after "its saved login", the account id) when the look found Claude Code's sign-in gone and the
+        put-back can't bring it back: one of LOST_MARKS (a saved login unreadable only once it has been so for
+        LOST_UNREADABLE_S), or the put-back's limit. (None, None) for every other answer: a wait, a put-back, a failed
+        write, a switch part-way, a sign-in under way, settings naming nobody, a login that can't be read. An answer
+        with the rule's key or the account's id is read by them; the words only for an answer that carries neither."""
+        from . import putback
+        key = None
+        # api.PutBack's key, account_id and seen, read with getattr: an answer without them is read by its words
+        rule_key, rule_id = getattr(look, 'key', None), getattr(look, 'account_id', None)
+        keyed = isinstance(look, api.PutBack) and (rule_key is not None or rule_id is not None)
+        if keyed and look.action == 'limit' and rule_key == 'limit':
+            key = 'limit'
+        elif keyed and look.action == 'leave':
+            key = rule_key if rule_key in LOST_MARKS else None
+        elif isinstance(look, api.PutBack) and look.action == 'limit':
+            key = 'limit'
+        elif isinstance(look, api.PutBack) and look.action == 'leave':
+            key = dict(('its saved login %s' % words, k) for k, words in putback.MARKS
+                       if k in LOST_MARKS).get(look.reason)
+        if key == 'unreadable':
+            if self.unreadable_since is None or self.unreadable_since[0] != look.account:
+                self.unreadable_since = (look.account, self.clock.mono())
+            if self.clock.mono() - self.unreadable_since[1] <= LOST_UNREADABLE_S:
+                return None, None
+        else:
+            self.unreadable_since = None
+        if key is None:
+            return None, None
+        aid = self._account_of(look.account, rule_id)
+        if aid is None:
+            return None, None
+        seen = getattr(look, 'seen', None)
+        if key == 'limit' and isinstance(seen, dict) and seen.get('fault') is True:
+            # with evidence of the fault the limits are an episode's (putback.EPISODE_WRITES, EPISODES_PER_HOUR)
+            return 'was put back again and again within minutes and was lost again each time', aid
+        if key == 'limit':
+            return 'was put back %d times within an hour and was lost again each time' % putback.PUT_BACK_MAX, aid
+        return dict(putback.MARKS)[key], aid
+
+    def _account_of(self, who, account_id=None):
+        """The account id the put-back named: its account_id when one account has it, else by email (or by id when it
+        has none), when exactly one account fits."""
+        if account_id is not None and any(a.id == account_id for a in self.accounts):
+            return account_id
+        hits = [a.id for a in self.accounts if a.id == who] or \
+            [a.id for a in self.accounts if a.email and a.email == who]
+        return hits[0] if len(hits) == 1 else None
+
+    def _moved(self, snap, res):
+        """After a move that kept Claude Code signed in: the brake (one such move off an account per NEED_EVERY), the
+        account left for a lost sign-in remembered by its fingerprint until it is signed in again, one log line and
+        one notification (the switch itself wrote the History line, with the same sentence)."""
+        frm = snap.active
+        by_id = dict((a.id, a) for a in snap.accounts)
+
+        def change(st):
+            need = st.setdefault('need', {})
+            for k in [k for k, v in need.items() if (usage.since_stamp(v, self.clock) or 0.0) > 6 * NEED_EVERY]:
+                del need[k]
+            need[STAY_KEY + frm] = usage.stamp(self.clock)
+            mem = st.get(STAY_LEFT) if isinstance(st.get(STAY_LEFT), dict) else {}
+            mem = dict((k, fp) for k, fp in mem.items() if k in by_id and (by_id[k].fingerprint or '') == fp)
+            if snap.lost and frm in by_id:
+                mem[frm] = by_id[frm].fingerprint or ''
+            st[STAY_LEFT] = mem
+        update_state(change)
+        number = dict((a.id, i + 1) for i, a in enumerate(snap.accounts))
+        self.log.line('moved Claude Code from account %s to account %s to keep it signed in (%s)' % (
+            number.get(frm, '?'), number.get(res.to_id, '?'), 'its sign-in was lost' if snap.lost else
+            'its sign-in ends'))
+        decision = api.Decision('switch', target=res.to_id, kind='forced')
+        text, instance = self.move or (policy.stay_note(decision, snap, short=True), None)
+        to = by_id.get(res.to_id)
+        _call(lambda: self.d.notify_move(move_note(text, _email_of(by_id[frm]) if frm in by_id else None,
+                                                   _email_of(to) if to else res.to_id, instance)))
+
+    def _note_move(self, decision, snap):
+        """Before the switch of a move that keeps Claude Code signed in: its notification (body and instance) in the
+        loop's state, so the page's note for the same switch is the same one, whichever of the two notices first."""
+        self.move = None
+        if policy.stay_why(snap) is None:
+            return
+        by_id = dict((a.id, a) for a in snap.accounts)
+        frm, to = by_id.get(snap.active), by_id.get(decision.target)
+        rec = {'frm': _email_of(frm) if frm else snap.active, 'to': _email_of(to) if to else
+               decision.target, 'body': policy.stay_note(decision, snap, short=True), 't': round(self.clock.wall(), 3)}
+        self.move = (rec['body'], '%.3f' % rec['t'])
+        update_state(lambda s: s.update({MOVE_NOTE: rec}))
 
     def _history_now(self):
         """history.jsonl's signature (one stat): it changes when the page or a terminal records a switch."""
@@ -1601,7 +2251,8 @@ class Loop(object):
 
     def _sleep_look(self):
         """One look at Claude Code's login from the sleep (the put-back stage alone). The sleep runs outside the pass's
-        guard, so a look that fails is said in the log and never ends the loop. True when the login was put back."""
+        guard, so a look that fails is said in the log and never ends the loop. True when a login was written (a
+        put-back or a promote: _put_back)."""
         try:
             return self._put_back()
         except Exception as e:  # noqa: BLE001 - a look never ends the loop
@@ -1708,6 +2359,31 @@ class Loop(object):
             # waiting that long would not move a clock and the wait would never end
             if self.clock.wait(self.stop, max(step, 0.01)):
                 return
+
+    def _settle_journal(self):
+        """A switch's journal that stays, once a pass. While it is there the put-back leaves every loss of Claude
+        Code's sign-in ("a switch is part-way"), and a switch cut off by a kill or a crash leaves it until the next
+        start. One last written more than JOURNAL_STALE_S ago is settled by the engine (api.resolve_journal) under the
+        switch lock: a switch holds that lock from its start to its end, however long it runs (it writes its journal
+        at each step, and one step can make five Keychain calls), so a switch under way is never raced. The age keeps
+        the pass off a journal a switch has just left for a write macOS did not confirm in time, so that answer can
+        land first. What was done is said once, in the engine's words, here and in History."""
+        from . import context, switcher
+        try:
+            age = self.clock.wall() - os.stat(switcher.journal_path(context.current())).st_mtime
+        except OSError:
+            self.journal_said = None
+            return
+        if age <= JOURNAL_STALE_S:
+            return
+        ok, note, err = self.stage('journal', lambda: self.d.resolve_journal(older_than=JOURNAL_STALE_S))
+        if not ok:
+            self.log.line('journal not settled: %s' % _no_emails(err))
+            return
+        if note and note != self.journal_said:
+            self.journal_said = note
+            self.log.line('journal: %s' % _no_emails(str(note)))
+            self.stage('noting', lambda: self.d.history_note(note, 'info', h='repair', by='auto'))
 
     def start(self):
         """Once at start: finish or roll back a switch that was cut off (the account engine's journal)."""

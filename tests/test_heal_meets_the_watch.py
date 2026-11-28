@@ -245,7 +245,7 @@ class TwoSettleOneRecord(RigBase):
         roster.forget_live()
 
     def race(self, loop_first):
-        """The loop's settle (api.resolve_journal, as Loop._settle_cut_off calls it) and the self-check's at once."""
+        """The loop's settle (api.resolve_journal, as Loop.start calls it) and the self-check's at once."""
         self.cut_off()
         real, inside, now = switcher._resolve_locked, [], {'n': 0, 'most': 0}
         lock = threading.Lock()
@@ -378,7 +378,7 @@ class TheLandingRead(RigBase):
         self.net = FakeNet(self.clock)
         deps = autoloop.Deps(net=self.net, net_ready=lambda: True, load=lambda: 0.5, power=lambda: (True, 100),
                              procs=lambda: 1, disk_free=lambda: 10 ** 12, history_note=lambda *a, **k: None,
-                             notify=lambda res: None)
+                             notify=lambda res: None, notify_move=lambda note: None)
         self.loop = autoloop.Loop(deps=deps, clock=self.clock, rand=lambda: 0.5)
         res = switcher.switch(self.ctx, 'uuid-a', source='auto', kind='forced')      # the move on older numbers
         self.assertTrue(res.ok)

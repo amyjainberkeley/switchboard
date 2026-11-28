@@ -117,15 +117,17 @@ def _live_of(ctx, lr):
                     why='Claude Code is on a one-year token, which auto-switch leaves as it is')
     # no record owns it: it is no account's, and no usage is read with it. An emptied sign-in stays that, whatever
     # its siblings hold (an MCP login or a plugin's own key is no login of the account's).
-    if login.kind != 'wiped' and live_mod.unrenewable(login):
+    if login is not None and login.kind != 'wiped' and live_mod.unrenewable(login):
         return Live(state='other', account_id=None, email=None, proof='none', degraded=r.degraded,
                     why="Claude Code is on a login with no refresh token, which is no saved account's")
+    from_file = r.provenance == 'file' and not r.degraded       # the Keychain said "no such item"
     if login is None or login.kind != 'oauth':
         state = 'wiped' if login is not None and login.kind == 'wiped' else 'other'
         why = ("Claude Code's login was emptied (Anthropic refused it); sign in again in Claude Code"
                if state == 'wiped' else 'Claude Code is not using an account login')
         return Live(state=state, account_id=lid or (vault.account_key(doc, uuid, org) if uuid else None),
-                    email=email or None, proof='label' if uuid else 'none', degraded=r.degraded, why=why)
+                    email=email or None, proof='label' if uuid else 'none', degraded=r.degraded, why=why,
+                    from_file=from_file)
     p = identity.prove(ctx, login, doc, block, network=False)
     if p.account_id:
         aid, who = p.account_id, doc['accounts'][p.account_id].get('email') or email
@@ -140,7 +142,8 @@ def _live_of(ctx, lr):
     elif not p.strong:
         why = 'Not proved yet whose login this is (only its label says)' if uuid else 'Not known whose login this is'
     return Live(state=PRESENT, account_id=aid, email=who or None, proof=p.kind, disagree=p.disagree,
-                degraded=r.degraded, why=why)
+                degraded=r.degraded, why=why, from_file=from_file, expires_ms=login.expires_ms,
+                rx_ms=login.refresh_expires_ms)
 
 
 # ---------- an access token for reading usage (api.access_token) ----------
@@ -308,6 +311,7 @@ def add_current(ctx):
     except vault.LockBusy:
         raise AccountsError('other', 'Switchboard is busy; try again in a moment. Nothing was changed.')
     forget_live(ctx)
+    vault.keep_shared(ctx, cur)                     # the item's Mac-wide parts, for a put-back into no item at all
     ctx.say('Added %s' % acc.email, 'info', h='signin', account=acc.email, by='you', reason=note)
     return acc
 
@@ -737,8 +741,9 @@ def health(ctx):
         when = time.strftime('%H:%M on %a %b %d', time.localtime(last['at'])) if last is not None else None
     except (OverflowError, ValueError, OSError):        # a hand-edited record
         when = "a time that can't be read"
+    how = ", from Claude Code's plain login file" if last is not None and last.get('how') == putback.PROMOTE else ''
     out['put_back'] = {'ok': True, 'line': '%s: never' % words} if last is None else {
-        'line': '%s: last at %s, for %s' % (words, when, last.get('account') or 'an account')}
+        'line': '%s: last at %s, for %s%s' % (words, when, last.get('account') or 'an account', how)}
     out['recovery'] = [dict((k, e.get(k)) for k in ('key', 'account_id', 'reason', 'fp', 'at', 'where'))
                        for e in vault.stashed(ctx)]
     from . import keychain as keychain_mod

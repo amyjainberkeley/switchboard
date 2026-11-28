@@ -1,0 +1,18 @@
+{
+ "v": 1,
+ "about": "Presets of routes Switchboard ships, each off until the person turns it on with switchboard routes preset NAME. A preset fills only kinds the person has set no route for, and its rows are tried in the person's own order: a row names a model inside each app and never decides between the apps. Each row says where it was read, on which day, and what it rests on. A kind with no row follows the person's order and each app's own default model.",
+ "presets": {
+  "by-the-job": {
+   "rows": {
+    "find": {"choices": ["claude:haiku:medium", "codex:gpt-6-luna:medium"],
+             "rests_on": "Each maker's own line about its own small model, not a test of either on lookups.",
+             "source": "https://platform.claude.com/docs/en/about-claude/models/overview (Haiku 5.5: for high-volume, latency-sensitive tasks such as classification, extraction, and routing); https://platform.claude.com/docs/en/build-with-claude/effort (Haiku 5.5: start with medium); OpenAI's own list of models as Codex 0.169.1 keeps it (GPT-6 Luna: Fast and affordable model for easier tasks; its default level is medium)",
+             "read": "2026-11-25"},
+    "write": {"choices": ["claude:sonnet:medium", "codex:gpt-6.2-sol:medium"],
+              "rests_on": "Each maker's own line about its own middle model, not a test of either on writing.",
+              "source": "https://platform.claude.com/docs/en/about-claude/models/choosing-a-model (Sonnet 5.5: code generation, data analysis, content creation); https://platform.claude.com/docs/en/build-with-claude/effort (Sonnet 5.5: start with medium for well-specified tasks); https://learn.chatgpt.com/docs/models (GPT-6.2 Sol: everyday coding, writing, and work across several sources)",
+              "read": "2026-11-25"}
+   }
+  }
+ }
+}

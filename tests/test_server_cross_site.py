@@ -17,6 +17,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, '..'))
 
 from switchboard import memorypage, server
+import pagekey_help  # noqa: E402  (the page key, as Switchboard's own programs send it)
 
 REAL_PAGES = (7798, 7799)
 DIRECT = urllib.request.build_opener(urllib.request.ProxyHandler({}))
@@ -47,7 +48,7 @@ class PageServer(unittest.TestCase):
         threading.Thread(target=httpd.serve_forever, daemon=True).start()
 
     def get(self, path, headers=None):
-        req = urllib.request.Request('http://127.0.0.1:%d%s' % (self.port, path), headers=headers or {})
+        req = urllib.request.Request('http://127.0.0.1:%d%s' % (self.port, path), headers=pagekey_help.with_key(headers))
         try:
             with DIRECT.open(req, timeout=10) as r:
                 return r.status, r.read()

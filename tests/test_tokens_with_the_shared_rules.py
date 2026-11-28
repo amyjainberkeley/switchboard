@@ -150,3 +150,18 @@ class TextEditedByHand(Case):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class AnOrdinarySwitch(Case):
+    def setUp(self):
+        super().setUp()
+        self.rig.two_accounts()                         # Claude Code is on b@example.com, number 2
+
+    def test_history_says_which_account_claude_code_left(self):
+        # Joined from two lines, the switch once used one name for the token it left and for Claude Code's save lock,
+        # so every switch's History said it came from "the one-year token for " and named no account.
+        code, out, err = self.run_cli('switch', '1')
+        self.assertEqual(code, 0, err)
+        said = [facts for text, kind, facts in self.rig.events if kind == 'switch']
+        self.assertIn('b@example.com', said[-1].get('frm') or '')
+        self.assertNotIn('one-year token', said[-1].get('frm') or '')

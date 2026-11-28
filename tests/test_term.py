@@ -28,7 +28,7 @@ ROOT = os.path.join(HERE, '..')
 sys.path.insert(0, ROOT)
 
 from switchboard import __main__ as cli
-from switchboard import connect, core, engine, linkapp, newer, notify_hooks, server, statusline, term
+from switchboard import connect, core, engine, firstrun, linkapp, newer, notify_hooks, server, statusline, term
 from switchboard.accounts import api
 from fakes_accounts_api import install
 
@@ -78,20 +78,24 @@ VIEW = {'now': NOW, 'active': 'ana@mail.example', 'engine': {'installed': True},
 PLAIN = """\
 Claude Code is on ana@mail.example · auto-switch on at 90% 5-hour · 95% weekly
 
-1  ana@northwind.example  Max 20x · Personal  checked 2 min ago
+1  ana@northwind.example  Max 20x · Personal
+   no 5-hour limit
    weekly  ────────────────────────    0%  resets Thu 5:00 PM · in 6 days
 
-2  ana@fernhill.example   Max 20x · Personal  checked 10 min ago
+2  ana@fernhill.example   Max 20x · Personal
+   no 5-hour limit
    weekly  ━━━━━━━━━━━━━━━━━━━━━━━─   94%  resets Mon 1:00 PM · in 3 days · at this pace, full by 9:38 PM
 
-3  ana@harbor.example     Team · Harbor       checked 5 min ago
+3  ana@harbor.example     Team · Harbor
    5-hour  ────────────────────────    0%  not started
    weekly  ━━━━────────────────────   17%  resets Mon 3:00 PM · in 3 days
 
-4  ana@lab.example        Max 20x · Personal  next · checked 5 min ago
-   weekly  ━━━━━━━━━━━━━━━━────────   65%  resets Sun 2:00 PM · in 2 days  Fable 90%
+4  ana@lab.example        Max 20x · Personal  next
+   no 5-hour limit
+   weekly  ━━━━━━━━━━━━━━━━────────   65%  resets Sun 2:00 PM · in 2 days
 
-5  ana@mail.example       Max 20x · Personal  in use · checked 3 min ago
+5  ana@mail.example       Max 20x · Personal  in use
+   no 5-hour limit
    weekly  ━━━━━━──────────────────   27%  resets Sat 12:00 PM · in 20 hours"""
 
 NARROW = """\
@@ -99,24 +103,23 @@ Claude Code is on ana@mail.example
 auto-switch on at 90% 5-hour · 95% weekly
 
 1  ana@northwind.example  Max 20x · Personal
-                          checked 2 min ago
+   no 5-hour limit
    weekly  ────────    0%  resets Thu 5:00 PM · in 6 days
 
 2  ana@fernhill.example   Max 20x · Personal
-                          checked 10 min ago
+   no 5-hour limit
    weekly  ━━━━━━━─   94%  full by 9:38 PM
 
 3  ana@harbor.example     Team · Harbor
-                          checked 5 min ago
    5-hour  ────────    0%  not started
    weekly  ━───────   17%  resets Mon 3:00 PM · in 3 days
 
-4  ana@lab.example        Max 20x · Personal
-                          next · checked 5 min ago
-   weekly  ━━━━━───   65%  resets Sun 2:00 PM  Fable 90%
+4  ana@lab.example        Max 20x · Personal  next
+   no 5-hour limit
+   weekly  ━━━━━───   65%  resets Sun 2:00 PM · in 2 days
 
-5  ana@mail.example       Max 20x · Personal
-                          in use · checked 3 min ago
+5  ana@mail.example       Max 20x · Personal  in use
+   no 5-hour limit
    weekly  ━━──────   27%  resets Sat 12:00 PM · in 20 hours"""
 
 
@@ -139,25 +142,22 @@ class TheView(unittest.TestCase):
         self.assertEqual(got[0], 'Claude Code is on \x1b[94mana@mail.example\x1b[0m'
                                  '\x1b[2m · auto-switch on at 90% 5-hour · 95% weekly\x1b[0m')
         found = dict((ESC.sub('', x).strip(), x) for x in got)
-        self.assertEqual(found['5  ana@mail.example       Max 20x · Personal  in use · checked 3 min ago'],
-                         '5  \x1b[1mana@mail.example\x1b[0m       \x1b[2mMax 20x · Personal\x1b[0m  \x1b[94min use\x1b[0m'
-                         '\x1b[2m · \x1b[0m\x1b[2mchecked 3 min ago\x1b[0m')
+        self.assertEqual(found['5  ana@mail.example       Max 20x · Personal  in use'],
+                         '5  \x1b[1mana@mail.example\x1b[0m       \x1b[2mMax 20x · Personal\x1b[0m  \x1b[94min use\x1b[0m')
         # the account in use: its used part blue, the rest dim, its % and label plain, the reset words dim
         self.assertIn('   weekly  \x1b[94m' + '━' * 6 + '\x1b[0m\x1b[2m' + '─' * 18 + '\x1b[0m   27%  '
                       '\x1b[2mresets Sat 12:00 PM · in 20 hours\x1b[0m', got)
-        # a counted model week at or over its line (Fable's is 90): a red note at the end of the weekly line
-        self.assertIn('   weekly  ' + '━' * 16 + '\x1b[2m' + '─' * 8 + '\x1b[0m   65%  '
-                      '\x1b[2mresets Sun 2:00 PM · in 2 days\x1b[0m  \x1b[91mFable 90%\x1b[0m', got)
         # under its line (weekly at 95) and not in use: the used part in the default colour
         self.assertIn('   weekly  ' + '━' * 23 + '\x1b[2m─\x1b[0m   94%  \x1b[2mresets Mon 1:00 PM · in 3 days\x1b[0m'
                       '\x1b[2m · \x1b[0mat this pace, full by 9:38 PM', got)
-        self.assertIn('2  \x1b[1mana@fernhill.example\x1b[0m   \x1b[2mMax 20x · Personal\x1b[0m  '
-                      '\x1b[2mchecked 10 min ago\x1b[0m', got)
-        self.assertIn('4  \x1b[1mana@lab.example\x1b[0m        \x1b[2mMax 20x · Personal\x1b[0m  \x1b[2mnext\x1b[0m'
-                      '\x1b[2m · \x1b[0m\x1b[2mchecked 5 min ago\x1b[0m', got)
+        # a model's own week at its line (lab's Fable, at 90) has no note in the list: the line ends at its reset
+        self.assertIn('   weekly  ' + '━' * 16 + '\x1b[2m' + '─' * 8 + '\x1b[0m   65%  '
+                      '\x1b[2mresets Sun 2:00 PM · in 2 days\x1b[0m', got)
+        self.assertIn('2  \x1b[1mana@fernhill.example\x1b[0m   \x1b[2mMax 20x · Personal\x1b[0m', got)
+        self.assertIn('4  \x1b[1mana@lab.example\x1b[0m        \x1b[2mMax 20x · Personal\x1b[0m  \x1b[2mnext\x1b[0m', got)
         self.assertEqual(term.prompt([1, 5], colour=True), 'Switch to 1–5, or Enter to stay \x1b[2m›\x1b[0m ')
         codes = set(re.findall(r'\x1b\[([0-9;]*)m', '\n'.join(got)))
-        self.assertEqual(codes, {'0', '1', '2', '91', '94'})
+        self.assertEqual(codes, {'0', '1', '2', '94'})
 
     def test_no_colour_with_no_color_set_or_off_a_terminal(self):
         class Tty(io.StringIO):
@@ -178,17 +178,16 @@ class TheView(unittest.TestCase):
         self.assertLessEqual(max(len(x) for x in got), 60)
         got = lines(width=77)
         self.assertEqual(got[:2], ['Claude Code is on ana@mail.example', 'auto-switch on at 90% 5-hour · 95% weekly'])
-        # 76 columns fit: full bars; lab's line, with its note, says its reset without how far off, and fernhill's,
-        # with its pace words, says those alone, shorter
-        self.assertEqual(got[3:], [x.replace(' · in 2 days  Fable', '  Fable').replace(
-            'resets Mon 1:00 PM · in 3 days · at this pace, full by', 'full by') for x in PLAIN.split('\n')[2:]])
+        # 76 columns fit: full bars; fernhill's line, with its pace words, says those alone, shorter
+        self.assertEqual(got[3:], [x.replace('resets Mon 1:00 PM · in 3 days · at this pace, full by', 'full by')
+                                   for x in PLAIN.split('\n')[2:]])
         self.assertEqual(lines(width=200), PLAIN.split('\n'))
         self.assertEqual(lines(width=105), PLAIN.split('\n'))        # just room for the pace words and the whole reset
         # what does not fit goes under its own column, or under the email when even that is too wide
-        a = term.read(VIEW, tz=TZ)['accounts'][1]
-        heads = term.head_lines(a, 1, 21, 18, width=40)
+        a = term.read(VIEW, tz=TZ)['accounts'][3]
+        heads = term.head_lines(a, 1, 21, 18, width=26)
         self.assertEqual([term.paint(x, False) for x in heads],
-                         ['2  ana@fernhill.example', '   Max 20x · Personal', '   checked 10 min ago'])
+                         ['4  ana@lab.example', '   Max 20x · Personal', '   next'])
 
     def test_states(self):
         view = {'now': NOW, 'engine': {'installed': True},
@@ -206,18 +205,18 @@ class TheView(unittest.TestCase):
         self.assertEqual('\n'.join(lines(view)), """\
 Claude Code is on bo@three.example · auto-switch off at 90% 5-hour · 95% weekly
 
-1  bo@one.example    Pro · Personal    sign in again · checked 1 min ago
+1  bo@one.example    Pro · Personal    sign in again
    5-hour  ────────────────────────    0%  not started
    weekly  ━━━━━━━━━━──────────────   40%  resets Wed 9:00 AM · in 5 days · at this pace, full by Tue 1:16 AM
 
-2  bo@two.example    Max 5x · Two Ltd  checked just now
+2  bo@two.example    Max 5x · Two Ltd
    weekly  ────────────────────────     —
 
-3  bo@three.example  Max 20x · Three   in use · checked 2 hours ago
+3  bo@three.example  Max 20x · Three   in use
    5-hour  ━━━━━━━━━━━━━━━━━━━━━━──   92%  resets 6:10 PM · in 3 hours
    weekly  ━━━━━━━━━━━━────────────   50%  resets Tue 9:00 AM · in 4 days
 
-4  bo@four.example   Max 20x · Four    checked 2 days ago
+4  bo@four.example   Max 20x · Four
    5-hour  ━━━━━━━─────────────────   31%  resets 5:40 PM · in 2 hours
    weekly  ━━━━━━━━━━━━━━━━━━━━━━━─   96%  resets Mon 8:00 AM · in 3 days""")
         coloured = lines(view, colour=True)
@@ -228,8 +227,7 @@ Claude Code is on bo@three.example · auto-switch off at 90% 5-hour · 95% weekl
                       '\x1b[2mresets Tue 9:00 AM · in 4 days\x1b[0m', coloured)
         self.assertIn('   weekly  \x1b[2m' + '─' * 24 + '\x1b[0m     —', coloured)        # not known: a bare bar
         self.assertNotIn('   5-hour  \x1b[2m' + '─' * 24 + '\x1b[0m     —', coloured)     # and no 5-hour line at all
-        self.assertIn('1  \x1b[1mbo@one.example\x1b[0m    \x1b[2mPro · Personal\x1b[0m    sign in again'
-                      '\x1b[2m · \x1b[0m\x1b[2mchecked 1 min ago\x1b[0m', coloured)
+        self.assertIn('1  \x1b[1mbo@one.example\x1b[0m    \x1b[2mPro · Personal\x1b[0m    sign in again', coloured)
         # no account, so none with a 5-hour limit: the header names the weekly line alone
         self.assertEqual(lines({'now': NOW, 'accounts': [], 'auto': {}}),
                          ['Claude Code is not signed in · auto-switch off at 95% weekly'])
@@ -263,25 +261,27 @@ Claude Code is on bo@three.example · auto-switch off at 90% 5-hour · 95% weekl
                           plan(plan=None, org=None)],
                          ['Max 20x · Personal', 'Team · Harbor', 'Max 20x', 'Max 5x · Lab', 'Lab', ''])
 
-    def test_a_model_week_has_no_line_of_its_own(self):
-        # (it had a line under the weekly one; now only a counted one at or over its line is said, as a note at the
-        # end of the weekly line: tests/test_rows_two_limits.py)
-        rows = term.read(VIEW, tz=TZ)['accounts']
-        self.assertEqual([[l['label'] for l in a['limits']] for a in rows],
-                         [['weekly'], ['weekly'], ['5-hour', 'weekly'], ['weekly'], ['weekly']])
-        self.assertEqual([a['limits'][-1]['note'] for a in rows],
-                         [None, None, None, {'label': 'Fable', 'pct': 90}, None])
+    def test_each_account_shows_its_5_hour_and_weekly_lines_and_nothing_else(self):
+        # A model's own week (Fable) is neither a line nor a note in the list (the page shows it), and the list does
+        # not say how old the numbers are. Four plans with no 5-hour limit say so in words in its place.
+        state = term.read(VIEW, tz=TZ)
+        self.assertEqual([[lim['label'] for lim in a['limits']] for a in state['accounts']],
+                         [['5-hour', 'weekly']] * 5)
+        self.assertEqual([lim.get('note') for a in state['accounts'] for lim in a['limits']], [None] * 10)
+        text = '\n'.join(term.view(state))
+        for word in ('Fable', 'checked', '· now'):
+            self.assertNotIn(word, text)
 
     def test_the_pages_own_rules(self):
         # The page (index.html) and the terminal must say the same thing about the same state.
         base = dict(acct(1, 'x@y.example', 'Ultra', personal('x@y.example'), session=w(62, at(13, 18, 10)),
                          weekly=w(70, at(16, 12))), active=True)
         read = lambda a, **v: term.read(dict({'now': NOW, 'auto': VIEW['auto']}, accounts=[a], **v), tz=TZ)['accounts'][0]  # noqa: E731
-        # a reading the engine would not decide on is not known: a dash, never numbers (its age still shows)
-        # (and, as on the page now, no 5-hour line: it is drawn only when there is a 5-hour number to show)
+        # a reading the engine would not decide on is not known: a dash, never numbers, and nothing of its age (the
+        # page says it; the list does not); as on the page, no 5-hour line: it is drawn only with a 5-hour number
         got = read(dict(base, trusted=False, usage_at=NOW - 7200))
         self.assertEqual([(l['label'], l['pct'], l['words']) for l in got['limits']], [('weekly', None, '')])
-        self.assertEqual(got['age'], 'checked 2 hours ago')
+        self.assertEqual(got['numbers'], '')
         # a 5-hour window Claude sends with no number has no line; a weekly one it does not send at all has not started
         got = read(dict(base, usage={'session': {'pct': None, 'resets': at(13, 18)}, 'weekly': None, 'scoped': []}))
         self.assertEqual([(l['label'], l['pct'], l['words']) for l in got['limits']], [('weekly', 0, 'not started')])
@@ -343,7 +343,7 @@ class TheQuestion(unittest.TestCase):
     def test_a_number_switches(self):
         code, out, switched, _ = self.ask('3')
         self.assertEqual((code, switched), (0, ['ana@harbor.example']))
-        self.assertTrue(out.endswith('27%  resets Sat 12:00 PM · in 20 hours\n\n'
+        self.assertTrue(out.endswith('weekly  ━━━━━━──────────────────   27%  resets Sat 12:00 PM · in 20 hours\n\n'
                                      'Switch to 1–5, or Enter to stay › 3\nClaude Code is on ana@harbor.example.\n'), out)
 
     def test_enter_and_q_leave_everything_as_it_is(self):
@@ -367,7 +367,7 @@ class TheQuestion(unittest.TestCase):
         view = dict(VIEW, accounts=[dict(a, needs_login=a['slot'] == 2) for a in VIEW['accounts']])
         code, out, switched, signed = self.ask('2', view)
         self.assertEqual((switched, signed), ([], ['ana@fernhill.example']))
-        self.assertIn('2  ana@fernhill.example   Max 20x · Personal  sign in again · checked 10 min ago', out)
+        self.assertIn('2  ana@fernhill.example   Max 20x · Personal  sign in again', out)
 
     def test_past_nine_accounts_a_number_is_typed(self):
         for typed, picked in (('11\n', 11), ('\n', None), ('13\n', None), ('', None)):
@@ -589,12 +589,14 @@ class TheSameNumbersAsThePage(Sandbox):
         return page
 
     def test_the_view_is_the_running_pages_own(self):
-        page = self.start_page(VIEW)
+        # The page sends its board of providers too (here: Claude alone, nothing to offer); the list keeps it as sent.
+        board = {'v': 1, 'now': NOW, 'order': ['claude'], 'providers': [], 'add': [], 'carry': False}
+        page = self.start_page(dict(VIEW, providers=board))
         self.assertEqual(cli.current_view(), page.view)
         code, out = self.run_cli('status')
         self.assertEqual(code, 0)
         self.assertTrue(out.startswith('Claude Code is on ana@mail.example · auto-switch on at 90% 5-hour'), out)
-        self.assertIn('4  ana@lab.example        Max 20x · Personal  next · checked 5 min ago\n', out)
+        self.assertIn('4  ana@lab.example        Max 20x · Personal  next\n', out)
         self.assertEqual(self.fake.calls, [])                   # the engine was not asked: the page was
 
     def test_a_switch_goes_through_the_running_page(self):
@@ -682,6 +684,10 @@ class FirstRun(Sandbox):
     def setUp(self):
         super().setUp()
         self.signed_in(A, 'org-a')
+        # no router package: the first run's routing step is tested in test_setup_first_run_terminal (TheRealRouter)
+        p = mock.patch.object(firstrun, 'router_parts', lambda: None)
+        p.start()
+        self.addCleanup(p.stop)
 
     def hooks(self):
         """How many of Switchboard's notification hooks are in the throwaway Claude Code settings file."""
@@ -699,7 +705,7 @@ class FirstRun(Sandbox):
                                        '2 of 3  Your other accounts\n'), out)
         self.assertIn(' '.join((PAGE_DOWN + '\n3 of 3  Where to find it\n'
                                 '  Claude Code   a status line with the account and its limits, and a notification '
-                                'when a long turn is done or it needs you\n').split()), ' '.join(out.split()))
+                                'when it needs you\n').split()), ' '.join(out.split()))   # "done": off when new
         self.assertTrue(out.endswith('\n\n1 Claude account. Type switchboard to see it.\n'), out)
         self.assertEqual(self.calls(), [('add_current',)])     # the order stays the engine's own: what refills first
         self.assertEqual(self.hooks(), 3)

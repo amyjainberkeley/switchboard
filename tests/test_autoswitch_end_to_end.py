@@ -47,7 +47,8 @@ class AutoAcrossTheEngine(unittest.TestCase):
         self.notes = []
         deps = autoloop.Deps(net=self.net, net_ready=lambda: True, load=lambda: 0.5, power=lambda: (True, 100),
                              procs=lambda: 1, disk_free=lambda: 10 ** 12,
-                             history_note=lambda text, kind='info', **f: self.notes.append(text))
+                             history_note=lambda text, kind='info', **f: self.notes.append(text),
+                             notify_move=lambda note: None)
         self.loop = autoloop.Loop(deps=deps, clock=self.clock, rand=lambda: 0.5)
 
     def tearDown(self):

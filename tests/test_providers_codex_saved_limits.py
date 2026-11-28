@@ -72,6 +72,23 @@ class SavedLimits(unittest.TestCase):
         got = codex_chats.saved_limits(self.reach, self.now)
         self.assertEqual((got.reached, got.plan), ('rate_limit_reached', 'plus'))
 
+    def test_a_reached_word_is_dropped_once_every_window_has_refilled(self):
+        # the last line after a limit still names it; days later both windows have refilled and nothing ran since
+        self.session(lambda c: c.token_count(
+            primary={'used_percent': 100.0, 'window_minutes': 300, 'resets_at': int(self.now - 3 * 86400)},
+            secondary={'used_percent': 40.0, 'window_minutes': 10080, 'resets_at': int(self.now - 10)},
+            reached='rate_limit_reached', plan='plus'))
+        got = codex_chats.saved_limits(self.reach, self.now)
+        self.assertEqual((got.reached, got.plan), (None, 'plus'))
+        self.assertEqual([w.used_pct for w in got.windows], [None, None])
+
+    def test_a_reached_word_stays_while_a_window_has_not_refilled(self):
+        self.session(lambda c: c.token_count(
+            primary={'used_percent': 100.0, 'window_minutes': 300, 'resets_at': int(self.now - 10)},
+            secondary={'used_percent': 99.0, 'window_minutes': 10080, 'resets_at': int(self.now + 86400)},
+            reached='rate_limit_reached'))
+        self.assertEqual(codex_chats.saved_limits(self.reach, self.now).reached, 'rate_limit_reached')
+
     def test_a_line_for_another_bucket_is_passed_over(self):
         def build(c):
             c.token_count(primary={'used_percent': 5.0, 'window_minutes': 10080, 'resets_at': int(self.now + 60)})

@@ -234,14 +234,18 @@ class NothingElseChanges(unittest.TestCase):
                 continue
             self.assertTrue(stopped_and_nothing_fresh(s), (i, s, before, got))
             self.assertEqual((before.action, before.kind, before.hold), ('stay', 'forced', 'no fresh numbers'), i)
-            self.assertEqual((got.action, got.kind), ('switch', 'forced'), i)
+            self.assertEqual(got.kind, 'forced', i)
+            if got.action == 'stay':                    # the same move, waiting for a calm Mac (2 minutes at most)
+                self.assertTrue(got.hold.startswith('waits for the Mac to calm down'), (i, got))
+            else:
+                self.assertEqual(got.action, 'switch', i)
             target = dict((a.id, a) for a in s.accounts)[got.target]
             self.assertTrue(policy._eligible(target, s), i)
             self.assertNotEqual(policy.rule_of(s.settings, target.id), 'out', i)        # never onto a kept-out one
             tv = policy.view(target, s.readings.get(target.id), s.settings, s.now)
             self.assertFalse(tv.over, i)
             self.assertFalse(policy._left_before_read(s, tv), i)   # never back to one left before it was read
-            self.assertTrue(policy.on_older_numbers(got, s), i)
+            self.assertTrue(got.action == 'stay' or policy.on_older_numbers(got, s), i)
             self.assertNotIn(target.id, fresh_ids, i)                  # one read fresh is never chosen this way
             some_fresh += bool(fresh_ids)
             ok = [v for v in candidates(s) if not v.over and v.id not in fresh_ids and

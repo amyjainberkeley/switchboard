@@ -53,7 +53,7 @@ class At80Columns(unittest.TestCase):
             self.assertTrue(any(email in x for x in got), email)          # whole, on one line
         self.assertLessEqual(max(len(x) for x in got), 80, text)
         self.assertIn('full by', text)                                    # the pace words still said
-        self.assertIn('Fable 97%', text)                                  # and the note
+        self.assertNotIn('Fable', text)                                   # a model's week: the page's to say
         self.assertIn('$1,400 of $2,000', text)
 
     def test_the_header_names_the_account_whole(self):

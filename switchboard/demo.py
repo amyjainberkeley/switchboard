@@ -93,8 +93,8 @@ def _build():
     ivy['session']['resets'] = _hour(now + 3.1 * H)
     ivy.update(scoped=[{'name': 'Fable', 'pct': 80, 'resets': _hour(now + 1.4 * D)}],     # room under its 95 line
                spend={'used': 9.04, 'limit': 70.84, 'currency': 'USD'})
-    # Each kind of account row: harbor's Fable week is over its 95 line, so auto-switch passes it over at 5% weekly
-    # (the short red note at the end of its weekly line); personal has no 5-hour limit, and needs a sign-in since
+    # Each kind of account row: harbor's Fable week is over its 95 line (the short red note at the end of its weekly
+    # line), and it still works on other models, at 5% weekly; personal has no 5-hour limit, and needs a sign-in since
     # yesterday, so its reading is too old to show (a dash, its age under it).
     harbor = st['accounts']['m.reyes@harbor.example']
     harbor['usage']['scoped'] = [{'name': 'Fable', 'pct': 97, 'resets': harbor['usage']['weekly']['resets']}]
@@ -145,7 +145,7 @@ def _build():
                       'rules': {}},             # no account has a rule at the start (the pictures start here)
              'guard': None,
              'mac': {'awake': True, 'notify': True, 'statusline': False, 'statusline_theirs': True},
-             'models': False,
+             'models': False, 'helpers': False,          # Sonnet for helpers, Models by the job: both off
              'keys': {'count': 2, 'on': True, 'command': 'switchboard claude'},
              'packs': {'house': False, 'codemap': True, 'claudemem': True, 'cap': 10},
              # the Claude extension, in some of the profiles (Chrome setup)
@@ -269,9 +269,10 @@ def view():
         _keep_fresh(now)
     from . import chats as ch
     board = FACTS['providers'] if 'providers' in FACTS else providers(now)
+    rows = FACTS['provider_rows'] if 'provider_rows' in FACTS else _rows_of(board, now)
     return server.render(STATE, dict(FACTS, now=now, history=_entries()[:server.HISTORY_SHOWN],
                                      chats=ch.counts(chats()), signins=_signins(now),
-                                     providers=board))
+                                     providers=board, provider_rows=rows))
 
 
 def _signins(now):
@@ -280,27 +281,64 @@ def _signins(now):
     return FACTS.get('signins') or dict({'state': 'idle'}, **signins.due(server.signins_accounts(STATE), now))
 
 
-def providers(now, codex=True):
+def providers(now, codex=True, out=False):
     """The made-up board of assistants, in providers/view.py's shape: Claude (the accounts above) with room and, unless
-    codex is False, Codex added on ChatGPT Pro and out on its weekly window until the day after tomorrow (else Codex
-    is on this Mac and not added). A test may set FACTS['providers'] itself."""
+    codex is False, one made-up Codex, added. By default it has room: Plus, maya@northwind.example, 5-hour 8% and
+    weekly 21%, read 40 seconds ago. out=True: ChatGPT Pro, out on its weekly window until the day after tomorrow.
+    codex=False: Codex is on this Mac and not added. The state's rows are derived from this board (provider_rows), so
+    the two cannot disagree. A test may set FACTS['providers'] (and FACTS['provider_rows']) itself."""
     claude = {'id': 'claude', 'name': 'Claude', 'vendor': 'Anthropic', 'app': 'Claude Code', 'added': True,
               'account_list': True, 'installed': True, 'signed_in': None, 'version': '2.1.330', 'state': 'room',
               'why': 'has room', 'back_at': None, 'read_at': now - 40, 'plan': None, 'count': 5, 'with_room': 3,
-              'can_carry': True, 'seats': [], 'error': None}
+              'can_carry': True, 'seats': [], 'error': None, 'email': None, 'has_app': False, 'newest_seen': None,
+              'fit_why': None}
     if not codex:
         return {'v': 1, 'now': now, 'order': ['claude'], 'providers': [claude], 'carry': False,
                 'add': [{'id': 'codex', 'name': 'Codex', 'app': 'Codex', 'version': '0.169.1'}]}
-    back = round((now + 1.6 * D) / H) * H
+    if out:
+        back = round((now + 1.6 * D) / H) * H
+        read, label, plan, state, why = now - 12 * 60, 'ChatGPT Pro', 'pro', 'out', 'is out'
+        windows = [{'label': 'weekly', 'used_pct': 100.0, 'resets_at': back, 'length_min': 10080, 'line': 95.0}]
+    else:
+        back = None
+        read, label, plan, state, why = now - 40, 'ChatGPT Plus', 'plus', 'room', 'has room'
+        windows = [{'label': '5-hour', 'used_pct': 8.0, 'resets_at': round((now + 3.7 * H) / 60) * 60,
+                    'length_min': 300, 'line': 90.0},
+                   {'label': 'weekly', 'used_pct': 21.0, 'resets_at': round((now + 5.6 * D) / H) * H,
+                    'length_min': 10080, 'line': 95.0}]
     codex_entry = {'id': 'codex', 'name': 'Codex', 'vendor': 'OpenAI', 'app': 'Codex', 'added': True,
-                   'account_list': False, 'installed': True, 'signed_in': True, 'version': '0.169.1', 'state': 'out',
-                   'why': 'is out', 'back_at': back, 'read_at': now - 12 * 60, 'plan': 'ChatGPT Pro', 'count': 0,
-                   'with_room': 0, 'can_carry': True, 'error': None,
-                   'seats': [{'label': 'ChatGPT Pro', 'plan': 'pro', 'in_use': True, 'read_at': now - 12 * 60,
-                              'windows': [{'label': 'weekly', 'used_pct': 100.0, 'resets_at': back,
-                                           'length_min': 10080, 'line': 95.0}]}]}
+                   'account_list': False, 'installed': True, 'signed_in': True, 'version': '0.169.1', 'state': state,
+                   'why': why, 'back_at': back, 'read_at': read, 'plan': label, 'count': 0, 'with_room': 0,
+                   'can_carry': True, 'error': None, 'email': 'maya@northwind.example', 'has_app': True,
+                   'newest_seen': '0.169.1', 'fit_why': None,
+                   'seats': [{'label': label, 'plan': plan, 'in_use': True, 'read_at': read, 'state': state,
+                              'back_at': back, 'windows': windows}]}
     return {'v': 1, 'now': now, 'order': ['claude', 'codex'], 'providers': [claude, codex_entry], 'carry': True,
             'add': []}
+
+
+def provider_rows(now, codex=True, out=False):
+    """The state's rows for the made-up board above (providers()), derived the way the server derives its own
+    (providers.rows.from_board), each with the demo's newest made-up chat as the one that would go, so the one list
+    shows without touching anything. Its times move with the clock."""
+    return _rows_of(providers(now, codex=codex, out=out), now)
+
+
+def _rows_of(board, now):
+    from .providers import rows
+    chat = {'name': newest_chat_name(), 'mark': newest_chat_mark()}
+    return [dict(r, chat=dict(chat)) for r in rows.from_board(board, now=now)]
+
+
+def newest_chat_name():
+    """The name of the newest of the demo's made-up chats that has one."""
+    return min((c for c in DEMO_CHATS if c[1]), key=lambda c: c[5])[1]
+
+
+def newest_chat_mark():
+    """That chat's mark, as a face sends it back with a press (providers.press.mark of its made-up id)."""
+    from .providers import press
+    return press.mark(min((c for c in DEMO_CHATS if c[1]), key=lambda c: c[5])[0])
 
 
 # Made-up chats for GET /api/chats and `switchboard chats`: one of each case the page draws. Each is (id, title,
@@ -509,7 +547,7 @@ def _week(now):
                      kinds=dict((k, w * dict(WEEK_KINDS).get(k, 0)) for k in KINDS),
                      tokens={'input': int(w * 0.02), 'output': int(w * 0.20 / WEIGHTS['output']),
                              'cache_write': written, 'cache_read': int(w * 0.42 / WEIGHTS['cache_read']),
-                             'cache_write_1h': written},
+                             'cache_write_1h': written, 'cache_read_low': 0},     # every read at 0.05, as on Opus
                      tools=int(w / 20000), agents=['a%d-%d' % (x['t'], i) for i in range(ran)],
                      runs=['r%d-%d' % (x['t'], i) for i in range(min(3, (ran + 5) // 6))])
     days = {}
@@ -531,7 +569,8 @@ def _week(now):
     # weighed at today's prices, every write a 1-hour one (as Claude Code's are): 42% re-reading, 36% saving, 20% writing
     written = int(total * 0.36 / WRITE_1H)
     tokens = {'input': int(total * 0.02), 'output': int(total * 0.20 / WEIGHTS['output']), 'cache_write': written,
-              'cache_read': int(total * 0.42 / WEIGHTS['cache_read']), 'cache_write_1h': written}
+              'cache_read': int(total * 0.42 / WEIGHTS['cache_read']), 'cache_write_1h': written,
+              'cache_read_low': 0}                            # every read at 0.05, as on Opus: none at Fable's 0.025
     split = {'chat': 0.09, 'helpers': 0.10, 'workflows': 0.81}
     who = lambda weight, parts: [{'label': WHO_LABEL[k], 'detail': {'weight': weight * parts[k]}} for k in WHO]  # noqa: E731
     last = total / 1.31                              # last week: 31% less, mostly workflows (they ran fewer)
@@ -609,9 +648,12 @@ def keys():
 
 
 def models():
-    """What the Models page shows in the demo: the same shape GET /api/models answers."""
+    """What the Models page shows in the demo: the same shape GET /api/models answers. The made-up Mac's Claude Code
+    reads the effort line, so Sonnet for helpers is at high effort."""
     _ready()
-    return {'enabled': FACTS['models'], 'decided_by': None, 'blocked': None, 'model': 'Sonnet', 'moved': 37,
+    return {'enabled': FACTS['models'], 'decided_by': None, 'blocked': None, 'model': 'Sonnet', 'effort': 'high',
+            'helpers': {'enabled': bool(FACTS.get('helpers')), 'blocked': None, 'left_out': []}, 'effort_level': None,
+            'moved': 37,
             'exact': True, 'log': [{'helper': 'Workflow steps', 'share': 81, 'models': [{'family': 'Opus', 'share': 76},
                                                                                        {'family': 'Sonnet', 'share': 18}]},
                                    {'helper': 'Helpers', 'share': 10, 'models': [{'family': 'Opus', 'share': 85},
@@ -677,8 +719,10 @@ def act(path, body):
             if rank is not None:
                 ranks = dict((k, v) for k, v in (FACTS['auto'].get('ranks') or {}).items() if k != a['id'])
                 FACTS['auto']['ranks'] = dict(ranks, **({a['id']: rank[1]} if rank[1] is not None else {}))
+    elif path == '/api/continue':                   # the made-up OpenAI row: nothing opens
+        raise SwitchError("The demo's OpenAI row is made up, so nothing opens.")
     elif path == '/api/models':
-        FACTS['models'] = bool(body.get('enabled'))
+        FACTS['helpers' if body.get('part') == 'helpers' else 'models'] = bool(body.get('enabled'))
     elif path == '/api/links':
         if 'on' in body:
             FACTS['links']['on'] = bool(body['on'])

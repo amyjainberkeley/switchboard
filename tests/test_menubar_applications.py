@@ -13,6 +13,7 @@ import plistlib
 import queue
 import subprocess
 import sys
+import time
 import unittest
 from contextlib import redirect_stdout
 from unittest import mock
@@ -23,7 +24,7 @@ sys.path.insert(0, ROOT)
 sys.path.insert(0, HERE)
 
 from switchboard import __main__ as cli
-from switchboard import core, menubar
+from switchboard import core, menubar, pagekey
 from switchboard import menubar_wrap as wrap
 
 import test_menubar as tm  # its sandbox, write_exe, hold and stand-in PyObjC; no tests run from here
@@ -352,7 +353,10 @@ class MenubarOpened(Base):
         tm.hold(self)
         self.job()
         self.assertEqual(self.go(), (0, ''))
-        self.assertEqual(self.opened, [['/usr/bin/open', 'http://localhost:%d/' % core.port()]])
+        # `open` is handed a private file that carries a one-use ticket (pagekey), never the page key
+        self.assertEqual([argv[0] for argv in self.opened], ['/usr/bin/open'])
+        self.assertEqual(os.path.dirname(self.opened[0][1]), core.data_path('page-open'))
+        self.assertNotIn(pagekey.key(), ' '.join(self.opened[0]))
         self.assertEqual((self.launchd, self.ran), ([], []))
 
     def test_not_running_its_job_starts_it(self):
@@ -389,7 +393,12 @@ class TheRunningItemOpenedAgain(tm.Sandbox):
         mods = tm.stand_in_pyobjc(queue.Queue())
         self.workspace = mock.MagicMock(name='NSWorkspace')
         mods['AppKit'].NSWorkspace = self.workspace
-        mods['Foundation'].NSURL = mock.MagicMock(URLWithString_=lambda s: 'NSURL(%s)' % s)
+        mods['Foundation'].NSURL = mock.MagicMock(URLWithString_=lambda s: 'NSURL(%s)' % s,
+                                                  fileURLWithPath_=lambda s: 'FILE(%s)' % s)
+        self.waits = []
+        p = mock.patch.object(pagekey, 'watch_taken', lambda path, say, port, patience, part='': self.waits.append(path))
+        p.start()
+        self.addCleanup(p.stop)
         p = mock.patch.dict(sys.modules, mods)
         p.start()
         self.addCleanup(p.stop)
@@ -399,8 +408,26 @@ class TheRunningItemOpenedAgain(tm.Sandbox):
 
     def test_it_opens_the_page(self):
         self.assertIs(self.bar.applicationShouldHandleReopen_hasVisibleWindows_(None, False), False)
-        self.workspace.sharedWorkspace.return_value.openURL_.assert_called_once_with(
-            'NSURL(http://localhost:%d/)' % core.port())
+        # NSWorkspace is handed the private file with a one-use ticket; the wait for its ticket runs on a thread
+        opened = self.workspace.sharedWorkspace.return_value.openURL_
+        opened.assert_called_once()
+        path = opened.call_args[0][0][len('FILE('):-1]
+        self.assertEqual(os.path.dirname(path), core.data_path('page-open'))
+        for _ in range(100):
+            if self.waits:
+                break
+            time.sleep(0.05)
+        self.assertEqual(self.waits, [path])
+
+    def test_add_account_opens_the_add_form_through_a_ticket_too(self):
+        self.bar.add_(None)
+        opened = self.workspace.sharedWorkspace.return_value.openURL_
+        opened.assert_called_once()
+        path = opened.call_args[0][0][len('FILE('):-1]
+        self.assertEqual(os.path.dirname(path), core.data_path('page-open'))
+        with open(path, encoding='utf-8') as f:
+            page = f.read()
+        self.assertRegex(page, r'http://127\.0\.0\.1:%d/\?t=[^"#]+#accounts/add"' % core.port())
 
 
 # ---------- `switchboard menubar --applications` ----------

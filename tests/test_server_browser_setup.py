@@ -316,7 +316,7 @@ class PortLines(Sandbox):
         with mock.patch.dict(os.environ, {'SWITCHBOARD_PORT': str(n)}):
             self.assertTrue(server.page_answers(n))
         out = self.serve_on(n)
-        self.assertEqual(out, "Switchboard's page is already running at http://localhost:%d.\n" % n)
+        self.assertEqual(out, "Switchboard's page is already running at http://127.0.0.1:%d.\n" % n)
 
     def test_the_demo_on_the_port_is_not_switchboards_page(self):
         self.addCleanup(demo.STATE.clear)
@@ -364,7 +364,7 @@ class PortLines(Sandbox):
         with mock.patch.dict(os.environ, {'SWITCHBOARD_PORT': str(n)}), contextlib.redirect_stdout(io.StringIO()):
             with self.assertRaises(Stop):
                 cli.main(['demo'])
-        self.assertEqual(seen, [['/usr/bin/open', 'http://localhost:%d' % n]])
+        self.assertEqual(seen, [['/usr/bin/open', 'http://127.0.0.1:%d' % n]])
 
 
 # ---------- a sign-in in the default browser says what to watch for; another account is a warning ----------
@@ -781,9 +781,15 @@ THIS_MAC = ('localhost', '127.0.0.1')
 # license's own address, a comment that names the NO_COLOR convention. Each only in its own files.
 # chromewebstore.google.com: the Claude extension's page, opened in the person's own browser profile from Chrome
 # setup; Switchboard never fetches it.
-NAMED_ONLY = {'www.w3.org': ('web/index.html', 'web/go.html'), 'openfontlicense.org': ('web/Geist-OFL.txt',),
+# learn.chatgpt.com: OpenAI's own pages, named by the Codex rows of the model list and of a preset as where each row
+# was read (a row with no source is refused). Kept as text beside the row; no code opens a row's source.
+NAMED_ONLY = {'www.w3.org': ('web/index.html', 'web/go.html'),
+              'openfontlicense.org': ('web/Geist-OFL.txt',),
               'no-color.org': ('statusline.py',), 'chromewebstore.google.com': ('browser.py',),
-              'openai.com': ('skill/reference/codex.md', 'skill/reference/what-it-does-not-do.md')}   # its terms, a link to read
+              'learn.chatgpt.com': ('providers/catalog.json', 'providers/route_presets.json'),
+              # openai.com: OpenAI's terms of use, named as text by Switchboard's skill for coding agents, as
+              # docs/faq.md names them. Nothing opens it.
+              'openai.com': ('skill/reference/codex.md', 'skill/reference/what-it-does-not-do.md')}
 # Not addresses: the gateway's own loopback address filled in at run time, and a refusal that shows the form.
 PLACEHOLDERS = {('gateway.py', '%s'): 'LOOPBACK', ('keys.py', 'host'): 'SwitchError'}
 # Fetched only when a pack is turned on and its plan agreed to: Node's own release, pinned with its checksum;
@@ -860,7 +866,8 @@ class NothingLeavesTheMac(Sandbox):
     def test_every_address_in_the_code_and_the_page_is_on_the_allow_list(self):
         found = addresses()
         hosts = set(h for _, _, h, _ in found)
-        self.assertTrue({'claude.ai', 'api.anthropic.com', 'openrouter.ai', 'localhost'} <= hosts, hosts)   # it looked
+        # it looked: this Mac's own address among them, the page's literal 127.0.0.1 (no address names localhost)
+        self.assertTrue({'claude.ai', 'api.anthropic.com', 'openrouter.ai', '127.0.0.1'} <= hosts, hosts)
         wrong = ['%s:%d %s' % (rel, n, host) for rel, n, host, line in found
                  if not (allowed(host) or rel in NAMED_ONLY.get(host, ()) or PACK_DOWNLOADS.get(host) == rel
                          or ((rel, host) in PLACEHOLDERS and PLACEHOLDERS[(rel, host)] in line))]

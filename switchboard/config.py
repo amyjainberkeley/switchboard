@@ -25,6 +25,7 @@ import sys
 from contextlib import contextmanager
 
 from . import autorules, browser, core, engine, gateway, names, term
+from .accounts import policy
 from .core import SwitchError
 
 SCHEMA = 1
@@ -106,6 +107,10 @@ class Facts(object):
     def models(self):
         from . import server
         return (self._once('models', server.models_view) or {}).get('enabled')
+
+    def models_helpers(self):
+        from . import server
+        return ((self._once('models', server.models_view) or {}).get('helpers') or {}).get('enabled')
 
     def hooks(self):
         from . import session_hooks
@@ -237,17 +242,34 @@ ROWS = (
         _ranks, command='switchboard auto rank NAME N|off', file_key='auto_policy',
         page_why="the page sets it in each account's row of Use last and Keep out", each=lambda n: 'rank %d' % n,
         as_command=lambda v: ['switchboard auto rank %s %d' % (_typed(name), n) for name, n in (v or {}).items()]),
+    Row('auto_policy.sign_lines', 'switching', 'on-off', policy.Settings.sign_lines,
+        "Move before Claude Code's usage sign shows (60% of the 5-hour window, 65% of the week). Each move makes open "
+        "chats read their conversation again.",
+        lambda f: f.auto().get('sign_lines'), post=('/api/auto', 'sign_lines'), file_key='auto_policy',
+        page_why='the page has no row for it yet'),
+    Row('auto_policy.pick_hold', 'switching', 'choice', policy.Settings.pick_hold,
+        'When you pick an account yourself, automatic switching stays there: 12 hours for a better refill, 2 hours '
+        'for a model or the usage sign (default), until a limit makes it move (until_out), or no hold (off).',
+        lambda f: f.auto().get('pick_hold'), post=('/api/auto', 'pick_hold'), choices=policy.PICK_HOLDS,
+        file_key='auto_policy', page_why='the page has no row for it yet'),
     Row('awake', 'working', 'on-off', True, 'Keep the Mac awake: held while Claude Code works, let go 2 minutes '
         'after it stops.', lambda f: f.helpers().get('awake'), post=('/api/awake', 'on'), file_key='awake'),
-    Row('notify', 'working', 'on-off', False, 'Notifications: a switch, a limit near or refilled, done, and needs you.',
-        lambda f: f.mac().get('notify'), command='switchboard notify on|off', file_key='notify',
-        as_command=_on_off('notify')),
+    Row('notify', 'working', 'on-off', False, 'Notifications: a switch, a limit near or refilled, needs you, and done '
+        'when notify_done is on.', lambda f: f.mac().get('notify'), command='switchboard notify on|off',
+        file_key='notify', as_command=_on_off('notify')),
+    Row('notify_done', 'working', 'on-off', False, 'A notification when a turn of a minute or more ends, while '
+        'Notifications are on.', _read_of('notify_hooks', 'done_on'), setter=_of('keep', 'notify_done_by_you'),
+        page_why='the page has no row for it: switchboard notify done on|off sets it', file_key='notify_done',
+        as_command=lambda v: 'switchboard notify done %s' % ('on' if v else 'off')),
     Row('statusline', 'code', 'on-off', False, 'The account, % left and refill time under each Claude Code window.',
         lambda f: f.statusline(), command='switchboard statusline on|off', page='statusLine',
         as_command=_on_off('statusline')),
-    Row('models', 'code', 'on-off', False, 'Sonnet for helpers: helpers and workflow steps that name no model run on '
-        'Sonnet. The chat keeps its own.', lambda f: f.models(), command='switchboard models on|off',
-        page='env.CLAUDE_CODE_SUBAGENT_MODEL', as_command=_on_off('models')),
+    Row('models', 'code', 'on-off', False, 'Models by the job: four helpers, each on the model that fits its job '
+        '(lookups on Haiku; reading, review and checks on Sonnet).', lambda f: f.models_helpers(),
+        command='switchboard models on|off', page='switchboard-*.md', as_command=_on_off('models')),
+    Row('models_sonnet', 'code', 'on-off', False, 'Sonnet for helpers: helpers and workflow steps that name no model '
+        'run on Sonnet. The chat keeps its own.', lambda f: f.models(), command='switchboard models sonnet on|off',
+        page='env.CLAUDE_CODE_SUBAGENT_MODEL', as_command=_on_off('models sonnet')),
     Row('hooks', 'code', 'on-off', False, 'The session hooks: they tell an open Claude Code session what a switch '
         'means for it.', lambda f: f.hooks(), command='switchboard hooks on|off',
         page_why='the page has no row for them: they go in with the first run, and this command changes them',
@@ -303,7 +325,10 @@ OWN_KEYS = ('key', 'let_go', 'auto_on_said', 'auto_set_by_you', 'notify_set_by_y
             'setup_hidden', 'claude_path', 'desktop_note_said', 'skill', 'skill_set_by_you', 'skill_by_itself',
             'skill_theirs_said')
 # read by policy.settings_from
-POLICY_KEYS = ('session_at', 'weekly_at', 'model_at', 'model', 'strategy', 'rules', 'own_lines', 'ranks')
+POLICY_KEYS = ('session_at', 'weekly_at', 'model_at', 'model', 'strategy', 'rules', 'own_lines', 'ranks',
+               'stay_signed_in', 'sign_lines', 'pick_hold', 'sign_session_at', 'sign_weekly_at', 'sign_model_at')
+# read by accounts.putback: Claude Code's plain login file kept after a put-back (the hold) and as a standing copy
+SIGNIN_FILE_KEYS = ('hold_signin_file', 'keep_signin_file')
 
 
 # ---------- values as words ----------
@@ -372,8 +397,9 @@ def not_read(s=None):
     out = [(k, nearest(k, real)) for k in sorted(s) if k not in known]
     policy = s.get('auto_policy')
     if isinstance(policy, dict):
-        subs = ['auto_policy.' + k for k in POLICY_KEYS]
-        out += [('auto_policy.' + k, nearest('auto_policy.' + k, subs)) for k in sorted(policy) if k not in POLICY_KEYS]
+        read = POLICY_KEYS + SIGNIN_FILE_KEYS
+        subs = ['auto_policy.' + k for k in read]
+        out += [('auto_policy.' + k, nearest('auto_policy.' + k, subs)) for k in sorted(policy) if k not in read]
     return out
 
 

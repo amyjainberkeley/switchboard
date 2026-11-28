@@ -165,6 +165,7 @@ def keep_pass(ctx, force=False):
             return back
     if lr.read.degraded or login is None or not login.full_pair:
         return None
+    vault.keep_shared(ctx, lr)                      # the item's Mac-wide parts, for a put-back into no item at all
     try:
         doc = vault.load(ctx)
     except vault.VaultError as e:

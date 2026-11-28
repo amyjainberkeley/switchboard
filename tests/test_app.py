@@ -31,6 +31,7 @@ sys.path.insert(0, os.path.join(HERE, '..'))
 from switchboard import __main__ as cli
 from switchboard import (artifacts, awake, browser, core, demo, engine, keep, linkapp, models, notify, plan,
                          server, statusline, usage)
+import pagekey_help  # noqa: E402  (the page key, as Switchboard's own programs send it)
 
 D, H = 86400, 3600
 REAL = usage.summarize                                         # before any test swaps it for a fake
@@ -325,7 +326,7 @@ class ChromePage(unittest.TestCase):
             p = subprocess.Popen([CHROME, '--headless=new', '--disable-gpu', '--no-first-run', '--no-default-browser-check',
                                   '--disable-extensions', '--use-mock-keychain', '--password-store=basic',
                                   '--user-data-dir=' + profile, '--virtual-time-budget=%d' % budget, '--dump-dom',
-                                  self.url + path],
+                                  self.address(path)],
                                  stdout=f, stderr=subprocess.DEVNULL, start_new_session=True)
             try:
                 p.wait(timeout=90)
@@ -338,6 +339,13 @@ class ChromePage(unittest.TestCase):
         if '<main' not in dom:
             self.fail('headless Chrome drew no page')
         return dom
+
+    def address(self, path=''):
+        """The address Chrome opens: the page's door with a one-use ticket, as a person's browser gets there (the page
+        then gives it its cookie and sends it on, `path` kept); another file of the page (go#...) as it is."""
+        if path and path[0] not in '?#':
+            return self.url + path
+        return pagekey_help.ticket_url(self.url, path)
 
     def run_page(self, body, path='', budget=8000):
         """Run `body` (JavaScript; it ends by calling done(value)) inside the real page and return the value."""
@@ -365,6 +373,8 @@ class ChromePage(unittest.TestCase):
         it (the accounts table's rows)."""
         dom = self.dom(path)
         dom = dom[dom.find('<main'):dom.find('</main>')]          # the drawn page, not the script's own text
+        if 'id="acc-other"' in dom:                                 # another provider's row, after the table, is no slot
+            dom = dom[:dom.find('id="acc-other"')]
         blocks = re.split(r'<div class="ag arow[ "]', dom)[1:]
         emails = [re.search(r'<span class="em" title="[^"]*">([^<]*)</span>', b).group(1) for b in blocks]
         nxt = [e for e, b in zip(emails, blocks) if 'class="badge next"' in b]
@@ -772,7 +782,8 @@ class Endpoints(Sandbox):
     def ask(self, path, body=None):
         req = urllib.request.Request('http://127.0.0.1:%d%s' % (self.httpd.server_address[1], path),
                                      data=None if body is None else json.dumps(body).encode(),
-                                     headers={'Content-Type': 'application/json', 'X-Switchboard': '1'})
+                                     headers=pagekey_help.with_key({'Content-Type': 'application/json',
+                                                                    'X-Switchboard': '1'}))
         try:
             with urllib.request.urlopen(req, timeout=10) as r:
                 return r.status, json.load(r)
@@ -1086,7 +1097,8 @@ class ModelsOverHttp(ModelsBase):
 
     def raw(self, body, **headers):
         req = urllib.request.Request('http://127.0.0.1:%d/api/models' % self.httpd.server_address[1],
-                                     data=json.dumps(body).encode(), headers=dict({'Content-Type': 'application/json'}, **headers))
+                                     data=json.dumps(body).encode(),
+                                     headers=pagekey_help.with_key(dict({'Content-Type': 'application/json'}, **headers)))
         try:
             with urllib.request.urlopen(req, timeout=10) as r:
                 return r.status
@@ -1146,8 +1158,9 @@ class SwitchLineLimits(Sandbox):
         os.environ['SWITCHBOARD_PORT'] = str(httpd.server_address[1])
         threading.Thread(target=httpd.serve_forever, daemon=True).start()
         req = urllib.request.Request('http://127.0.0.1:%d/api/auto' % httpd.server_address[1],
-                                     data=b'{"session_at": NaN}', headers={'Content-Type': 'application/json',
-                                                                           'X-Switchboard': '1'})
+                                     data=b'{"session_at": NaN}',
+                                     headers=pagekey_help.with_key({'Content-Type': 'application/json',
+                                                                    'X-Switchboard': '1'}))
         with self.assertRaises(urllib.error.HTTPError) as cm:
             urllib.request.urlopen(req, timeout=10)
         with cm.exception as e:

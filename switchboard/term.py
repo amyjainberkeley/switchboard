@@ -10,14 +10,28 @@ from the state. What it prints:
      5-hour  ━━━━━━━━━━━━━━━─────────   62%  resets 6:10 PM · in 2 hours
      weekly  ━━━━━━━━━━━━━━━━━───────   70%  resets Mon 12:00 PM · in 3 days
 
-An account whose sign-in ends within the week, or has ended, says when after its age ('· Sign-in ends', a day and a time).
+An account whose sign-in ends within the week, or has ended, says when after its status ('· Sign-in ends', a day and
+a time).
+Another provider the person added (Codex) is a row after the Claude accounts, in the same form, its maker and plan in
+the plan column:
+
+  6  maya@northwind.example  OpenAI · Plus  next
+     weekly  ━━━━━───────────────────   21%  resets Thu 9:00 AM · in 6 days
+
+How old a row's numbers are is not said, with one exception: another provider's row with room by numbers read over an
+hour ago says so after its status ('had room when last read 2 hours ago'), since old room is not room. Numbers taken
+from another Mac say 'from another Mac' there.
+
+Under the list, only what those rows do not say (under_list): an added provider with no row, and why
+('  Codex  not signed in'); a provider on this Mac that is not added, with the command that adds it.
 
 Colour only on a terminal and never with NO_COLOR set: blue for the account in use, red at or over a switch line
 (red beats blue), dim for what is said quietly, bold for emails. A narrow terminal gets narrower bars.
 
-An account has at most two limit lines: 5-hour only when there is a 5-hour number to show, weekly always (a dash when
-not known). A model's own week has no line; one auto-switch counts that is at or over its line is a short red note at
-the end of the weekly line ('Fable 97%').
+An account has at most two limit lines: 5-hour, then weekly (a dash when not known). The 5-hour line is always there
+when its plan is known: with a number, its bar; on a plan with no 5-hour limit, the words 'no 5-hour limit' in its
+place (no_five, the one rule for every row on every face); with a number not known, no line. A model's own week has
+no line and no note here: the page shows it, and `switchboard auto` names the one auto-switch counts.
 
 When, at the pace of its use so far, an account's weekly limit would be full before it refills (pace.week), its weekly
 line says when after its reset words ('· at this pace, full by Sat 4:23 PM'). When it lasts, nothing is said.
@@ -31,7 +45,7 @@ from .core import parse_iso
 
 BAR = 24                # cells in a bar
 MIN_BAR = 8             # the narrowest a bar gets on a narrow terminal
-LABEL = 6               # '5-hour', 'weekly', or a model's name, padded to this
+LABEL = 6               # '5-hour' or 'weekly', padded to this
 MODEL_LINE = 95         # a model's own week (Fable) turns red at its line, 95% unless set
 USED, LEFT = '━', '─'      # a bar: the part used, then the rest
 SEP = ' · '
@@ -139,17 +153,7 @@ def checked_at(a):
     return max(times) if times else None
 
 
-def age_words(a, now):
-    """How old an account's numbers are, the same on the page (ageWords), in the menu bar and here: 'now' for the
-    account in use while they are Claude Code's own from the last minute (the server's live mark), else
-    'checked just now', 'checked 3 min ago' (checked_at). Each account's own reading, never the server's tick: a tick
-    a minute ago can sit over a reading ten minutes old. '' when the reading's time is not known."""
-    if a.get('live') is True and a.get('active'):
-        return 'now'
-    when = age(checked_at(a), now)
-    if when and a.get('elsewhere'):
-        return 'from another Mac, ' + when        # read there, taken here (readings.py): its age is its real age
-    return 'checked ' + when if when else ''
+ELSEWHERE = 'from another Mac'      # an account's numbers taken from another Mac (readings.py), after its status
 
 
 # ---------- when a sign-in ends ----------
@@ -307,23 +311,25 @@ def counts(models, name):
     return False
 
 
-def limits(a, now, line5, line_w, tz=None, line_m=MODEL_LINE, models=None):
-    """At most two lines, as on the page: 5-hour, then weekly, each against its own line. The 5-hour line only when
-    there is a 5-hour number to show: none for an account with no 5-hour limit (Ultra: its reading has no 5-hour
-    window), for a 5-hour window sent with no number, and for a reading not known (too old to show: trusted False; or
-    never read). The weekly line always, not known as a dash. A model's own week has no line: the weekly limit carries
-    `note` (over_note), the counted model week at or over its line, or None."""
+def limits(a, now, line5, line_w, tz=None):
+    """At most two lines, as on the page: 5-hour, then weekly, each against its own line. The 5-hour line with its
+    number when there is one to show. An account with no 5-hour limit (Ultra: its reading has no 5-hour window) has
+    the words of no_five in that place instead, no bar and no percent (no_five_line). No 5-hour line for a 5-hour
+    window sent with no number, or for a reading not known (too old to show, of a plan that has a 5-hour limit:
+    trusted False; or never read). The weekly line always, not known as a dash. A model's own week (Fable) has no
+    line and no note here: the page shows it, and `switchboard auto` names the one auto-switch counts."""
     u = a.get('usage') if a.get('trusted') is not False else None
+    nf = no_five('term', account=a)
+    nf = [no_five_line(nf)] if nf else []   # no 5-hour limit on this plan: said in words in the 5-hour place
     if not isinstance(u, dict):
-        return [dict(unknown('weekly'), note=None, pace='')]
-    week = dict(window(u.get('weekly'), now, line_w, 'weekly', tz), note=over_note(u, line_m, models),
-                pace=pace_words(a, now, tz))
+        return nf + [dict(unknown('weekly'), pace='')]
+    week = dict(window(u.get('weekly'), now, line_w, 'weekly', tz), pace=pace_words(a, now, tz))
     five = u.get('session')
     shown = isinstance(five, dict) and _num(five.get('pct'))
     cost = spend.shown(u, five['pct'] if shown else None)
     if cost is not None:                    # a row has two lines at most: the spend limit stands in for the 5-hour one
         return [week, spend_line(cost, now, tz)]
-    return ([window(five, now, line5, '5-hour', tz)] if shown else []) + [week]
+    return ([window(five, now, line5, '5-hour', tz)] if shown else nf) + [week]
 
 
 def spend_line(s, now, tz=None):
@@ -345,16 +351,16 @@ def pace_words(a, now, tz=None):
     return 'at this pace, full by %s' % clock(t, now, tz) if t is not None else ''
 
 
-# A model week auto-switch counts, at or over its switch line, is said at the end of the weekly line (term and menu
-# bar): its name and its percent. False takes the note out of both; the page has its own (index.html,
+# A model week auto-switch counts, at or over its switch line, is a note of its name and its percent in the menu bar's
+# limits (menubar.limits); the terminal's list has none. False takes it out there; the page has its own (index.html,
 # MODEL_OVER_NOTE).
 MODEL_OVER_NOTE = True
 
 
 def over_note(u, line_m=MODEL_LINE, models=None):
     """{label, pct}: the model week auto-switch counts (`models`: counts) that is at or over its line (`line_m`), the
-    highest when several are; None when there is none, or when MODEL_OVER_NOTE is off. This is why auto-switch treats
-    an account as full while its weekly limit is under its own line."""
+    highest when several are; None when there is none, or when MODEL_OVER_NOTE is off. The account still works on other
+    models: a model's own week never puts it at its lines (policy.unusable_by_windows)."""
     if not MODEL_OVER_NOTE:
         return None
     best = None
@@ -389,16 +395,138 @@ def model_words(auto):
     return ', %s too' % (said[0] if len(said) == 1 else '%s and %s' % (', '.join(said[:-1]), said[-1]))
 
 
+_CONTROL = re.compile('[\x00-\x1f\x7f-\x9f]')
+
+
+def _plain(v):
+    """Text from the state, on one line and without control characters (so no escape sequence reaches the terminal)."""
+    return _CONTROL.sub('', v).strip() if isinstance(v, str) else ''
+
+
+LATEST = 32503680000.0          # Jan 1 3000: a reset time past this (or before 1970) is not a time; not known
+
+
+def a_time(t):
+    """t when it is a time a clock can show (a number from 1970 to the year 3000), else None."""
+    return t if _num(t) and 0 < t < LATEST else None
+
+
+NOT_KNOWN = 'not known'          # a provider's window with no number, other than its 5-hour one
+NUMBERS_NOT_KNOWN = 'numbers not known'     # a provider row with no window to show
+ASK_HINT = 'switchboard providers --ask reads them'    # its one step, said only where the line still fits (head_lines)
+
+# What a row says in its 5-hour place when its plan has no 5-hour limit, on each face: the page has the room for the
+# whole sentence (index.html, NO_FIVE); the terminal list and the menu bar's rows say the shortest true form.
+NO_FIVE = {'page': 'No 5-hour limit on this plan', 'menu': 'No 5-hour limit', 'term': 'no 5-hour limit'}
+
+
+def no_five(face, account=None, row=None):
+    """The words for a row's 5-hour place when its plan has no 5-hour limit (NO_FIVE[face]), else ''. The one rule for
+    every row on every face: a Claude account's last reading (shown or too old to show: it still tells the plan) holds
+    no 5-hour window, and none of its saved readings ever held a 5-hour number (the state's `five_seen`: one reading
+    with no 5-hour window, on a plan that has the limit, is not known); another provider's row (`row`) has windows
+    and none of them is its 5-hour one. A reading never made, a row with no window yet, or a 5-hour window sent with
+    no number is not known: '' (each face keeps what it shows for a number not known)."""
+    if row is not None:
+        wins = [w for w in row.get('windows') or [] if isinstance(w, dict)] if isinstance(row, dict) else []
+        none = bool(wins) and not any(_plain(w.get('label')) == '5-hour' for w in wins)
+    else:
+        u = account.get('usage') if isinstance(account, dict) else None
+        none = isinstance(u, dict) and bool(u) and not isinstance(u.get('session'), dict) \
+            and not account.get('five_seen')        # {}: not known; so is a plan that has shown a 5-hour number
+    return NO_FIVE[face] if none else ''
+
+
+def no_five_line(words):
+    """A limit line that is only words, in the 5-hour place: no bar, no percent, never red."""
+    return dict(unknown('5-hour'), words=words, none=True)
+
+
+def provider_limits(row, now, tz=None):
+    """A provider row's windows (used_pct) as limits() gives them: each against the line the provider set for it (95%
+    when it set none). As on the account rows, a 5-hour window shows only with a number, and a row whose windows hold
+    no 5-hour one says so in words first (no_five); any other window with no number says it is not known. A window
+    whose reset has passed has refilled ('not started'); a reset time that is not a time (a_time) is not known. []
+    when there is no window to show."""
+    out = []
+    for w in row.get('windows') or []:
+        if not isinstance(w, dict):
+            continue
+        label, pct, t = _plain(w.get('label')) or 'limit', w.get('used_pct'), a_time(w.get('resets_at'))
+        line = w.get('line') if _num(w.get('line')) else MODEL_LINE
+        if label == '5-hour' and not _num(pct):
+            continue
+        if _num(t) and t <= now:
+            out.append({'label': label, 'pct': 0, 'words': 'not started', 't': None, 'over': False})
+        elif not _num(pct):
+            out.append(dict(unknown(label), words=NOT_KNOWN))
+        else:
+            p = jsround(pct)
+            out.append({'label': label, 'pct': p, 't': t if _num(t) else None, 'over': p >= line,
+                        'words': 'resets %s%s%s' % (clock(t, now, tz), SEP, until(t, now)) if _num(t) else ''})
+    words = no_five('term', row=row)
+    return ([no_five_line(words)] if words and out else []) + out
+
+
+def provider_numbers(accounts, rows):
+    """The number each entry of the state's provider rows has in the list, in order, None for one that is not a row:
+    after the highest number of the Claude accounts the state lists, one each in the rows' order. The one rule the
+    list, the menu bar's menu, the notification (comeup.row_number) and a press (server.provider_number) number by."""
+    n = max([a['slot'] for a in accounts or () if isinstance(a, dict) and isinstance(a.get('slot'), int) and
+             not isinstance(a.get('slot'), bool)] + [0])
+    out = []
+    for r in rows if isinstance(rows, list) else []:
+        is_row = isinstance(r, dict) and bool(_plain(r.get('provider')))
+        n += is_row
+        out.append(n if is_row else None)
+    return out
+
+
+def provider_rows(rows, accounts, now, tz=None):
+    """The state's provider rows (its 'provider_rows', one per seat), numbered after the Claude accounts in the order
+    given (provider_numbers), each in the shape read() gives an account, with 'provider' (its id) and 'name' (its
+    app's name) added: named by the account's email when the app told it, else by the app; the maker and the plan in
+    the plan column ('OpenAI · Plus'). After its status a row says only what is true of its numbers and matters
+    (numbers): 'numbers not known' for a row with no window to show, with 'hint' the step that reads them (ASK_HINT);
+    old_room's words for room by numbers read over an hour ago; else nothing."""
+    rows = rows if isinstance(rows, list) else []
+    out = []
+    for r, slot in zip(rows, provider_numbers(accounts, rows)):
+        if slot is None:
+            continue
+        in_use = r.get('in_use') is True
+        lims = provider_limits(r, now, tz)
+        out.append({'slot': slot, 'email': _plain(r.get('email')) or _plain(r.get('name')) or _plain(r['provider']),
+                    'plan': SEP.join(x for x in (_plain(r.get('vendor')), _plain(r.get('plan'))) if x),
+                    'active': in_use, 'needs_login': False, 'next': r.get('next') is True and not in_use,
+                    'unmanaged': False, 'signin': '', 'limits': lims, 'provider': _plain(r['provider']),
+                    'numbers': NUMBERS_NOT_KNOWN if not lims else old_room(r, now),
+                    'hint': '' if lims else ASK_HINT, 'name': _plain(r.get('name')) or _plain(r['provider'])})
+    return out
+
+
+def old_room(r, now):
+    """'had room when last read 2 hours ago': a provider row with room by numbers read over an hour ago says so, in
+    the board's own words (view.state_words), since old room is not room; '' for any other row. The hour is the one
+    rule of a row's fresh (providers.cli.WORDS_FRESH_S)."""
+    from .providers import cli as provider_cli, words as provider_words
+    read = r.get('read_at')
+    if r.get('state') != 'room' or not _num(read) or not now - read > provider_cli.WORDS_FRESH_S:
+        return ''
+    return provider_words.STATE_HAD_ROOM.format(ago=provider_words.ago(now - read))
+
+
 def read(view, live=None, tz=None):
     """The page's state as rows: {'head': {email, auto, line5, line_w, models}, 'accounts': [{slot, email, plan, active,
-    next, needs_login, unmanaged, age, rule ('last', 'out' or '': its rule in auto-switch), limits, token (token_words
-    of a one-year token kept for it, or '')}],
-    'now'}. `live` is the email Claude Code is signed in to (for the header when no account here is in use)."""
+    next, needs_login, unmanaged, numbers (ELSEWHERE for numbers taken from another Mac, else ''), rule ('last', 'out'
+    or '': its rule in auto-switch), signin, limits, token (token_words of a one-year token kept for it, or '')}],
+    'now'}. `live` is the email Claude Code is signed in to (for the header when no account here is in use). The
+    state's other providers (its 'provider_rows', providers.rows) follow the Claude accounts, each with 'provider'
+    added (provider_rows); when one of them is next, no Claude account is."""
     now = view.get('now') if _num(view.get('now')) else 0
     auto = view.get('auto') or {}
     line5 = auto.get('session_at') if _num(auto.get('session_at')) else 90
     line_w = auto.get('weekly_at') if _num(auto.get('weekly_at')) else 95
-    line_m = auto.get('model_at') if _num(auto.get('model_at')) else MODEL_LINE
     on = bool(auto.get('enabled'))
     rules = auto.get('rules') if isinstance(auto.get('rules'), dict) else {}
     own_lines = auto.get('own_lines') if isinstance(auto.get('own_lines'), dict) else {}
@@ -412,13 +540,17 @@ def read(view, live=None, tz=None):
         active, out = bool(a.get('active')), bool(a.get('needs_login')) or bool(a.get('unmanaged'))
         accounts.append({'slot': a.get('slot'), 'email': email, 'plan': plan_words(a), 'active': active,
                          'needs_login': bool(a.get('needs_login')), 'next': on and email == nxt and not active and not out,
-                         'unmanaged': bool(a.get('unmanaged')), 'age': age_words(dict(a, active=active), now),
+                         'unmanaged': bool(a.get('unmanaged')), 'numbers': ELSEWHERE if a.get('elsewhere') else '',
                          'rule': rules.get(a.get('id')) if rules.get(a.get('id')) in RULE_NOTES else '',
                          'signin': '' if a.get('unmanaged') else signin_line(dict(a, active=active), now, tz),
-                         'limits': limits(a, now, *own_lines_of(own_lines.get(a.get('id')), line5, line_w),
-                                          tz=tz, line_m=line_m, models=auto.get('models')),
+                         'limits': limits(a, now, *own_lines_of(own_lines.get(a.get('id')), line5, line_w), tz=tz),
                          'token': token_words(tokens.get(a.get('id')) if a.get('id') else None, tz)})
+    others = provider_rows(view.get('provider_rows'), accounts, now, tz)
+    if any(p['next'] for p in others):
+        for a in accounts:                              # one row is next across providers
+            a['next'] = False
     active = next((a['email'] for a in accounts if a['active']), None) or view.get('active') or live
+    accounts += others
     return {'head': {'email': active, 'auto': on, 'line5': line5, 'line_w': line_w, 'models': model_words(auto),
                      'five': has_five(view.get('accounts'))},
             'accounts': accounts, 'now': now}
@@ -456,11 +588,12 @@ def header(head, width=None):
 
 def status(a):
     """`in use`, `sign in again` or `next`, then its rule in auto-switch ('used last', 'kept out of auto-switch'), then
-    how old the account's numbers are ('now', 'checked 3 min ago'), then when its sign-in ends or ended
-    (signin_line)."""
+    what the row says of its numbers (numbers: 'from another Mac', 'numbers not known', 'had room when last read 2
+    hours ago'), then when its sign-in ends or ended (signin_line). How old the numbers are is not said otherwise: a
+    reading too old to show has no numbers at all (limits)."""
     word = [('in use', BLUE)] if a['active'] else [('sign in again', None)] if a['needs_login'] else \
         [('next', DIM)] if a['next'] else []
-    for said, colour in ((RULE_NOTES.get(a.get('rule')), DIM), (a['age'], DIM), (a.get('signin'), None),
+    for said, colour in ((RULE_NOTES.get(a.get('rule')), DIM), (a.get('numbers'), DIM), (a.get('signin'), None),
                          (a.get('token'), DIM)):
         if said:
             word = word + [(SEP, DIM), (said, colour)] if word else [(said, colour)]
@@ -473,10 +606,15 @@ def _pad(n):
 
 def head_lines(a, slot_w, email_w, plan_w, width=None):
     """The account's first line: slot, email, plan · org, status. On a narrow terminal what does not fit goes to
-    the next line, under its own column when it fits there."""
+    the next line, under its own column when it fits there. A row's 'hint' (a step) ends its status only at a
+    terminal where the whole line still fits."""
     first = [(str(a['slot'] or '').rjust(slot_w) + '  ', None), (a['email'], BOLD)]
     plan = [(a['plan'], DIM)] if a['plan'] else []
     st = status(a)
+    if a.get('hint') and width is not None:
+        hinted = st + [(SEP, DIM), (a['hint'], DIM)]
+        if slot_w + 2 + email_w + 2 + (plan_w + 2 if plan_w else 0) + width_of(hinted) <= width:
+            st = hinted
     gap = [('  ', None)]
     col = slot_w + 2 + email_w + 2                      # where the plan column starts
     line = list(first)
@@ -515,6 +653,8 @@ def cells(pct, bar):
 
 
 def limit_line(lim, indent, label_w, bar, active, width=None):
+    if lim.get('none'):                     # no 5-hour limit on this plan: the words alone, quiet, no bar, no percent
+        return [(' ' * indent, None), (lim['words'], DIM)]
     n = cells(lim['pct'], bar)
     fill = RED if lim['over'] else BLUE if active else None
     pct = DASH if lim['pct'] is None else '%d%%' % lim['pct']
@@ -527,7 +667,7 @@ def limit_line(lim, indent, label_w, bar, active, width=None):
     words, said_pace = fit(lim, indent + label_w + 2 + bar + 6, width)
     if words:
         segs += [('  ', None), (words, DIM)]
-    return segs + pace_segs(dict(lim, pace=said_pace), after=bool(words)) + note_segs(lim)
+    return segs + pace_segs(dict(lim, pace=said_pace), after=bool(words))
 
 
 def said(lim, before=0, width=None):
@@ -539,17 +679,16 @@ PACE_LEAD = 'at this pace, '
 
 
 def fit(lim, before=0, width=None):
-    """(reset words, pace words) for a limit's line. On a line with pace words or a note that would not fit `width`
-    (`before`: the columns ahead of the words), each step says less until it fits, the note always whole: the reset
-    without how far off ('resets Mon 1:00 PM'), then the pace words without 'at this pace, ', then no reset words."""
+    """(reset words, pace words) for a limit's line. On a line with pace words that would not fit `width` (`before`:
+    the columns ahead of the words), each step says less until it fits: the reset without how far off ('resets Mon
+    1:00 PM'), then the pace words without 'at this pace, ', then no reset words."""
     words, said_pace = lim['words'], lim.get('pace') or ''
-    note = width_of(note_segs(lim))
-    if width is None or not (said_pace or note) or not words:
+    if width is None or not said_pace or not words:
         return words, said_pace
     short, bare = words.split(SEP)[0], said_pace.replace(PACE_LEAD, '', 1)
-    steps = [(words, said_pace), (short, said_pace)] + ([(short, bare), ('', bare)] if said_pace else [])
+    steps = [(words, said_pace), (short, said_pace), (short, bare), ('', bare)]
     for w, p in steps:
-        if before + (2 + len(w) if w else 0) + width_of(pace_segs({'pace': p}, after=bool(w))) + note <= width:
+        if before + (2 + len(w) if w else 0) + width_of(pace_segs({'pace': p}, after=bool(w))) <= width:
             return w, p
     return steps[-1]
 
@@ -561,26 +700,14 @@ def pace_segs(lim, after=True):
     return [(SEP if after else '  ', DIM), (words, None)] if words else []
 
 
-def note_words(lim):
-    """'Fable 97%': the weekly line's note (over_note), or ''."""
-    n = lim.get('note')
-    return '%s %d%%' % (n['label'], n['pct']) if n else ''
-
-
-def note_segs(lim):
-    """The note at the end of a limit's line, red: a model week auto-switch counts is at or over its line."""
-    words = note_words(lim)
-    return [('  ', None), (words, RED)] if words else []
-
-
 def bar_width(accounts, indent, label_w, width=None):
     """24 cells, fewer on a narrow terminal (never under 8), the same for every bar so the numbers line up."""
     if width is None:
         return BAR
-    # a line with a note or pace words may say less (fit): they never take room from every bar
-    words = max([width_of(pace_segs({'pace': lim['pace'].replace(PACE_LEAD, '', 1)}, after=False) + note_segs(lim)) - 2
-                 if lim.get('pace') else len(lim['words'].split(SEP)[0]) + width_of(note_segs(lim)) if lim.get('note')
-                 else len(lim['words']) for a in accounts for lim in a['limits']] + [0])
+    # a line with pace words may say less (fit): they never take room from every bar
+    words = max([width_of(pace_segs({'pace': lim['pace'].replace(PACE_LEAD, '', 1)}, after=False)) - 2
+                 if lim.get('pace') else len(lim['words']) for a in accounts for lim in a['limits']
+                 if not lim.get('none')] + [0])
     fixed = indent + label_w + 2 + 2 + 4 + (2 + words if words else 0)
     return max(MIN_BAR, min(BAR, width - fixed))
 
@@ -704,16 +831,43 @@ MODELS_NOTE = {'next': 'Open chats use it for their next helper.',
 
 
 def models_line(v):
-    """`switchboard models`: 'Sonnet for helpers: on' or 'off', with what else decides it or why it can't go on, as the
-    page's switch says beside it (index.html, settingsHTML); 'unknown' with why when the settings can't be read: never
-    off while its key may be there. `v` is GET /api/models (server.models_view)."""
+    """`switchboard models`: 'Sonnet for helpers: on' (', at high effort' when that line is in too) or 'off', with what
+    else decides it or why it can't go on, as the page's switch says beside it (index.html, settingsHTML); 'unknown'
+    with why when the settings can't be read: never off while its key may be there. `v` is GET /api/models
+    (server.models_view)."""
     name = '%s for helpers' % (v.get('model') or 'Sonnet')
     if v.get('enabled') is None:
         return '%s: unknown. %s' % (name, v.get('why') or "Claude Code's settings file can't be read.")
     by = v.get('decided_by')
     why = ('%s%s.' % ('One model for every helper is set in ' if by.get('what') == 'force' else 'Already set in ',
                       by.get('where'))) if by else (v.get('blocked') or '') if not v.get('enabled') else ''
-    return '%s: %s%s' % (name, 'on' if v.get('enabled') else 'off', '. ' + why if why else '')
+    on = 'on, at %s effort' % v['effort'] if v.get('effort') else 'on'
+    return '%s: %s%s' % (name, on if v.get('enabled') else 'off', '. ' + why if why else '')
+
+
+def effort_first_line(v):
+    """When CLAUDE_CODE_EFFORT_LEVEL is set somewhere, the line both Models switches say under them (index.html,
+    effortFirst): it beats every helper's effort line and CLAUDE_CODE_SUBAGENT_EFFORT. None when it is not set."""
+    lvl = v.get('effort_level')
+    if not lvl:
+        return None
+    return 'CLAUDE_CODE_EFFORT_LEVEL=%s in %s comes first: every helper runs at that effort.' % (lvl['value'],
+                                                                                               lvl['where'])
+
+
+def helpers_line(v):
+    """`switchboard models`: 'Models by the job: on' or 'off', with why it can't go on, or, when on, the helpers it left
+    out and why ('reviewer (you have your own)'); 'unknown' when Switchboard's record can't be read. `v` is GET
+    /api/models (server.models_view), its 'helpers'."""
+    h = v.get('helpers') or {}
+    if h.get('enabled') is None:
+        return 'Models by the job: unknown. %s' % (h.get('why') or v.get('why') or
+                                                   "Switchboard's record of this setting can't be read.")
+    if not h.get('enabled'):
+        return 'Models by the job: off' + ('. ' + h['blocked'] if h.get('blocked') else '')
+    left = h.get('left_out') or []
+    return 'Models by the job: on' + ('. Left out: %s.' % ', '.join('%s (%s)' % (x['name'], x['why']) for x in left)
+                                      if left else '')
 
 
 NOTIFY_ON = 'Notifications are on.'
@@ -988,31 +1142,28 @@ def _key(a):
     return None
 
 
-# ---------- the other assistants: the group after the accounts (switchboard status) ----------
+# ---------- the other assistants: under the list, what their rows do not say ----------
 
-def providers_lines(board, now, width=None, colour=False):
-    """The group of providers after the accounts, from the state's `providers` (providers/view.py's board): a blank
-    line, 'Providers, in your order', each added one on a line (its name, then its state, plan and windows; the one
-    whose rows are the accounts above says so), then a blank line and the line to type to carry a chat on, and a line
-    for each provider on this Mac not added yet. On a narrow terminal a provider's words go on under its name column.
-    [] when there is nothing to say."""
+def under_list(board, now, rows=(), width=None, colour=False):
+    """The lines under the list (bare `switchboard` and `switchboard status`), from the state's board of providers
+    (`providers`, providers/view.py) and its provider rows: view.under_list's (kind, name, words), each on a line. An
+    added provider with no row is one dim line, its name and why ('  Codex  not signed in'); a provider on this Mac
+    not added, and the line to carry a chat on, are said in their own words. A blank line first; [] when there is
+    nothing to say. On a narrow terminal a provider's words go on under its name column, and a command to type is
+    never broken across two lines."""
     from .providers import view as provider_view
-    rows = provider_view.lines(board, now)
-    if not rows:
+    items = provider_view.under_list(board, now, rows)
+    if not items:
         return []
-    named = [(name, text) for kind, name, text in rows if kind == 'provider']
+    named = [(name, text) for kind, name, text in items if kind == 'provider']
     name_w = max([len(name) for name, _ in named] + [0])
     out = [[('', None)]]
-    if named:
-        out.append([('Providers', BOLD), (', in your order', DIM)])
-        for name, text in named:
+    for kind, name, text in items:
+        if kind == 'provider':
             lead = '  ' + name.ljust(name_w) + '  '
             for i, piece in enumerate(_provider_pieces(text, len(lead), width)):
-                out.append([((lead if i == 0 else ' ' * len(lead)) + piece, None)])
-    rest = [text for kind, _, text in rows if kind != 'provider']
-    if rest and named:
-        out.append([('', None)])
-    for text in rest:                       # a command to type is never broken across two lines
+                out.append([((lead if i == 0 else ' ' * len(lead)) + piece, DIM)])
+            continue
         glued = _COMMAND.sub(lambda m: m.group(0).replace(' ', '\x00'), text)
         out += [[(x.replace('\x00', ' '), None)] for x in _wrapped([glued], 0, width)]
     return [paint(x, colour) for x in out]

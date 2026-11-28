@@ -172,6 +172,7 @@ class OneLog(Sandbox):
             ('Keys gateway on', 'setting', {'by': 'you'}),
             ('Notifications: on', 'setting', {'by': 'you'}),
             ('Sonnet for helpers: off', 'setting', {'by': 'you'}),
+            ('Models by the job: on', 'setting', {'by': 'you'}),
             ('Status line in Claude Code: on', 'setting', {'by': 'you'}),
             ('Code map on', 'setting', {'by': 'you'}),
         ]
@@ -465,6 +466,15 @@ class FromTheTerminal(Sandbox):
 
 # ---------- 2. switchboard log ----------
 
+def _default_interrupt():
+    """In a `log -f` child, just before it starts: the interrupt signal's default handling. A child inherits an
+    ignored interrupt from whatever started this run (a job started with & from a shell that is not interactive
+    ignores it), and then the test's Ctrl-C would never reach it; the result must not depend on how a run was
+    started."""
+    import signal
+    signal.signal(signal.SIGINT, signal.SIG_DFL)
+
+
 class LogCommand(Sandbox):
     def fill(self, n, start=None):
         h = history()
@@ -580,14 +590,17 @@ class LogCommand(Sandbox):
             t.join(5)
         self.assertEqual([json.loads(x)['text'] for x in got], ['Notifications: on'])
 
+    def child_env(self):
+        return dict(os.environ, HOME=self.home, SWITCHBOARD_HOME=self.data, CLAUDE_CONFIG_DIR=self.claude,
+                    PYTHONDONTWRITEBYTECODE='1')
+
     def test_ctrl_c_ends_it_cleanly(self):
         import signal
         import subprocess
         self.fill(1)
-        env = dict(os.environ, HOME=self.home, SWITCHBOARD_HOME=self.data, CLAUDE_CONFIG_DIR=self.claude,
-                   PYTHONDONTWRITEBYTECODE='1')
+        env = self.child_env()
         p = subprocess.Popen([sys.executable, '-m', 'switchboard', 'log', '-f'], cwd=os.path.join(HERE, '..'), env=env,
-                             stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                             stdout=subprocess.PIPE, stderr=subprocess.PIPE, preexec_fn=_default_interrupt)
         try:
             first = p.stdout.readline()                          # it printed the log and now follows it
             p.send_signal(signal.SIGINT)
@@ -603,10 +616,9 @@ class LogCommand(Sandbox):
     def test_a_reader_that_stops_reading_ends_it_quietly(self):
         import subprocess
         self.fill(1)
-        env = dict(os.environ, HOME=self.home, SWITCHBOARD_HOME=self.data, CLAUDE_CONFIG_DIR=self.claude,
-                   PYTHONDONTWRITEBYTECODE='1')
+        env = self.child_env()
         p = subprocess.Popen([sys.executable, '-m', 'switchboard', 'log', '-f'], cwd=os.path.join(HERE, '..'), env=env,
-                             stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                             stdout=subprocess.PIPE, stderr=subprocess.PIPE, preexec_fn=_default_interrupt)
         try:
             p.stdout.readline()
             p.stdout.close()                                    # `switchboard log -f | head -1` once head has its line
@@ -661,8 +673,9 @@ class Served(Sandbox):
 
     def get(self, path):
         import urllib.request
+        import pagekey_help                     # the page key, as Switchboard's own programs send it
         opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
-        with opener.open(self.base + path, timeout=10) as r:
+        with opener.open(urllib.request.Request(self.base + path, headers=pagekey_help.with_key()), timeout=10) as r:
             return json.load(r)
 
 

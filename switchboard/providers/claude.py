@@ -20,6 +20,7 @@ check are reached through bridge.py only.
 import grp
 import json
 import os
+import re
 import stat
 from typing import List, Optional, Tuple
 
@@ -49,6 +50,7 @@ NO_ASK = ('Switchboard reads Claude\'s numbers itself, as it always has; it does
 # The name of the side a note came from, for each provider id the registry knows (the Codex adapter keeps the same).
 PROVIDER_NAMES = {'claude': 'Claude', 'codex': 'Codex'}
 ANOTHER = 'another assistant'           # no sidecar, one that cannot be read, or an id the registry does not know
+_HOP_RE = re.compile(r'^h-[0-9a-f]{8}\Z')   # a hop id (tasks.new_hop_id), the only id a first message names
 
 
 class ClaudeProvider(Provider):
@@ -68,6 +70,7 @@ class ClaudeProvider(Provider):
     session_env = 'CLAUDE_CODE_SESSION_ID'
     rule_files = ('CLAUDE.md', 'CLAUDE.local.md', os.path.join('.claude', 'CLAUDE.md'))
     rule_dirs = (os.path.join('.claude', 'rules'),)
+    plan_phrase = 'Claude plan'
 
     def __init__(self, reach):
         super().__init__(reach)
@@ -112,6 +115,16 @@ class ClaudeProvider(Provider):
     @accounts.deleter
     def accounts(self):
         self._accounts = None
+
+    def started_in(self, path: str) -> Optional[str]:
+        """The folder a Claude Code chat file's own first lines name (the reader files the chat there); None when the
+        file cannot be read or names none."""
+        try:
+            said = self.chatfiles._head_facts(path).get('cwd') if isinstance(path, str) and os.path.isfile(path) \
+                else None
+        except Exception:  # noqa: BLE001 - a file it cannot read tells nothing
+            return None
+        return said if isinstance(said, str) and os.path.isabs(said) else None
 
     def _claude_dir(self) -> str:
         """Claude's folder: CLAUDE_CONFIG_DIR when the person set it, else ~/.claude (as core.claude_dir does)."""
@@ -287,8 +300,10 @@ class ClaudeProvider(Provider):
             line = _number(settings.get(line_name))
             if line is None:
                 line = claude_facts.DEFAULT_LINES[line_name]
+        # a model's own week never makes the account out: only its 5-hour and weekly windows can (policy)
         return Window(label=label, used_pct=_number(getattr(w, 'pct', None)),
-                      resets_at=_number(getattr(w, 'resets_at', None)), length_min=length, line=line)
+                      resets_at=_number(getattr(w, 'resets_at', None)), length_min=length, line=line,
+                      seat_wide=not name.startswith(claude_facts.MODEL_PREFIX))
 
     # ---------- chats (claude_chats.py's) ----------
 
@@ -314,6 +329,33 @@ class ClaudeProvider(Provider):
         program = self._chosen()
         first = words.FIRST_WORDS.format(hop=handoff.hop, path=handoff.path, from_name=self._other_name(handoff))
         return self._launch(program, how, [program.path, first], folder, first)
+
+    @staticmethod
+    def _task_words(extra) -> Tuple[str, ...]:
+        """The extra words of a start on a new task, checked: only the model and effort options, each with its value
+        (claude_facts.TASK_FLAGS). Anything else, a flag that loosens the person's permission checks among them, is
+        refused (ValueError)."""
+        extra = tuple(str(w) for w in (extra or ()))
+        pairs = list(zip(extra[::2], extra[1::2]))
+        if len(extra) % 2 or any(f not in claude_facts.TASK_FLAGS or f in claude_facts.NEVER_FLAGS or
+                                 not claude_facts.TASK_VALUE_RE.match(v) for f, v in pairs):
+            raise ValueError('a word a start on a new task never carries')
+        return extra
+
+    def start_task(self, folder: str, hop: str, path: str, how: str, extra=()):
+        """How to start Claude Code in folder on a new task (switchboard do): `claude [--model M] [--effort E]
+        "<first words>"`, the first words fixed, with the hop id and the task file's path (words.TASK_WORDS). The same
+        program and checks as start(); extra may hold only the model and effort options with their values
+        (claude_facts.TASK_FLAGS), so no flag that loosens the person's permission checks is ever passed
+        (ValueError)."""
+        if how == IN_APP:
+            return self._unsupported(contract.START_APP, words.NO_CLAUDE_LINK)
+        if not os.path.isabs(folder or '') or not os.path.isabs(path or '') or not _HOP_RE.match(str(hop)):
+            raise ValueError('an absolute folder and task file, and a hop id')
+        extra = self._task_words(extra)
+        program = self._chosen()
+        first = words.TASK_WORDS.format(hop=hop, path=path)
+        return self._launch(program, how, [program.path] + list(extra) + [first], folder, first)
 
     def resume(self, chat: ChatRef, handoff: Handoff, how: str):
         if how == IN_APP:

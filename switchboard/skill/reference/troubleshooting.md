@@ -48,7 +48,7 @@ macOS shows them as Script Editor's: allow Script Editor in System Settings > No
 
 ## macOS asks for permission
 
-Switchboard keeps logins in the Keychain, adds two background jobs, sends notifications, and reads Chrome's tab titles to check which profile is which account. Each is asked by macOS; Chrome only after the person asks Switchboard to check links.
+Switchboard keeps logins in the Keychain, adds three background jobs (the page, the sign-in watch and the menu bar item), sends notifications, and reads Chrome's tab titles to check which profile is which account. Each is asked by macOS; Chrome only after the person asks Switchboard to check links.
 
 ## Another program is also switching Claude Code's login
 

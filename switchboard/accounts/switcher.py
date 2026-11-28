@@ -14,7 +14,11 @@ A switch, in order:
 6. The outgoing login is saved for its owner only with proof, and never older over newer. Without proof it stays in
    the safety copy only and no slot is written ("label and login disagree" is shown, not resolved by guessing).
 7. The target's login (with the live item's machine-wide siblings) is written to Claude Code's item, then its identity
-   block to the global config under Claude Code's config lock.
+   block to the global config under Claude Code's config lock. The item is written, read back and (on a roll back)
+   written again only under Claude Code's save lock on it, taken last and let go first, never held while waiting for
+   another lock; when Claude Code keeps it past its budget, the switch is undone as a refused write is. Holding it,
+   the item is read again first: when it no longer holds the text the write was composed from (Claude Code saved
+   meanwhile), nothing is written and the switch is undone the same way.
 8. Both are read back: the item must hold exactly the bytes written and the config must name the target. A mismatch
    puts the original login and label back (the target's stays in its slot, so nothing is lost) and says so.
 At start, resolve_journal() finishes or undoes a switch that was cut off, from what the live login really holds.
@@ -62,7 +66,8 @@ def _drop_journal(ctx):
 # ---------- plain errors ----------
 
 DIALOG_WORDS = 'macOS is waiting for you to answer a Keychain dialog. Answer it, then try again; nothing was changed.'
-SLOW = ('timeout', 'busy', 'dialog')        # Keychain answers that came too late: the call may still land
+# Keychain answers that came too late: the call may still land (but a 'busy' that says `untouched` started nothing)
+SLOW = ('timeout', 'busy', 'dialog')
 
 
 def keychain_refusal(why, sentence):
@@ -238,6 +243,46 @@ def _changed_meanwhile():
     return AccountsError('other', "Claude Code's login changed meanwhile, so Switchboard left it as it is.")
 
 
+SAVING_WORDS = 'Claude Code was saving its login, so nothing was changed. Try again in a few seconds.'
+
+
+def sealed_error():
+    """The refusal for a switch away from a login Claude Code keeps encrypted in its overflow items (2.1.331): it can't
+    be saved for its account, so a switch would lose it."""
+    return AccountsError('other', "Claude Code keeps the login in use in a form Switchboard can't read (a split "
+                                  "Keychain item), so Switchboard can't save it and did not switch. Nothing was "
+                                  "changed.")
+
+
+def _left_rx(j):
+    """The sign-in end stamp (epoch ms) of the outgoing login a journal kept ('orig_rx'), or None. A switch's record
+    keeps it as 'left_rx', so the put-back can tell a new sign-in of the account left from a renewal of it."""
+    rx = j.get('orig_rx')
+    return rx if type(rx) is int and rx > 0 else None
+
+
+def _noted_stamp(j):
+    """The plain file's stamp a journal noted after the switch's write, or None."""
+    got = j.get('file')
+    if isinstance(got, list) and len(got) == 4 and all(type(n) is int for n in got):
+        return list(got)
+    return None
+
+
+def _read_back(ctx):
+    """The live login read back under Claude Code's save lock, so what is compared is not one of its saves half-way.
+    When Claude Code keeps the lock past its budget, or the read under it got no answer within the short time a call
+    may take there (keychain.UNDER_LOCK_S), it is read again without the lock: a read changes nothing."""
+    try:
+        with live_mod.storage_lock(ctx):
+            back = live_mod.read_live(ctx, fresh=True, interactive=True)
+    except ccfiles.LockBusy:
+        return live_mod.read_live(ctx, fresh=True, interactive=True)
+    if back.read.kind == UNREADABLE and back.read.why in ('timeout', 'busy'):
+        return live_mod.read_live(ctx, fresh=True, interactive=True)
+    return back
+
+
 def switch(ctx, target, kind='manual', source='cli', reason='', interactive=False, replace_dead=None):
     """Move Claude Code's live login to account id `target`. Raises AccountsError when nothing was changed.
 
@@ -298,6 +343,8 @@ def _switch_locked(ctx, target, kind, source, reason, interactive, replace_dead=
     pre = live_mod.read_live(ctx, fresh=True, interactive=interactive)
     if pre.read.kind == UNREADABLE or pre.read.degraded:
         raise unreadable_error(pre.read)
+    if pre.login is not None and pre.login.kind == 'sealed':
+        raise sealed_error()
     cfg_r, block, cfg_path = live_mod.config_identity(ctx)
     if cfg_r.kind == UNREADABLE:
         raise AccountsError('other', "Claude Code's settings file (%s) can't be %s, so nothing was changed. Open "
@@ -540,6 +587,8 @@ def _critical(ctx, target, pre, proof, tlogin, cclocks, kind, source, reason, af
     cur = live_mod.read_live(ctx, fresh=True, interactive=True)
     if cur.read.kind == UNREADABLE or cur.read.degraded:
         raise unreadable_error(cur.read)
+    if cur.login is not None and cur.login.kind == 'sealed':
+        raise sealed_error()
     cfg_r, block, cfg_path = live_mod.config_identity(ctx)
     if cfg_r.kind == UNREADABLE:
         raise AccountsError('other', "Claude Code's settings file (%s) can't be read now, so nothing was changed."
@@ -611,7 +660,40 @@ def _critical(ctx, target, pre, proof, tlogin, cclocks, kind, source, reason, af
     j['written_text_fp'] = live_mod.parse(composed).text_fp     # a token's login has no refresh fingerprint
     _write_journal(ctx, j)
     _step('writing')
-    done = live_mod.write_live(ctx, composed, interactive=True)
+    try:
+        with live_mod.storage_lock(ctx) as save_lock:     # (not `held`: that names the kept token left above)
+            # what was composed comes from a read made before the keep and the wait for this lock (seconds): a save
+            # of Claude Code's since then (a renewal, a connector's login) is never written over
+            now = live_mod.read_live(ctx, fresh=True, interactive=True)
+            if now.read.kind == UNREADABLE or now.read.degraded:
+                after['drop_journal'] = True
+                raise unreadable_error(now.read)
+            if (now.login.text if now.login else None) != (out.text if out else None):
+                after['drop_journal'] = True
+                raise AccountsError('claude_busy', SAVING_WORDS)
+            item = now.read.value if now.read.kind == PRESENT and now.read.provenance == 'keychain' else None
+            wrote = {}
+            done = live_mod.write_live(ctx, composed, interactive=True, held=save_lock, before=item, wrote=wrote)
+            # the plain login file this write put there, by its own stamp ([device, inode, mtime ns, size], the four
+            # numbers putback._stamp gives), so the put-back never takes that rewrite for one of Claude Code's
+            stamp = list(wrote['file']) if done.ok and wrote.get('file') else None
+            if done.ok:
+                # the standing copy of the sign-in holds the new login before the settings name its account: the VS
+                # Code extension checks the sign-in of every panel once that name changes
+                mirrored = _mirror_put(ctx, composed)
+                stamp = list(mirrored) if mirrored else stamp
+    except ccfiles.LockBusy:
+        after['drop_journal'] = True
+        raise AccountsError('claude_busy', SAVING_WORDS)
+    if not done.ok and done.why == 'collided':
+        after['drop_journal'] = True
+        raise AccountsError('claude_busy', SAVING_WORDS)
+    if not done.ok and (done.why == 'unchanged' or (done.why == 'busy' and done.untouched)):
+        # ended at its deadline with the item as it was, or never started (Switchboard's other Keychain calls kept
+        # the gate for the whole short time a call has under this lock): nothing can still land, so no record stays
+        # behind to make the put-back wait for a switch that is not coming
+        after['drop_journal'] = True
+        raise unreadable_error(Read(UNREADABLE, why='timeout'), "Claude Code's login", verb='write')
     if not done.ok:
         if done.why in SLOW:
             j['step'] = 'write_unknown'
@@ -625,6 +707,8 @@ def _critical(ctx, target, pre, proof, tlogin, cclocks, kind, source, reason, af
         after['drop_journal'] = True
         raise unreadable_error(Read(UNREADABLE, why=done.why), "Claude Code's login", verb='write')
     j['step'] = 'credential_written'
+    if stamp:
+        j['file'] = stamp
     _write_journal(ctx, j)
     _step('credential_written')
     try:
@@ -642,15 +726,19 @@ def _critical(ctx, target, pre, proof, tlogin, cclocks, kind, source, reason, af
     j['step'] = 'config_written'
     _write_journal(ctx, j)
     _step('config_written')
-    back = live_mod.read_live(ctx, fresh=True, interactive=True)
+    back = _read_back(ctx)
     _, block2, _ = live_mod.config_identity(ctx)
     _step('verify')
     label_ok = block2 is None if want_block is None else (block2 is not None and _label_is(block2, a))
     if not (back.usable and back.login is not None and back.login.text == composed and label_ok):
         rolled = _rollback(ctx, j, out, block, label_too=True, after=after)
         return _undone(ctx, from_id, target, kind, source, reason, rolled, 'the Keychain did not keep it', email)
-    doc['switches'] = (doc.get('switches') or [])[-49:] + [{'at': ctx.wall(), 'from': left_id, 'to': target,
-                                                            'kind': kind, 'source': source}]
+    rec = {'at': ctx.wall(), 'from': left_id, 'to': target, 'kind': kind, 'source': source}
+    if stamp:
+        rec['file'] = stamp                             # no key when there was no plain file
+    if _left_rx(j):
+        rec['left_rx'] = _left_rx(j)                    # the sign-in it left; no key when not known
+    doc['switches'] = (doc.get('switches') or [])[-49:] + [rec]
     doc['active'] = target
     vault.save(ctx, doc)
     j['step'] = 'verified'
@@ -700,19 +788,45 @@ def _undone(ctx, from_id, target, kind, source, reason, rolled, why, email):
                         rolled_back=rolled, note=text), [(text, 'warn', {'h': 'problem', 'account': email})]
 
 
+def _mirror_put(ctx, text):
+    """putback.mirror_put, which never stops a switch: on a failure a file of ours is taken away (it must not hold the
+    account the switch left while the settings name the new one; the next look of the sign-in watch makes the copy
+    again), said in the log. The file's stamp, or None."""
+    from . import putback
+    try:
+        return putback.mirror_put(ctx, text)
+    except Exception as e:  # noqa: BLE001 - the switch itself has landed; the copy is a best effort
+        ctx.log("Could not bring Claude Code's plain login file up to the switch (%s)" % e.__class__.__name__)
+        try:
+            putback.mirror_drop(ctx)
+        except Exception as e2:  # noqa: BLE001 - said once more; the next look takes the file away
+            ctx.log("Could not take away the plain login file Switchboard kept for Claude Code (%s)"
+                    % e2.__class__.__name__)
+        return None
+
+
 def _rollback(ctx, j, out, orig_block, label_too, after=None):
     """Put the original live login (and label) back. The target's login stays in its slot, so this loses nothing.
     True when the original state is back (the journal then goes once the locks are let go)."""
     ok = True
-    if out is None:
-        from . import facts
-        done = ctx.keychain.delete(facts.keychain_service(ctx.env), facts.keychain_account(ctx.env))
-        ok = done.ok
-    else:
-        done = live_mod.write_live(ctx, out.text, interactive=True)
-        back = live_mod.read_live(ctx, fresh=True, interactive=True) if done.ok else None
-        ok = bool(done.ok and back is not None and back.usable and back.login is not None and
-                  back.login.text == out.text)
+    try:
+        with live_mod.storage_lock(ctx) as held:
+            if out is None:
+                from . import facts
+                if not held.still_held():                   # let go on the way out (ccfiles.release_all)
+                    raise ccfiles.LockBusy(held.path)
+                done = ctx.keychain.delete(facts.keychain_service(ctx.env), facts.keychain_account(ctx.env))
+                ok = done.ok
+            else:
+                done = live_mod.write_live(ctx, out.text, interactive=True, held=held)
+                back = live_mod.read_live(ctx, fresh=True, interactive=True) if done.ok else None
+                ok = bool(done.ok and back is not None and back.usable and back.login is not None and
+                          back.login.text == out.text)
+            if ok:
+                _mirror_put(ctx, out.text if out is not None else None)     # the standing copy goes back too
+    except ccfiles.LockBusy:
+        ctx.log('Could not undo the switch yet: Claude Code was saving its login')
+        ok = False
     if ok and label_too:
         try:
             with ccfiles.config_lock(ctx.env, ctx.home, log=ctx.log):
@@ -805,9 +919,13 @@ def _resolve_locked(ctx):
             with vault.account_lock(ctx, timeout=10.0):
                 doc = vault.load(ctx)
                 if tgt is not None:
-                    doc['switches'] = (doc.get('switches') or [])[-49:] + [{
-                        'at': ctx.wall(), 'from': j.get('left_id', j.get('from_id')), 'to': j.get('to_id'),
-                        'kind': j.get('kind'), 'source': 'repair'}]
+                    rec = {'at': ctx.wall(), 'from': j.get('left_id', j.get('from_id')), 'to': j.get('to_id'),
+                           'kind': j.get('kind'), 'source': 'repair'}
+                    if _noted_stamp(j):
+                        rec['file'] = _noted_stamp(j)
+                    if _left_rx(j):
+                        rec['left_rx'] = _left_rx(j)
+                    doc['switches'] = (doc.get('switches') or [])[-49:] + [rec]
                     doc['active'] = j.get('to_id')
                 vault.save(ctx, doc)
             _drop_journal(ctx)
@@ -820,8 +938,11 @@ def _resolve_locked(ctx):
                                                                                    isinstance(orig, dict)):
                 with ccfiles.config_lock(ctx.env, ctx.home, log=ctx.log):
                     ccfiles.write_identity(ctx.env, ctx.home, orig)
+                _drop_journal(ctx)
+                return 'Repaired the switch that was cut off'
             _drop_journal(ctx)
-            return 'Repaired the switch that was cut off'
+            return ('Put away the record of a switch that was cut off: Claude Code holds the login it had before, so '
+                    'nothing was changed.')
     except (ccfiles.LockBusy, vault.LockBusy):
         return 'A switch was cut off; Claude Code is busy, so it will be settled on the next try.'
     except (ccfiles.CCFileError, OSError) as e:
@@ -831,5 +952,8 @@ def _resolve_locked(ctx):
              'not_kept': 'the login that was in use had no refresh token, so no copy of it was made'}
     where = where.get(j.get('out_token')) or \
         ('the login that was in use is in a safety copy' if j.get('safety_key') else None)
+    if login is None or login.kind in ('no_login', 'empty'):    # a sign-in lost since: the put-back's rule decides
+        return ('Put away the record of a switch that was cut off: Claude Code holds no login now, so nothing was '
+                'changed%s.' % (' (%s)' % where if where else ''))
     return ('Put away the record of a switch that was cut off: Claude Code now holds a login Switchboard did not '
             'write, so nothing was changed%s.' % (' (%s)' % where if where else ''))

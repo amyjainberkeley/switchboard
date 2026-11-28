@@ -14,7 +14,7 @@ Then open a new terminal window. (For bash the line goes in `~/.bash_profile`; f
 
 ## macOS asks for permission
 
-Switchboard keeps logins in your Keychain, adds two background jobs, sends notifications, and reads Chrome's tab titles to check links. macOS may ask about any of these: choose Allow. It asks about Chrome only after you ask Switchboard to look at Chrome's tabs: Let Switchboard check links or Check on the page, or `switchboard check`. A command run in a terminal while the page is not running (`switchboard check`, `switchboard open`) reads the tabs itself, so then macOS asks about the terminal. The exact prompts have not been checked on a real Mac yet.
+Switchboard keeps logins in your Keychain, adds three background jobs, sends notifications, and reads Chrome's tab titles to check links. macOS may ask about any of these: choose Allow. It asks about Chrome only after you ask Switchboard to look at Chrome's tabs: Let Switchboard check links or Check on the page, or `switchboard check`. A command run in a terminal while the page is not running (`switchboard check`, `switchboard open`) reads the tabs itself, so then macOS asks about the terminal. The exact prompts have not been checked on a real Mac yet.
 
 ## The Keychain is locked, slow, or waiting for you
 
@@ -33,7 +33,7 @@ If a switch or a run says an account's renewed login could not be written or rea
 
 macOS shows Switchboard's notifications as Script Editor's. If Script Editor may not notify you, none appear: allow it in System Settings > Notifications > Script Editor.
 
-`switchboard notify` says whether notifications are on, whether Claude Code's hooks are in and can run, and what keeps them from running (Claude Code's own `disableAllHooks`, for one). "Claude Code is done" comes only after a turn of a minute or more.
+`switchboard notify` says whether notifications are on, whether Claude Code's hooks are in and can run, and what keeps them from running (Claude Code's own `disableAllHooks`, for one). "Claude Code is done" comes only after a turn of a minute or more, and only once it is turned on: `switchboard notify done on` (a new install has it off).
 
 ## No menu bar item
 
@@ -77,9 +77,13 @@ The Mac is too busy for the page to get a quick answer. It keeps the last number
 
 ## The page won't open
 
-`switchboard page` says the page is not running, or the browser can't reach http://localhost:7799. Either its background job is not running, or another program holds the port. `switchboard doctor` says which. When another program holds it, auto-switch and the readings still run, the menu bar item says which port, and the page opens by itself once the port is free; to use another port: `switchboard update --port 7801`. Otherwise the menu bar item starts the page again within a few minutes, or start it by hand with `switchboard serve`.
+`switchboard page` says the page is not running, or the browser can't reach http://127.0.0.1:7799. Either its background job is not running, or another program holds the port. `switchboard doctor` says which. When another program holds it, auto-switch and the readings still run, the menu bar item says which port, and the page opens by itself once the port is free; to use another port: `switchboard update --port 7801`. Otherwise the menu bar item starts the page again within a few minutes, or start it by hand with `switchboard serve`.
 
 While the page waits for its port, a command that changes something says so in one line, makes the change itself, and ends with the same `switchboard update --port` line. `switchboard signin` changes nothing then: Sign in to all runs on the page.
+
+## The page says to open it from the menu bar
+
+The page opens only for you, so a browser has to be sent to it by Switchboard once: Open Switchboard in the menu bar, or `switchboard page`. A tab opened before an update, another browser or browser profile, and every browser after `switchboard page --new-key`, show that line until then. When `open` can't start your browser, `switchboard page` prints a link to open by hand; it works once, for five minutes.
 
 ## A command says the page serves another data folder
 
@@ -109,7 +113,7 @@ Once the date has passed ("Sign-in ended by Fri 8:38 PM"), or when Anthropic ref
 
 ## Claude Code lost its sign-in
 
-When many open chats save Claude Code's Keychain item at once, the item can be left without the login. Switchboard puts the same account's saved login back within seconds and says so. When it can't (the account a switch just left, no usable saved login for it, or four times already in an hour), a notification says so after 5 minutes: open Switchboard and press Use on an account, or Sign in on the one Claude Code was on. When Switchboard can't write Claude Code's login at all, run `/login` in Claude Code instead. A chat that showed the sign-in screen meanwhile may need that screen cancelled.
+When many open chats save Claude Code's Keychain item at once, the item can be left without the login. Switchboard puts the same account's saved login back within seconds and says so. When it can't (the account a switch just left, no usable saved login for it, or four times already in an hour), a notification says so after 5 minutes: open Switchboard and press Use on an account, or Sign in on the one Claude Code was on. When Switchboard can't write Claude Code's login at all, run `/login` in Claude Code instead. A chat that showed the sign-in screen meanwhile may need that screen cancelled. The sign-in watch, a background job of its own, notices a lost sign-in within a second; if Claude Code's plain login file (`.credentials.json` in its folder) is there for a while after a put-back, leave it: it is Switchboard's copy for the chats that were told the sign-in was missing, and Switchboard removes it by itself.
 
 ## Switchboard says it restored a file
 
@@ -133,7 +137,7 @@ Three ways it happens: Claude Code's settings file can't be read, you edited ins
 
 When the uninstaller says Switchboard could not start (its Python or its folder is gone), it removes everything else and leaves Claude Code's files as they are. To put them back by hand:
 
-- In `~/.claude/settings.json`, take out `statusLine` when its command ends with `# switchboard statusline`, and every hook whose command ends with `# switchboard notify` or `# switchboard sessions`. If you turned on Sonnet for helpers, take `CLAUDE_CODE_SUBAGENT_MODEL` out of `env`.
+- In `~/.claude/settings.json`, take out `statusLine` when its command ends with `# switchboard statusline`, and every hook whose command ends with `# switchboard notify` or `# switchboard sessions`. If you turned on Sonnet for helpers, take `CLAUDE_CODE_SUBAGENT_MODEL` and `CLAUDE_CODE_SUBAGENT_EFFORT` out of `env`. If you turned on Models by the job, delete `~/.claude/agents/switchboard-lookup.md`, `switchboard-reader.md`, `switchboard-reviewer.md`, `switchboard-verifier.md` and `~/.claude/rules/switchboard-models.md`, unless you edited them.
 - In `~/.claude/CLAUDE.md`, take out each block between a `<!-- switchboard …: start` line and its `end` line.
 - `settings.json.switchboard-backup`, beside the settings file, is the file as it was before Switchboard's last change.
 

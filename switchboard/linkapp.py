@@ -31,7 +31,7 @@ import time
 import urllib.error
 import urllib.request
 
-from . import browser
+from . import browser, pagekey
 from .core import SwitchError, data_path, home, port, read_json, read_text, run, write_text
 
 CACHE = {'at': 0, 'value': None}
@@ -237,8 +237,7 @@ class PageDown(OSError):
 def ask_page(path, body, timeout=2.0):
     """POST to this Mac's page directly (never through a proxy), with the header only Switchboard's own callers send.
     Returns its JSON answer. Raises PageDown when it doesn't answer, SwitchError with its words when it says no."""
-    req = urllib.request.Request('http://127.0.0.1:%d%s' % (page_port(), path), data=json.dumps(body).encode(),
-                                 headers={'Content-Type': 'application/json', 'X-Switchboard': '1'})
+    req = pagekey.request('http://127.0.0.1:%d' % page_port(), path, body)
     opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
     try:
         with opener.open(req, timeout=timeout) as r:

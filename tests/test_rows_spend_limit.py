@@ -125,7 +125,9 @@ class TheTerminal(unittest.TestCase):
     def test_a_reading_too_old_to_show_shows_no_spend(self):
         v = view()
         v['accounts'][1]['trusted'] = False
-        self.assertEqual([l['label'] for l in self.rows(v)[ULTRA]['limits']], ['weekly'])
+        got = self.rows(v)[ULTRA]['limits']
+        self.assertEqual([l['label'] for l in got], ['5-hour', 'weekly'])          # no spend line
+        self.assertTrue(got[0]['none'])                         # its plan has no 5-hour limit: the words, no number
 
     def test_over_many_made_up_cases_at_most_two_lines_and_nothing_new_without_spend(self):
         rnd = random.Random(20261125)
@@ -145,7 +147,7 @@ class TheTerminal(unittest.TestCase):
                 self.assertEqual(lims, bare)                                     # with no spend line: as before
             else:
                 self.assertEqual(lims[0], [l for l in bare if l['label'] == 'weekly'][0])
-                five_shown = [l for l in bare if l['label'] == '5-hour']
+                five_shown = [l for l in bare if l['label'] == '5-hour' and not l.get('none')]   # a number
                 self.assertTrue(not five_shown or lims[1]['pct'] > five_shown[0]['pct'])
 
 

@@ -44,7 +44,7 @@ The rules, each the terminal's own (term.py), so the two never disagree:
   `added_at` (when Switchboard kept it; a token carries no end date) and null limits: a token's percents are not
   known, and an API key has no plan limits (`five_hour` and `week` null). A sign-in that also has a one-year token
   kept for it says when in `one_year_added_at`. While Claude Code is on a token, `in_use` is null and that token's
-  own `in_use` is true.
+  own `in_use` is true. On a login no account here is (a token no record owns), `in_use` is null and no row is in use.
 
 Pure: the page's state goes in (server.render's shape, the view `switchboard status` prints), a plain dict comes out.
 """
@@ -77,17 +77,20 @@ def _limit(w, now):
 def limits(a, now):
     """{'five_hour', 'week', 'models'} of an account in the page's state, as term.limits reads it: a reading too old to
     show (trusted False) or none at all is not known; a reading with no 5-hour window is an account with no 5-hour
-    limit, however old the reading (as the page's row says "No 5-hour limit" from it); a model's own week (Fable) is
-    listed only with a number."""
+    limit, however old the reading (as the page's row says "No 5-hour limit" from it), unless its saved readings ever
+    held a 5-hour number (five_seen): then its 5-hour limit is not known, as the rows say; a model's own week (Fable)
+    is listed only with a number."""
     u = a.get('usage') if a.get('trusted') is not False else None
     if not isinstance(u, dict):
         held = a.get('usage')
-        no_five = isinstance(held, dict) and bool(held) and not isinstance(held.get('session'), dict)
+        no_five = isinstance(held, dict) and bool(held) and not isinstance(held.get('session'), dict) \
+            and not a.get('five_seen')
         return {'five_hour': None if no_five else {'used_percent': None, 'refills_at': None},
                 'week': {'used_percent': None, 'refills_at': None, 'pace': None}, 'models': [], 'spend': None}
     models = [dict({'name': str(x.get('name') or 'Model')}, **_limit(x, now)) for x in u.get('scoped') or []
               if isinstance(x, dict) and term._num(x.get('pct'))]
-    return {'five_hour': _limit(u['session'], now) if isinstance(u.get('session'), dict) else None,
+    return {'five_hour': _limit(u['session'], now) if isinstance(u.get('session'), dict)
+            else {'used_percent': None, 'refills_at': None} if a.get('five_seen') else None,
             'week': dict(_limit(u.get('weekly'), now), pace=week_pace(a, now)), 'models': models,
             'spend': spend_limit(u, now)}
 
@@ -145,6 +148,8 @@ def document(view, version, live=None, this_folder=None):
     """`switchboard status --json`: the page's state as the document above. `live` is the email Claude Code is signed
     in to, for `in_use` when no account in the state is in use (term.read). this_folder: {'account', 'folder'} or
     None (foldercmd.this_folder)."""
+    # The document is the Claude accounts: another provider's rows are left out, and 'next' is auto-switch's own.
+    view = dict(view, provider_rows=[], **({'next': view['claude_next']} if 'claude_next' in view else {}))
     state = term.read(view, live=live)
     now = state['now']
     by_email = dict(((a.get('email') or ''), a) for a in view.get('accounts') or [] if isinstance(a, dict))
@@ -159,8 +164,11 @@ def document(view, version, live=None, this_folder=None):
                  one_year_added_at=when(t.get('added_at')) if t else None)
     accounts += bearers.report_rows(view, when)
     on_token = any(t.get('active') for t in tokens)
+    head = names.email_of(state['head']['email']) or None
+    if head and not any(r['active'] for r in rows) and any(names.email_of(r['email']) == head for r in rows):
+        head = None     # its own row says it is not in use: Claude Code is on a login Switchboard does not keep
     return {'schema': SCHEMA, 'version': version, 'read_at': when(now),
-            'in_use': None if on_token else names.email_of(state['head']['email']) or None,
+            'in_use': None if on_token else head,
             'next': next((names.email_of(r['email']) for r in rows if r['next']), None),
             'auto_switch': auto_switch(view, state['head']),
             'accounts': accounts,
@@ -194,18 +202,21 @@ def _whole(n):
     return n if isinstance(n, int) and not isinstance(n, bool) else None
 
 
-def current(email, held, number=None, short_name=None, kind=None, label=None):
+def current(email, held, number=None, short_name=None, kind=None, label=None, other=False):
     """`switchboard current --json`: {'schema', 'email' (the account Claude Code is signed in to, None when it is
     signed out or on a one-year token kept as an account of its own), 'signed_in', 'in_switchboard' (Switchboard keeps
     that login), 'number' (the one a person types, None when Switchboard does not keep it), 'short_name', 'kind'
     ('sign_in', or 'one_year' while Claude Code is on a one-year token Switchboard keeps; None when signed out),
-    'label' (a token of its own's name, as `status --json` gives it; else None)}."""
-    on = bool(email) or bool(label)
+    'label' (a token of its own's name, as `status --json` gives it; else None)}. other: Claude Code is on a login no
+    account here is (a token no record owns): signed in, with no email, not in Switchboard, and kind None."""
+    if other:
+        email, held, kind, label = None, False, None, None
+    on = bool(email) or bool(label) or bool(other)
     held = on and bool(held)
     return {'schema': SCHEMA, 'email': email or None, 'signed_in': on, 'in_switchboard': held,
             'number': number if held and isinstance(number, int) and not isinstance(number, bool) else None,
             'short_name': _text(short_name) if held else None,
-            'kind': (kind or 'sign_in') if on else None, 'label': _text(label) if label else None}
+            'kind': (kind or 'sign_in') if on and not other else None, 'label': _text(label) if label else None}
 
 
 def owner(url, found):

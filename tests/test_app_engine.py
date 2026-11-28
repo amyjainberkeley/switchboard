@@ -230,6 +230,31 @@ class AnotherSwitchingProgram(Base):
     def test_no_launch_agents_folder_is_nothing(self):
         self.assertIsNone(engine.foreign_switcher(os.path.join(self.data, 'nowhere')))
 
+    def test_a_job_is_judged_by_what_it_is_never_by_the_folders_its_files_live_in(self):
+        # A job of the person's whose files sit under a folder named like a switcher ('.claude-switch') is not one:
+        # only the label and the basenames of its program and of each argument that is a path are read.
+        write_agent(self.agents, 'com.example.deliver',
+                    ['/usr/bin/python3', '/Users/x/.claude-switch/tools/deliver.py', '--queue',
+                     '/Users/x/.claude-switch/queue/', '--log=/Users/x/.claude-switch/logs/deliver.log'])
+        write_agent(self.agents, 'com.example.nightly', [], Program='/Users/x/claude-accounts/bin/nightly')
+        write_agent(self.agents, 'com.example.tidy', ['/bin/sh', '-c', 'cd /Users/x/.claude-switch && ./tidy.sh'])
+        self.assertIsNone(engine.foreign_switcher())
+
+    def test_a_program_named_like_a_switcher_is_one_and_ours_never_counts(self):
+        tool = '/opt/example/bin/claude-login-switcher'                # a made-up program, named for what it does
+        for label, args, more in (('com.example.claude.switcher', [tool], {}),
+                                  ('com.example.helper', [tool, '--every', '5m'], {}),
+                                  ('com.example.helper', [], {'Program': tool})):
+            with self.subTest(label=label, args=args, more=more):
+                shutil.rmtree(self.agents, ignore_errors=True)
+                write_agent(self.agents, label, args, **more)
+                self.assertEqual(engine.foreign_switcher(), label)
+        for label in engine.OUR_LABELS:
+            with self.subTest(ours=label):
+                shutil.rmtree(self.agents, ignore_errors=True)
+                write_agent(self.agents, label, [tool])
+                self.assertIsNone(engine.foreign_switcher())
+
 
 class Health(Base):
     def test_health_items_say_each_thing_and_lines_only_what_is_wrong(self):

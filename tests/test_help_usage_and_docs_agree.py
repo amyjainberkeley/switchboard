@@ -30,7 +30,7 @@ USAGES = {
     'switch': cli.SWITCH_USAGE,
     'add': places.ADD,
     'leftovers': leftovers.FORMS,
-    'run': foldercmd.RUN_USAGE,
+    'run': foldercmd.RUN_USAGE + '\n' + cli.ROOMIEST_USAGE,
     'folder': foldercmd.FOLDER_USAGE,
     'folders': foldercmd.FOLDERS_USAGE,
     'resume': resume.USAGE,

@@ -28,6 +28,7 @@ from switchboard import browser, claudecode, connect, core, demo, gateway as G, 
 from switchboard import memorypage, server
 from fakes_accounts_api import install as fake_engine
 from switchboard.packs import common as PC, houserules, memory as PM
+import pagekey_help  # noqa: E402  (the page key, as Switchboard's own programs send it)
 from fakes_gateway import Upstream, call, claude_headers, message_json, request_body
 from test_keys import FakeKeychain
 
@@ -64,7 +65,7 @@ class Served(unittest.TestCase):
     def http(self, method, path, body=None):
         c = http.client.HTTPConnection('127.0.0.1', self.port, timeout=20)
         try:
-            headers = {'Host': '127.0.0.1:%d' % self.port}
+            headers = pagekey_help.with_key({'Host': '127.0.0.1:%d' % self.port})
             data = None
             if body is not None:
                 data = json.dumps(body).encode()
@@ -637,7 +638,8 @@ class MemoryAndKeysInThePage(test_app.ChromePage):
         self.assertTrue(v['current'].startswith('Settings'), v['current'])
         self.assertIn('Replaces yours', v['replaces'])
         # the Claude Code switches (opening links as their owner is always on, so it has no switch here)
-        self.assertEqual(v['more'], ['Status line', 'Sonnet for helpers', 'House rules', 'Code map', 'claude-mem'])
+        self.assertEqual(v['more'], ['Status line', 'Models by the job', 'Sonnet for helpers', 'House rules',
+                                     'Code map', 'claude-mem'])
         self.assertEqual(v['items'], ['All', 'Switching', 'While Claude works', 'In Claude Code', 'Links', 'Keys', 'Accounts'])
         self.assertIn('## How to work here', v['rules'])
         self.assertEqual(v['cap'], '10')

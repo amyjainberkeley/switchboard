@@ -103,6 +103,7 @@ code { padding: 0 5px; border-radius: 4px; background: var(--muted); font: 12px/
 svg.i { display: block; width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
 mark { background: color-mix(in srgb, var(--fg) 12%, transparent); color: inherit; border-radius: 2px; }
 .boot { padding: 4px 0; font-size: 13px; line-height: 20px; color: var(--muted-fg); }
+#locked { font-size: 15px; line-height: 22px; color: var(--fg); }
 
 /* ---- small parts: Kbd, Badge, Button, Switch, Input with a suffix, Select, command and key tokens ---- */
 kbd { display: inline-flex; align-items: center; justify-content: center; gap: 2px; min-width: 20px; height: 20px; padding: 0 5px;
@@ -115,6 +116,9 @@ kbd { display: inline-flex; align-items: center; justify-content: center; gap: 2
 .btn svg.i { width: 14px; height: 14px; }
 .btn.outline { border: 1px solid var(--input); background: var(--bg); box-shadow: var(--xs); }
 .btn.outline:hover:not(:disabled), .btn.ghost:hover:not(:disabled) { background: var(--hover); }
+/* a press under way (Continue here): dim, and still focusable, so the keyboard stays on it; its action ignores it */
+.btn[aria-disabled="true"] { cursor: default; opacity: .5; }
+.btn.ghost[aria-disabled="true"]:hover { background: none; }
 .btn.primary { background: var(--accent); color: var(--accent-fg); }
 .btn.primary:hover:not(:disabled) { filter: brightness(1.06); }
 .btn.sm { height: 28px; padding: 0 10px; font-size: 12px; }
@@ -266,14 +270,11 @@ h1 .on { color: var(--accent); }
 .who { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
 .em { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 20px; }
 .is-on .em { font-weight: 600; }
-/* the plan, under the email, and beside it how many chats that started on the account were written in the last day */
+/* the plan, under the email, and nothing else */
 .sub { display: block; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; line-height: 16px; color: var(--muted-fg); }
 .sub:empty { display: none; }
 /* when its sign-in ends or ended: one quiet line under the plan */
 .sig { display: block; margin-top: 2px; font-size: 12px; line-height: 16px; color: var(--muted-fg); }
-/* Chats: a click opens them */
-.chn { color: var(--muted-fg); text-decoration: none; border-radius: 4px; }
-.chn:hover, .chn:focus-visible { color: var(--fg); text-decoration: underline; text-underline-offset: 3px; }
 /* a limit's line: name, percent, bar, refill */
 .c-five, .c-week { display: grid; grid-template-columns: 60px 40px minmax(0, 1fr) 152px; column-gap: 12px; align-items: center; }
 .c-five, .c-week { row-gap: 6px; }
@@ -294,9 +295,11 @@ h1 .on { color: var(--accent); }
 /* how old a reading is, under its own numbers: it starts where the bars start */
 .note[data-kind="age"] { grid-column: 3 / -1; font-size: 12px; line-height: 16px; }
 .dash { color: var(--muted-fg); }
-/* a row with no 5-hour line (no 5-hour limit, or a reading too old to show): its weekly line takes the 5-hour line's
+/* a plan with no 5-hour limit: the words alone in the 5-hour line's place, quiet; no bar, no percent */
+.c-nofive { grid-area: five; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; line-height: 20px; color: var(--muted-fg); }
+/* a row with no 5-hour line (a 5-hour number not known, or a reading too old to show): its weekly line takes the 5-hour line's
    place, beside the email, and the row is a line shorter (the narrower layouts: below, with the media rules) */
-.arow:not(:has(> .c-five)) { grid-template-areas: "who week state"; grid-template-rows: auto; }
+.arow:not(:has(> .c-five, > .c-nofive)) { grid-template-areas: "who week state"; grid-template-rows: auto; }
 /* a model week auto-switch counts, at or over its line: its name and % in red, in the weekly line's refill place */
 .rf.pace { color: var(--fg); }
 /* a spend limit: a line under the weekly one, in the 5-hour line's place (the narrower layouts: below) */
@@ -310,6 +313,10 @@ h1 .on { color: var(--accent); }
 .inuse { display: inline-flex; align-items: center; gap: 8px; margin-right: 2px; color: var(--accent); font-size: 13px; font-weight: 600; white-space: nowrap; }
 .inuse i { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 .use { color: var(--muted-fg); font-weight: 400; }
+/* why another provider's row cannot be continued to: it wraps in the last column, its whole text on hover too */
+.c-state .sub.why { white-space: normal; text-align: right; overflow-wrap: anywhere; }
+.mk { padding: 20px 8px 4px; font-size: 12px; line-height: 16px; font-weight: 600; color: var(--muted-fg); border-bottom: 1px solid var(--hair); }
+.mk:first-child { padding-top: 6px; }
 .arow:hover .use, .use:focus-visible { color: var(--fg); }
 /* one account's own question, under its row: a short name, or removing it */
 .arow-x { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; padding: 10px 8px 12px; border-bottom: 1px solid var(--border); background: var(--row); font-size: 13px; line-height: 20px; }
@@ -401,6 +408,31 @@ h1 .sep { margin: 0 8px; color: var(--muted-fg); font-weight: 400; }
 .res .copy:hover { color: var(--fg); }
 .res-none { padding-top: 8px; font-size: 12px; line-height: 16px; color: var(--muted-fg); }
 
+/* ---- Keep running, under the accounts: one sentence, the steps, then the causes as rows ---- */
+.keep { margin-top: 72px; }
+.keep:empty { display: none; }
+.kp-sum { margin-top: 6px; max-width: 72ch; font-size: 14px; line-height: 21px; }
+.kp-now { margin-top: 4px; max-width: 72ch; font-size: 13px; line-height: 19px; color: var(--muted-fg); }
+.kp-steps { margin-top: 20px; border-top: 1px solid var(--hair); }
+.kp-steps > li { display: grid; grid-template-columns: 24px minmax(0, 1fr) auto; column-gap: 12px; padding: 14px 0; border-bottom: 1px solid var(--hair); }
+.kp-steps .n { color: var(--muted-fg); font-variant-numeric: tabular-nums; font-size: 13px; line-height: 20px; }
+.kp-steps .t { font-size: 14px; line-height: 20px; font-weight: 500; overflow-wrap: anywhere; }
+.kp-steps .why { margin-top: 2px; font-size: 13px; line-height: 19px; color: var(--muted-fg); overflow-wrap: anywhere; }
+.kp-steps .it { margin-top: 6px; font-size: 12px; line-height: 18px; color: var(--muted-fg); }
+.kp-steps .it li { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.kp-steps .it b { font-weight: 400; color: var(--fg-2); }
+.kp-steps .go { align-self: start; }
+.kp-h { margin-top: 32px; font-size: 13px; line-height: 18px; font-weight: 600; }
+.kp-rows { margin-top: 8px; }
+.kp-rows > li { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 16px; padding: 9px 0; border-bottom: 1px solid var(--hair); font-size: 13px; line-height: 20px; }
+.kp-rows .nm { min-width: 0; overflow-wrap: anywhere; }
+.kp-rows .nm .muted { margin-left: 8px; font-variant-numeric: tabular-nums; }
+.kp-rows .st { white-space: nowrap; color: var(--muted-fg); text-align: right; }
+.kp-rows .st.yes { color: var(--fg); }
+.kp-rows .dn { grid-column: 1 / -1; font-size: 12px; line-height: 16px; color: var(--muted-fg); overflow-wrap: anywhere; }
+.kp-more { margin-top: 10px; }
+.kp-probs { margin-top: 12px; font-size: 12px; line-height: 16px; color: var(--muted-fg); }
+
 /* ---- Your week, under the accounts: one hero chart, three highlights, calm small multiples ---- */
 .week { margin-top: 72px; }
 .wk-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px 24px; flex-wrap: wrap; }
@@ -458,6 +490,11 @@ h1 .sep { margin: 0 8px; color: var(--muted-fg); font-weight: 400; }
 .tip .t-x .lim { color: var(--fg); }
 .tip .t-x .lim::before { content: ""; display: inline-block; width: 6px; height: 6px; margin-right: 6px; border-radius: 50%; background: var(--red); vertical-align: 1px; }
 .tip .t-x .swi::before { content: ""; display: inline-block; width: 2px; height: 9px; margin: 0 8px 0 2px; border-radius: 1px; background: var(--ev); vertical-align: -1px; }
+/* a number of the week with a takeaway: a quiet dotted underline; the takeaway opens beside it, where it can be pressed */
+.opt { cursor: pointer; text-decoration: underline dotted var(--muted-fg); text-underline-offset: 4px; border-radius: 3px; }
+.tip.opt-pop { pointer-events: auto; position: absolute; }   /* in the page, so it moves with its number on a scroll */
+.opt-pop .t-l { margin-top: 6px; color: var(--fg-2); }
+.opt-pop .btn { margin-top: 10px; }
 /* highlights: the figure first, then what it means; at most three */
 .highs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px 40px; margin-top: 40px; padding-top: 28px; border-top: 1px solid var(--hair); }
 .highs:empty { display: none; }
@@ -723,6 +760,9 @@ pre.view { margin: 10px 0 0; padding: 12px 14px; max-height: 260px; overflow: au
   .c-state .use { padding: 0 6px; }
   .arow-x { padding-left: 0; padding-right: 0; background: none; }
   .week { margin-top: 56px; }
+  .keep { margin-top: 56px; }
+  .kp-steps > li { grid-template-columns: 20px minmax(0, 1fr); }
+  .kp-steps .go { grid-column: 2; margin-top: 10px; justify-self: start; }
   .highs { grid-template-columns: minmax(0, 1fr); gap: 22px; margin-top: 30px; padding-top: 24px; }
   .high { display: grid; grid-template-columns: 64px minmax(0, 1fr); column-gap: 16px; align-items: baseline; }
   .high .v { font-size: 22px; line-height: 26px; }
@@ -735,8 +775,8 @@ pre.view { margin: 10px 0 0; padding: 12px 14px; max-height: 260px; overflow: au
 }
 /* a row with no 5-hour line, and the model week note, in the narrower layouts (see .arow and .mnote above) */
 @media (max-width: 900px) {
-  .arow:not(:has(> .c-five)) { grid-template-areas: "who state" "sub sub" "week week"; grid-template-rows: none; }
-  .arow.has-sig:not(:has(> .c-five)) { grid-template-areas: "who state" "sub sub" "sig sig" "week week"; }
+  .arow:not(:has(> .c-five, > .c-nofive)) { grid-template-areas: "who state" "sub sub" "week week"; grid-template-rows: none; }
+  .arow.has-sig:not(:has(> .c-five, > .c-nofive)) { grid-template-areas: "who state" "sub sub" "sig sig" "week week"; }
 }
 @media (max-width: 520px) {
   .mnote { grid-column: 3; font-size: 12px; line-height: 16px; }
@@ -780,30 +820,6 @@ pre.view { margin: 10px 0 0; padding: 12px 14px; max-height: 260px; overflow: au
 }
 @media (forced-colors: active) {
   .sw-k, .k-lim, .k-sw, .pbar i, .bar > i { forced-color-adjust: none; }
-}
-/* ---- Providers, under the accounts: each assistant in the person's order on the accounts' own columns (its name and
-   plan, its limits drawn as an account's are, its state in words), then the command to type. drawProviders. ---- */
-.pv:empty { display: none; }
-.pv { margin-top: 32px; }
-.pv-head { display: flex; align-items: baseline; gap: 10px; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
-.pv-head .muted { font-size: 13px; }
-.pv-list { margin: 0 -8px; }
-.pv-row { grid-template-areas: "who lims state"; align-items: start; padding-top: 14px; padding-bottom: 14px; border-bottom: 1px solid var(--hair); }
-.pv-row:last-child { border-bottom-color: var(--border); }
-.pv-who { grid-area: who; min-width: 0; }
-.pv-lims { grid-area: lims; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
-.pv-state { grid-area: state; font-size: 13px; line-height: 20px; text-align: right; color: var(--muted-fg); }
-.pv-state.out { color: var(--fg); }
-.pv-above { font-size: 13px; line-height: 20px; color: var(--muted-fg); }
-.pv-foot { padding-top: 10px; }
-.pv > .pv-foot:first-child { padding-top: 0; }
-.pv-go { font-size: 13px; line-height: 22px; color: var(--muted-fg); overflow-wrap: anywhere; }
-.pv-go + .pv-go { margin-top: 4px; }
-.pv-cmd { color: var(--fg); -webkit-user-select: all; user-select: all; }
-@media (max-width: 900px) {
-  .pv-list { margin: 0; }
-  .pv-row { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "who state" "lims lims"; column-gap: 16px; row-gap: 10px; padding: 14px 0; }
-  .pv-who .sub { margin-top: 2px; }         /* an account row's narrow plan line sits up under its email; this one does not */
 }
 </style>
 <script>
@@ -944,7 +960,8 @@ const BUSY_AFTER = 15;              // seconds: numbers older than this, from a 
 let switching = null;              // a switch that was sent and not yet read back: In use moves at once
 let adding = false, asking = null, houseShown = false, purgeAsk = false;
 let opened = null;                  // one account's own question under its row: {email, what: 'alias'}
-let usageData = null, modelsData = null, codeData = null, keysData = null, moreData = null, memData = null, memSeq = 0, memTimer = 0, memRetry = 0;
+let carrying = null, runLine = null;  // a Continue here under way; the line to run its answer gave ({text, line, provider, n})
+let keepData = null, usageData = null, modelsData = null, codeData = null, keysData = null, moreData = null, memData = null, memSeq = 0, memTimer = 0, memRetry = 0;
 let extrasAt = 0, autoAt = 0, linksAskedAt = 0;
 const busy = {}, MSG = {};
 const plans = {}, logShown = {}, detailShown = {};   // an install's plan waiting for Install; open logs and details
@@ -952,10 +969,55 @@ const ui = {sec: 'accounts', folder: null};
 
 // ---------- talking to the server (JSON, and the X-Switchboard header on every change) ----------
 
-const post = (path, body = {}) => fetch(path, {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Switchboard': '1'}, body: JSON.stringify(body)})
-  .then((r) => r.json().catch(() => ({})).then((d) => { if (!r.ok) throw new Error(d.error || 'That did not work.'); return d; }));
+// The page key (switchboard/pagekey.py), sent in a header on every request to /api/ (api below, the one wrapper). It is
+// kept in this browser's storage for this page's own address (http://127.0.0.1:<port>) and nowhere else, never in a
+// cookie: the browser never sends it by itself, and a server on another port can't read it. A ticket in the address
+// (?t=, from Open Switchboard or `switchboard page`) is traded for it once, at load (trade, at the end).
+// The key belongs to the literal address the server listens on. Under any other name (localhost may lead to ::1, where
+// another program could listen) the page keeps no key, trades no ticket, sends no key, and goes to the same place at
+// 127.0.0.1, without the ticket.
+const KEY_AT = 'switchboard-key';
+const AT_HOME = location.hostname === '127.0.0.1';
+if (!AT_HOME && location.hostname && location.replace) {
+  try { localStorage.removeItem(KEY_AT); } catch (e) { /* no storage: nothing kept */ }
+  location.replace('http://127.0.0.1:' + location.port + location.pathname + location.hash);
+}
+let pageKey = '', keyReady = !(AT_HOME && ASK.get('t')), locked = false, traded = Promise.resolve(), bookmarkKey = '', keyless = false;
+if (AT_HOME) { try { pageKey = localStorage.getItem(KEY_AT) || ''; } catch (e) { /* no storage: the key lives in this tab only */ } }
+// While a ticket is being traded, every request waits for the trade to be over, so a view opened with the ticket
+// (#accounts/add, #chats) never asks before the page has its key. Without a trade under way a request goes at once.
+// bare: no key (GET /api/state is answered to anyone, and needs none).
+const send = (path, o, bare) => fetch(path, Object.assign({}, o, {headers: Object.assign({}, o.headers || {}, AT_HOME && pageKey && !bare ? {'X-Switchboard-Key': pageKey} : {})}));
+const api = (path, o = {}, bare = false) => (keyReady ? send(path, o, bare) : traded.then(() => send(path, o, bare)));
+// No key, or a 401 (the key was made again, or this tab opened before an update): the stored key is cleared and the
+// page shows one line that says how to open it, once. Nothing reloads, so never a loop.
+const LOCKED = '<p class="boot" id="locked">To open this page, type <code>switchboard page</code> in a terminal, or use Open Switchboard in your menu bar.</p>' +
+  '<p class="boot locked-why">It can show your chats, so it opens only for you.</p>';
+const lock = () => {
+  if (locked) return;
+  locked = true; pageKey = '';
+  try { localStorage.removeItem(KEY_AT); } catch (e) { /* as above */ }
+  root.innerHTML = LOCKED;
+};
+const relock = (r) => { if (r.status === 401) lock(); };
+const post = (path, body = {}) => api(path, {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Switchboard': '1'}, body: JSON.stringify(body)})
+  .then((r) => r.json().catch(() => ({})).then((d) => { relock(r); if (!r.ok) throw new Error(d.error || 'That did not work.'); return d; }));
 const timed = (ms) => (window.AbortSignal && AbortSignal.timeout ? AbortSignal.timeout(ms) : undefined);
-const getJSON = (path) => fetch(path, {signal: timed(8000)}).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+const getJSON = (path) => api(path, {signal: timed(8000)}).then((r) => { relock(r); return r.ok ? r.json() : null; }).catch(() => null);
+// A picture of a page (GET /api/preview/<id>) needs the key too, so it is asked for here and shown from a blob address.
+// Only the demo has no key: its pictures load by their address.
+const PV_URL = {};
+function fillPictures() {
+  all('img[data-preview]:not([src])').forEach((img) => {
+    const id = img.dataset.preview, got = PV_URL[id];
+    if (typeof got === 'string') { if (got) img.src = got; else img.dispatchEvent(new Event('error')); return; }
+    if (got) return;                                    // asked already
+    PV_URL[id] = 1;
+    api('/api/preview/' + encodeURIComponent(id)).then((r) => { relock(r); return r.ok ? r.blob() : null; }).catch(() => null)
+      .then((b) => { PV_URL[id] = b ? URL.createObjectURL(b) : ''; fillPictures(); });
+  });
+}
+if (typeof MutationObserver === 'function') new MutationObserver(fillPictures).observe(root, {childList: true, subtree: true});
 
 // One short line for whatever was pressed: in a toast at the corner (with the command that does the same, when there
 // is one), or in place where the view has a place for it (the first run, the sign-in form, project maps). Never an alert.
@@ -1071,6 +1133,7 @@ const isOn = (a) => a.email === onEmail();
 // same), and only while automatic switching runs.
 function nextEmail() {
   if (!S.auto || !S.auto.enabled) return null;             // with auto-switch off nothing moves on its own: no Next
+  if (others().some((p) => p.next === true && p.in_use !== true)) return null;   // another provider's row is next
   const n = 'next' in S ? S.next : (S.auto.on && S.plan ? S.plan.next : null);
   const a = n ? acct(n) : null;
   return a && !isOn(a) && !a.needs_login ? n : null;
@@ -1078,6 +1141,8 @@ function nextEmail() {
 // Every account is named by its whole email, here as on every other surface. A short name (an alias) is only
 // something to type, in ⌘K and in commands; nothing shows it.
 const domainOf = (e) => (String(e || '').split('@')[1] || '').split('.')[0];
+// What a row says in its 5-hour place when its plan has no 5-hour limit: the same words as term.NO_FIVE['page'].
+const NO_FIVE = 'No 5-hour limit on this plan';
 // The lines automatic switching switches at: each window against its own (5-hour, weekly, a model's week).
 function linesOf() {
   const au = S.auto || {};
@@ -1099,15 +1164,16 @@ function windowOf(u, key) {
 }
 // 5-hour, weekly, then one per model week (no line of its own: the weekly line's hover and note say it). A reading
 // too old to show is not known: a dash, never numbers. The 5-hour line is drawn only when there is a 5-hour number to
-// show; otherwise its entry says why it has none (none: words for a screen reader): no 5-hour window in the reading
-// is an account with no 5-hour limit (Ultra), and no reading to show is not known.
+// show; otherwise its entry says why it has none (none): no 5-hour window in the reading is an account with no 5-hour
+// limit (Ultra), said in words in the 5-hour line's place (NO_FIVE), and no reading to show is not known. An account
+// whose saved readings ever held a 5-hour number (a.five_seen) has the limit: one reading without it is not known.
 function limits(a) {
   const u = a.trusted === false ? null : a.usage || null, L = accountLines(a);
   const raw = a.usage || null, five = !!(u && u.session && num(u.session.pct));
   const out = [{kind: 'five', label: '5-hour limit', short: '5-hour', w: windowOf(u, 'session'), line: L.five,
-    none: five ? '' : raw && !raw.session ? 'No 5-hour limit' : 'Not known'}];
+    none: five ? '' : raw && Object.keys(raw).length && !raw.session && !a.five_seen ? NO_FIVE : 'Not known'}];
   out.push({kind: 'week', label: 'Weekly limit', short: 'Weekly', w: windowOf(u, 'weekly'), line: L.week,
-    noFive: !!raw && !raw.session, full: paceFull(a)});
+    noFive: !!raw && !raw.session && !a.five_seen && 'Anthropic reports no 5-hour limit for this account', full: paceFull(a)});
   // A spend limit stands in for the 5-hour line when more of it is used (spend.shown): two lines at most.
   const cost = spendOf(u);
   if (cost && (!five || Math.round(cost.pct) > Math.round(u.session.pct))) {
@@ -1176,7 +1242,7 @@ const pctText = (l) => (l.unknown ? '—' : l.pct + '%');
 // A usage bar: grey, blue for the account in use, red at or past its line; the tick is its switch line.
 const bar = (l, on) => '<span class="bar' + (on ? ' on' : '') + (l.over ? ' over' : '') + '" title="' + esc((l.unknown ? 'Not known' : l.pct + '% used') + (l.line != null ? ' · switches at ' + fmtLine(l.line) + '%' : '')) + '">' +
   '<i class="' + (l.used > 0 ? '' : 'zero') + '" style="width:' + Math.min(100, Math.max(0, l.used || 0)) + '%"></i>' + (l.line != null ? '<b style="left:' + Math.min(100, Math.max(0, l.line)) + '%"></b>' : '') + '</span>';
-// How old an account's numbers are, as the terminal and the menu bar say it too (term.age_words): "now" for the
+// How old an account's numbers are, in the words of term.age: "now" for the
 // account in use on Claude Code's own numbers of the last minute, else "just now" (under a minute), "3 min ago". It
 // counts from the last read that was answered (checked_at, term.checked_at), never older than the numbers' own time
 // (usage_at), and from each account's own reading, never the server's tick: a tick a minute ago can sit over a
@@ -1415,6 +1481,8 @@ function notesHTML() {
     // off, the accounts are still read by the same loop: when that is stuck or stopped, say so (turning off is no fix)
     h += nl(esc(au.reading_problem || 'Switchboard is not reading the accounts right now. It starts again by itself.')).replace('class="nl"', 'class="nl" data-k="reading-line"');
   }
+  // the sign-in watch, only once it has been down for two minutes (the server says when): nothing while all is well
+  if ((S.watch || {}).line) h += nl(esc(S.watch.line)).replace('class="nl"', 'class="nl" data-k="watch-line"');
   return h + watchNotesHTML();
 }
 // Two lines only when something is off: auto-switch is on and running but decided nothing for minutes past the pass it
@@ -1498,15 +1566,19 @@ const paceWords = (ms) => 'At this pace, full by ' + clock(ms);
 // A refill time when the window has one still to come.
 const refillAt = (w) => { const t = Date.parse((w && w.resets) || ''); return w && w.started && w.used != null && !isNaN(t) && t > nowMs() ? t : null; };
 function useCell(l, label, on, models, old) {
-  // No 5-hour number to show (no 5-hour limit, or a reading too old to show or never read): no line at all. A hidden
-  // cell keeps the table's four columns for a screen reader and says why; the weekly line's hover says it too.
+  // A plan with no 5-hour limit: the words in the 5-hour line's place, quiet, no bar and no percent (term.no_five).
+  if (l && l.none === NO_FIVE) return '<div class="c c-nofive" role="cell">' + esc(NO_FIVE) + '</div>';
+  // No 5-hour number known (a reading too old to show or never read, a window with no number): no line at all. A
+  // hidden cell keeps the table's four columns for a screen reader and says why.
   if (!l || l.none) return '<div class="c c-gone sr" role="cell">' + esc(l ? l.none : 'Not known') + '</div>';
   // one line: its name (the column's name to a screen reader, so the label is not read twice), how much is used, its
   // bar, and when it refills (nothing there for a window that hasn't started). Its hover also says each model's own
-  // week, and that there is no 5-hour limit.
+  // week, and why there is no 5-hour line (noFive).
   const t = refillAt(l.w);
-  const tip = [(l.unknown ? 'Not known' : l.pct + '% used') + (l.line != null ? ', switches at ' + fmtLine(l.line) + '%' : '') + (t ? '. Refills ' + clock(t) + ', ' + until(t) : '')]
-    .concat((models || []).map((m) => modelWords(m, l)), l.noFive ? ['Anthropic reports no 5-hour limit for this account'] : [], l.full ? [paceWords(l.full)] : []).join('\n');
+  // another provider's window that is not its column's own ("3-day" in the weekly column) says its name on hover too
+  const other = l.kind !== 'spend' && !!l.short && l.short !== (l.kind === 'five' ? '5-hour' : 'Weekly');
+  const tip = [(other ? l.label + ': ' : '') + (l.unknown ? 'Not known' : l.pct + '% used') + (l.line != null ? ', switches at ' + fmtLine(l.line) + '%' : '') + (t ? '. Refills ' + clock(t) + ', ' + until(t) : '')]
+    .concat((models || []).map((m) => modelWords(m, l)), l.noFive ? [l.noFive] : [], l.full ? [paceWords(l.full)] : []).join('\n');
   // A model's own week has no line. One auto-switch counts, at or over its line, is a short red note in the refill's
   // place (the refill column has no room for both): its refill, and the weekly one's, on hover.
   const n = modelNote(models);
@@ -1516,8 +1588,9 @@ function useCell(l, label, on, models, old) {
     : l.money ? '<span class="rf" title="' + esc(t ? 'Refills ' + clock(t) + ', ' + until(t) : l.money) + '">' + esc(l.money) + '</span>'
     : t ? '<span class="rf" title="' + esc(clock(t) + ', ' + until(t)) + '">Refills ' + esc(refillWords(t)) + '</span>' : '';
   if (old) tail += '<span class="note" data-kind="age" title="' + esc(cadence()) + '">' + esc(old) + '</span>';
-  // a spend limit sits in the 5-hour column for a screen reader: it says its own name
-  const named = l.kind === 'spend' ? ' aria-label="' + esc(l.label + ': ' + pctText(l) + ' used' + (l.money ? ', ' + l.money : '')) + '"' : '';
+  // a spend limit sits in the 5-hour column for a screen reader, and such a window in the weekly one: each says its name
+  const named = l.kind === 'spend' ? ' aria-label="' + esc(l.label + ': ' + pctText(l) + ' used' + (l.money ? ', ' + l.money : '')) + '"'
+    : other ? ' aria-label="' + esc(l.label + ': ' + (l.unknown ? 'not known' : pctText(l) + ' used')) + '"' : '';
   return '<div class="c c-' + l.kind + (l.over ? ' over' : '') + (l.unknown ? ' unknown' : '') + '" role="cell" data-kind="' + l.kind + '"' + named + ' title="' + esc(tip) + '"><span class="ml" aria-hidden="true">' + label + '</span>' +
     '<span class="pct">' + pctText(l) + '</span>' + bar(l, on) + tail + '</div>';
 }
@@ -1539,8 +1612,8 @@ function needHTML(a) {
 // (why its numbers aren't current) under it.
 const tipAttr = (...lines) => { const t = lines.filter(Boolean).join('\n'); return t ? ' title="' + esc(t) + '"' : ''; };
 // The email alone names a row (a short name is only something to type, in ⌘K), with its plan under it in small
-// grey; its limits are one under another, never side by side; a reading that is not fresh says its age under its
-// own numbers.
+// grey and nothing else; its limits are one under another, never side by side; a reading that is not fresh says
+// its age under its own numbers.
 function accRow(a, nx) {
   const on = isOn(a), L = limits(a), e = esc(a.email);
   const five = L.find((l) => l.kind === 'five') || null, week = L.find((l) => l.kind === 'week'), models = L.filter((l) => l.kind === 'model');
@@ -1549,16 +1622,12 @@ function accRow(a, nx) {
   const tok = tokenAlso(a);                                // a one-year token kept for it: said on its own row
   const plan = [planWords(a), skipped, rnote, tok].filter(Boolean).join(' · '), whole = [planLine(a), skipped, rnote, tok].filter(Boolean).join(' · ');
   const old = isOld(a) || a.elsewhere ? ageWords(a) : '';      // numbers from another Mac always say so
-  // Chats: under the email, after the plan, in words ("2 chats"); a click opens them
-  const n = chatsHome(a.email), subTip = [whole, n ? plural(n, 'chat') : ''].filter(Boolean).join(' · ');
-  const chn = (words, k) => '<a class="chn" href="#chats/' + esc(encodeURIComponent(a.email)) + '" data-k="' + k + ':' + e + '" title="' +
-    esc(plural(n, 'chat') + ' that started on this account, written in the last day') + '">' + esc(words) + '</a>';
   const more = a.unmanaged ? '' : '<button type="button" class="icon-btn" data-do="menu" data-email="' + e + '" data-k="menu:' + e + '" aria-haspopup="menu" aria-label="More for ' + e + '">' + I.more + '</button>';
   // when its sign-in ends (a week ahead) or ended: one quiet line under the plan, why on hover
   const sig = signinOf(a), sigLine = sig.words ? '<span class="sig" title="' + esc(SIGNIN_WHY) + '">' + esc(sig.line) + '</span>' : '';
   return '<div class="ag arow' + (on ? ' is-on' : '') + (a.unmanaged ? ' fixed' : '') + (sigLine ? ' has-sig' : '') + '" role="row" data-email="' + e + '" data-slot="' + esc(a.slot) + '">' +
     '<div class="c c-who" role="cell"><div class="who"><span class="em" title="' + e + '">' + e + '</span></div>' +
-      '<span class="sub"' + tipAttr(subTip, a.note) + '>' + [esc(plan), n ? chn(plural(n, 'chat'), 'chats-sub') : ''].filter(Boolean).join(' · ') + '</span>' + sigLine + '</div>' +
+      '<span class="sub"' + tipAttr(whole, a.note) + '>' + esc(plan) + '</span>' + sigLine + '</div>' +
     (cost ? useCell(cost, 'Spend', on) : useCell(five, '5-hour', on)) + useCell(week, 'Weekly', on, models, old) +
     '<div class="c c-state" role="cell">' + stateHTML(a, nx) + more + '</div></div>' + ownHTML(a);
 }
@@ -1611,6 +1680,80 @@ function tokenRow(t) {
 function tokenRows() {
   return (S.tokens || []).filter((t) => !t.for && TOKEN_WHAT[t.kind]).map(tokenRow).join('');
 }
+// Each other provider the person added (the state's provider_rows: Codex, one row per account) is a row after the
+// Claude accounts, under a small heading for each maker, drawn as an account's row is; they are drawn around the
+// accounts' own block, which stays as it was. With none, there is no heading and nothing else. Continue here opens that
+// provider's own app on the newest chat (POST /api/continue): the chat waits in its message box until you press send
+// there.
+const makerTopHTML = () => (others().length ? makerHTML('Claude') : '');
+function otherRowsHTML() {
+  const more = others(), makers = [];
+  for (const p of more) if (!makers.includes(makerOf(p))) makers.push(makerOf(p));
+  return makers.map((m) => makerHTML(m) + more.filter((p) => makerOf(p) === m).map(otherRow).join('')).join('');
+}
+const others = () => (S && Array.isArray(S.provider_rows) ? S.provider_rows : []).filter((p) => p && typeof p.provider === 'string' && p.provider);
+// A provider row's number in the terminal's list, by the list's one rule (term.provider_numbers): after the highest
+// account slot, one each in the rows' order. null when it has no row.
+function rowNumber(provider) {
+  const at = others().findIndex((p) => p.provider === provider);
+  const slots = (Array.isArray(S.accounts) ? S.accounts : []).map((a) => (a && Number.isInteger(a.slot) ? a.slot : 0));
+  return at < 0 ? null : Math.max(0, ...slots) + at + 1;
+}
+const makerOf = (p) => p.vendor || p.name || p.provider;
+const makerHTML = (m) => '<div class="mk" role="row"><span role="cell">' + esc(m) + '</span></div>';
+// A time from the server in seconds, as ms; null when it is not a time (before 1970, past the year 3000), never a Date
+// that throws.
+const timeMs = (s) => (num(s) && s > 0 && s < 32503680000 ? s * 1000 : null);
+// One window as an account's limit line (useCell): "5-hour" and "Weekly" in the accounts' words, another in its own
+// ("3-day"). A window already refilled reads 0%, not started, as an account's does; a 5-hour one with no number stays
+// not known (otherRow then draws no 5-hour line).
+function otherLimit(w) {
+  const t = timeMs(w.resets_at), five = w.label === '5-hour', short = five ? '5-hour' : w.label === 'weekly' ? 'Weekly' : String(w.label || '');
+  const l = {kind: five ? 'five' : 'week', label: short + ' limit', short, line: num(w.line) ? w.line : MODEL_LINE,
+    w: t != null && t <= nowMs() && !(five && !num(w.used_pct)) ? {used: 0, started: false} : {used: num(w.used_pct) ? w.used_pct : null, started: true, resets: t != null ? new Date(t).toISOString() : null}};
+  l.used = l.w.used; l.unknown = l.used == null; l.pct = l.unknown ? null : Math.round(l.used); l.over = !l.unknown && l.pct >= l.line;
+  return l;
+}
+// "Out until Sun 5 PM", or "Out" when that time is not known, gone by, or already said by one of the row's limit lines.
+function outWords(back, lims) {
+  const t = timeMs(back);
+  if (t == null || t <= nowMs()) return 'Out';
+  const when = refillWords(t);
+  return lims.some((l) => { const r = refillAt(l.w); return r != null && refillWords(r) === when; }) ? 'Out' : 'Out until ' + when;
+}
+// The row: its email (else the app's name) with its plan under it; 5-hour over the week line, as an account's (no
+// 5-hour window: NO_FIVE in its place; a 5-hour number not known: no 5-hour line), or "Numbers not known" and no bar
+// when it has no window. Its last cell, first match wins, as the menu bar's: In use; why it cannot be continued to;
+// Out; Continue here, with Next; else nothing.
+function otherRow(p) {
+  const wins = (Array.isArray(p.windows) ? p.windows : []).filter((w) => w && typeof w === 'object');
+  const fw = wins.find((w) => w.label === '5-hour'), ww = wins.find((w) => w.label === 'weekly') || wins.find((w) => w.label !== '5-hour');
+  const five = fw ? otherLimit(fw) : null, week = ww ? otherLimit(ww) : null, on = p.in_use === true, id = esc(p.provider);
+  const name = p.email || p.name || p.provider, chat = p.chat && typeof p.chat === 'object' ? p.chat : null, app = p.name || p.provider;
+  const noFive = !five ? makerOf(p) + ' reports no 5-hour limit for this account' : five.unknown ? '5-hour not known' : '';
+  if (week && noFive) week.noFive = noFive;
+  const old = num(p.read_at) && S.now - p.read_at >= 3600 ? 'checked ' + ago(S.now - p.read_at) + ' ago' : '';
+  const lims = !wins.length ? useCell(null) + '<div class="c c-week" role="cell"><span class="ml note">Numbers not known</span></div>'
+    : (noFive ? useCell({none: five ? 'Not known' : NO_FIVE}) : useCell(five, '5-hour', on, [], week ? '' : old)) +
+      (week ? useCell(week, esc(week.short), on, [], old) : useCell(null));     // the table's four cells, as with no window
+  // what the press will do, truly: the app opens with a note of the chat, or, without the app here, a line to run
+  const tip = p.app === false ? app + '’s app is not on this Mac: this gives a line to run in a terminal.'
+    : 'Opens ' + app + ' with a note of ' + (chat && chat.name ? 'your chat “' + chat.name + '”' : 'your newest chat') + ' in its message box. You send it there.';
+  const why = typeof p.why === 'string' && p.why ? p.why.charAt(0).toUpperCase() + p.why.slice(1) : '';
+  const said = why || (p.state === 'out' ? outWords(p.back_at, [five, week].filter(Boolean)) : '');
+  // the chat a press drafts, said beside the plan while Continue here is there, so no one needs a mouse to see it
+  const goes = !on && !said && p.can === true ? (chat && typeof chat.name === 'string' && chat.name ? chat.name : '') : '';
+  const state = on ? '<span class="inuse"><i></i>In use</span>'
+    : said ? '<span class="sub why" title="' + esc(said) + '">' + esc(said) + '</span>'
+    : p.can !== true ? ''
+    : (p.next === true ? '<span class="badge next" title="Every Claude account is at its line">Next</span>' : '') +
+      '<button type="button" class="btn xs ghost use" data-do="carry" data-provider="' + id + '" data-zone="acc" data-k="carry:' + id + ':' + others().indexOf(p) + '" title="' + esc(tip) +
+      '" aria-label="' + esc('Continue here in ' + app + (goes ? ' with your chat “' + goes + '”' : '')) + '"' + (carrying ? ' aria-disabled="true"' : '') + '>Continue here</button>';
+  return '<div class="ag arow other' + (on ? ' is-on' : '') + '" role="row" data-provider="' + id + '">' +
+    '<div class="c c-who" role="cell"><div class="who"><span class="em" title="' + esc(name) + '">' + esc(name) + '</span></div><span class="sub">' +
+    [esc(p.plan || ''), goes ? esc('chat “' + goes + '”') : ''].filter(Boolean).join(' · ') + '</span></div>' +
+    lims + '<div class="c c-state" role="cell">' + state + '</div></div>';
+}
 function addFields() {                                   // no browser profiles to pick without Chrome: the sign-in opens in the default browser
   return '<span class="field"><input type="email" name="email" placeholder="Email (optional)" aria-label="Email, optional" autocomplete="off" spellcheck="false" data-keep data-k="add-email"></span>' +
     (!(S.browser || {}).present ? '' : '<span class="select pick"><select name="profile" aria-label="Browser profile" data-keep data-k="add-profile"><option value="+new">New ' + esc((S.browser || {}).name || 'browser') + ' profile</option>' +
@@ -1643,24 +1786,48 @@ function waitRows() {
     return nl('<span class="pulse"></span>Waiting for sign-in' + (c.email ? ' as ' + esc(c.email) : '') + tip, btn('Cancel'));
   }).join('');
 }
+// Under the board, quietly, what the provider rows do not say, from the board of every assistant (S.providers): one
+// added that cannot be continued to has no row, so a line says why (fit_why: not on this Mac, not signed in...); one
+// on this Mac not added yet, with the command that adds it to copy (adding is done in the terminal); and, only when
+// there is no row at all, the command that carries a chat on. The terminal and the menu bar say the same lines
+// (providers/view.py, under_list).
+function boardLines() {
+  const b = S.providers && typeof S.providers === 'object' ? S.providers : {};
+  const list = (x) => (Array.isArray(x) ? x : []).filter((e) => e && typeof e === 'object' && typeof e.id === 'string' && e.id);
+  const copy = (cmd, k) => '<button type="button" class="act" data-do="copy" data-text="' + esc(cmd) + '" data-zone="acc" data-k="' + esc(k) + '">Copy</button>';
+  return list(b.providers).filter((e) => e.account_list !== true && typeof e.fit_why === 'string' && e.fit_why)
+      .map((e) => nl(esc((e.name || e.id) + ': ' + e.fit_why))).join('') +
+    list(b.add).map((e) => nl(esc(e.app || e.name || e.id) + ' is on this Mac too: <code>' + esc('switchboard add ' + e.id) + '</code> adds it.',
+      copy('switchboard add ' + e.id, 'addCopy:' + e.id))).join('') +
+    (b.carry === true && !others().length ? nl('To carry a chat on in the next one with room, type in its folder: <code>switchboard continue</code>',
+      copy('switchboard continue', 'carryCopy')) : '');
+}
 function belowHTML() {
   const k = S.keys || {};
   let h = waitRows();
+  if (runLine && rowNumber(runLine.provider) !== runLine.n) runLine = null;   // its number is another row's now
+  if (runLine) {                                          // the provider's app is not on this Mac: the line to run, until hidden
+    h += nl(esc(runLine.text) + ' <code>' + esc(runLine.line) + '</code>', '<button type="button" class="act" data-do="copy" data-text="' + esc(runLine.line) +
+      '" data-zone="acc" data-k="runCopy">Copy</button><button type="button" class="lnk" data-do="hideRun" data-k="runHide">Hide</button>', true);
+  }
   if (allOut() && k.count > 0) {
     const cmd = k.command || 'switchboard claude';
     h += nl('Every account is at its line. On your keys: <code>' + esc(cmd) + '</code>', '<button type="button" class="act" data-do="copy" data-text="' + esc(cmd) +
       '" data-then="' + (k.on ? '' : 'Turn on the gateway in Settings › Keys first.') + '" data-zone="acc" data-k="keysCmd">Copy</button>', true);
   }
+  h += boardLines();
   return h ? '<div class="notes">' + h + '</div>' : '';
 }
 function drawAccounts() {
   paint($('top'), topHTML());
   paint($('notes'), notesHTML());
   paint($('strip-box'), stripHTML());
+  paint($('acc-mk'), makerTopHTML());
   paint($('acc'), rowsHTML());
+  paint($('acc-other'), otherRowsHTML());
   paint($('acc-foot'), footHTML());
   paint($('below'), belowHTML());
-  drawProviders();
+  paint($('keep'), keepHTML());
   drawWeek();
 }
 
@@ -1693,6 +1860,97 @@ function placeMenu(m, btn) {                              // under its button (o
   const f = m.querySelector('button'); if (f) f.focus({preventScroll: true});
 }
 function closeMenu() { const m = $('menu'); m.hidden = true; m.classList.remove('ch-menu'); menuFor = null; }
+
+// ---------- Keep running, under the accounts: /api/keep, drawn ----------
+// What stopped your work, what Switchboard does about it, and the one thing left for you: the week in one sentence,
+// at most five steps (the rest behind "Show all"), then each cause as a row that ends in "Handled" or in its step, then
+// the workflow runs that lost agents. Every number and word comes from the payload (keeprun.build).
+
+const kp = {all: false};
+const KP_STEP = {on: 'Turn on Keep running', cut: 'Open the chats that were cut off', runs: 'Resume the runs',
+  lid: 'Plug in before you close the lid', auto: 'Turn on automatic switching'};
+// a dead agent's why, in keeprun.WHY_WORDS's words
+const KP_WHY = {signed_out: 'signed out', offline: 'offline', flagged: 'flagged', limit_model: 'model limit',
+  limit_5hour: '5-hour limit', limit_weekly: 'weekly limit', limit_credits: 'credits',
+  limit_other: 'usage or rate limit', overloaded: 'overloaded', too_long: 'too long', blocked_403: '403',
+  restart: 'restart', empty: 'no reply', error_other: 'other error'};
+const KP_DO = {'/api/running': 'keepRun', '/api/awake': 'awake', '/api/auto': 'auto'};
+const kpWhen = (at) => { const ms = Date.parse(at); if (!num(ms)) return '';
+  const d = new Date(ms), today = ymd(nowMs()) === ymd(ms), week = nowMs() - ms < 6 * 864e5;
+  return today ? hm(ms) : (week ? d.toLocaleDateString('en-US', {weekday: 'short'}) : d.toLocaleDateString('en-US', {month: 'short', day: 'numeric'})) + ' ' + hm(ms); };
+const kpN = (n) => (num(n) && n >= 0 ? String(Math.round(n)) : '');     // a count, or nothing when it is not given
+// the middle wait, and how many it is the middle of; without both numbers nothing is said
+const kpMid = (min, n) => (num(min) && min >= 0 && num(n) && n > 0 ? 'the next reply came about ' + counted(Math.round(min), 'minute') +
+  ' later for the ' + (n === 1 ? 'one that went on by itself' : n + ' that went on by themselves') : '');
+// After a press in the section: ask for a new answer (fresh=press makes one now) and draw it once it is there (its
+// `at` moved), asking again every 3 s, at most 8 times. A newer press takes over.
+let keepAsk = 0;
+function keepAgain() {
+  const was = keepData && keepData.at, me = ++keepAsk;
+  let n = 0;
+  const ask = () => getJSON('/api/keep' + (n ? '' : '?fresh=press')).then((k) => {
+    if (me !== keepAsk) return;
+    if (k && k.week && k.at !== was) { keepData = k; draw(); return; }
+    if (++n < 8) setTimeout(ask, 3000);
+  });
+  setTimeout(ask, 300);
+}
+function keepHTML() {
+  const d = keepData;
+  if (!d || d.state === 'reading' || !d.week) return '';
+  const now = d.now || {}, wk = d.week || {}, steps = (d.steps || []).filter((x) => x && x.title),
+    causes = (d.causes || []).filter((c) => c && c.name), runs = (d.runs || []).filter((r) => r && r.name);
+  const state = now.switch ? (now.on ? 'On' : 'Off') : '';
+  // with no switch (no Keep running in this build) the section is named for what it shows
+  let h = '<div class="wk-head"><h2 id="h-keep">' + (now.switch ? 'Keep running' : 'What stopped your work') + (state ? '<span class="muted">' + state + '</span>' : '') + '</h2>' +
+    (now.switch ? '<div class="wk-tools">' + sw('keepRun', !!now.on, 'Keep running') + '</div>' : '') + '</div>';
+  h += (wk.sentence ? '<p class="kp-sum">' + esc(wk.sentence) + '</p>' : '') + (now.words ? '<p class="kp-now">' + esc(now.words) + '</p>' : '');
+  const shown = kp.all ? steps : steps.slice(0, 5);
+  if (shown.length) {
+    h += '<ol class="kp-steps" aria-label="Steps">' + shown.map((x, i) => {
+      const a = x.action, items = (x.items || []).slice(0, kp.all ? 20 : 4);
+      let go = '';
+      if (a && a.kind === 'press' && KP_DO[a.post]) go = '<button type="button" class="btn outline sm go" data-do="keepDo" data-act="' + KP_DO[a.post] + '" data-on="1" data-zone="keep" data-k="kp:' + esc(x.key) + '">' + esc(a.label || 'Turn on') + '</button>';
+      else if (a && a.kind === 'copy') go = '<span class="go">' + tok(a.text, true, 'Copy') + '</span>';
+      return '<li data-step="' + esc(x.key) + '"><span class="n">' + (i + 1) + '</span><div><p class="t">' + esc(x.title) + '</p>' +
+        (x.why ? '<p class="why">' + esc(x.why) + '</p>' : '') +
+        (items.length ? '<ul class="it">' + items.map((it) => '<li><b>' + esc(it.title) + '</b>' + (it.at ? ' · ' + esc(kpWhen(it.at)) : '') + (it.note ? ' · ' + esc(it.note) : '') + '</li>').join('') +
+          ((x.items || []).length > items.length ? '<li>' + ((x.items || []).length - items.length) + ' more</li>' : '') + '</ul>' : '') +
+        '</div>' + go + '</li>';
+    }).join('') + '</ol>';
+  }
+  const rows = kp.all ? causes : causes.slice(0, 6);
+  if (rows.length) {
+    h += '<h3 class="kp-h">' + (now.switch ? 'What stopped your work, last 14 days' : 'Last 14 days') + '</h3><ol class="kp-rows">' + rows.map((c) => {
+      // "Handled" only when measured ('yes'); else the step's words, or nothing: no unmeasured status word
+      const said = [kpN(c.count), c.note || '', kpMid(c.went_on_min, c.went_on_n)].filter(Boolean).join(' · '),
+        st = c.handled === 'yes' ? 'Handled' : (c.step && KP_STEP[c.step]) || '';
+      const ex = (c.examples || []).filter((e) => e && e.title).map((e) => e.title + (e.at ? ', ' + kpWhen(e.at) : '')).join(' · ');
+      const dn = [c.doing || '', ex].filter(Boolean).join(' ');
+      return '<li data-cause="' + esc(c.key) + '"><span class="nm">' + esc(c.name) + (said ? '<span class="muted">' + esc(said) + '</span>' : '') + '</span>' +
+        '<span class="st' + (c.handled === 'yes' ? ' yes' : '') + '">' + esc(st) + '</span>' +
+        (dn ? '<span class="dn">' + esc(dn) + '</span>' : '') + '</li>';
+    }).join('') + '</ol>';
+  }
+  // what the extension's log says right after a switch: counted lines, said as lines, never as chats or stops
+  h += (d.switches || []).filter((x) => x && num(x.slow) && x.slow > 0).slice(kp.all ? 0 : -2).map((x) => '<p class="kp-now" data-k="switch-log">' +
+    'VS Code logged ' + kpN(x.slow) + ' “did not finish starting” ' + (x.slow === 1 ? 'line' : 'lines') + ' within 3 minutes after the switch to ' + esc(x.to || '') + ' at ' + esc(kpWhen(x.at)) + '.' + '</p>').join('');
+  const rr = kp.all ? runs : runs.slice(0, 3);
+  if (rr.length) {
+    h += '<h3 class="kp-h">Workflow runs that lost agents</h3><ol class="kp-rows">' + rr.map((r) => {
+      const why = Object.keys(r.why || {}).filter((k) => kpN(r.why[k])).map((k) => kpN(r.why[k]) + ' ' + (KP_WHY[k] || 'other error')).join(', ');
+      const dn = [[why, kpWhen(r.at)].filter(Boolean).join(', '), r.said_completed ? 'The run still said completed' : '',
+        kpN(r.never_rerun) && r.never_rerun > 0 ? 'No later run of the same workflow started' : r.later_run ? 'A later run of the same workflow started' : ''].filter(Boolean);
+      const died = kpN(r.dead) && kpN(r.agents) ? kpN(r.dead) + ' of ' + kpN(r.agents) + ' died' : kpN(r.dead) ? kpN(r.dead) + ' died' : '';
+      return '<li data-run="' + esc(r.name) + '"><span class="nm">' + esc(r.name) + (r.chat ? '<span class="muted">' + esc(r.chat) + '</span>' : '') + '</span>' +
+        '<span class="st">' + esc(died) + '</span>' + (dn.length ? '<span class="dn">' + esc(dn.join('. ')) + '.</span>' : '') + '</li>';
+    }).join('') + '</ol>';
+  }
+  const more = steps.length > 5 || causes.length > 6 || runs.length > 3;
+  if (more) h += '<div class="kp-more"><button type="button" class="btn ghost xs quiet" data-do="keepAll" data-k="keepAll" aria-expanded="' + kp.all + '">' + (kp.all ? 'Show less' : 'Show all') + '</button></div>';
+  if ((d.problems || []).length) h += '<p class="kp-probs">' + d.problems.map(esc).join(' ') + '</p>';
+  return h;
+}
 
 // ---------- Your week, under the accounts: /api/usage's week, drawn ----------
 // One hero chart: use by hour at every width (a narrow page draws the hours edge to edge), stacked by who did it, with
@@ -1785,6 +2043,7 @@ function drawWeek() {
   paint($('wk-legend'), legendHTML(M));
   paint($('wk-highs'), highsHTML());
   paint($('wk-mults'), multsHTML());
+  markOpt();
 }
 
 // the chart: an SVG drawn to the width it has, an hour a bar at every width. Bars keep a gap while each has 3 px or
@@ -1925,6 +2184,90 @@ function hideTip() {
   const t = $('tip'); if (t) t.hidden = true;
   const hl = $('wk-hl'); if (hl) hl.setAttribute('width', '0');
 }
+// Takeaways on the week's numbers (/api/optimize): a number one hangs on gets a quiet mark; hover, focus, Enter or a tap
+// opens the takeaway beside it: the measured share, its sentence, then its one press, and after a press what it did
+// with Undo. With no takeaways nothing here touches the page. Text goes in as text, never as HTML.
+let optData = [], optSaid = null, optOpen = null, optTimer = 0, optSkip = false;
+const optWho = (i) => { const li = all('#wk-legend ul:first-child li')[i]; return li ? li.querySelector('b') : null; };
+const OPT_ON = {'tokens.cache_read': () => document.querySelector('#wk-highs .high[data-key="context"] .v'),
+  'who.workflows': () => optWho(0), 'who.helpers': () => optWho(1)};      // the legend's order: WHO
+function markOpt() {
+  for (const el of all('#week .opt')) { el.classList.remove('opt'); el.removeAttribute('tabindex'); el.removeAttribute('role'); el.removeAttribute('aria-describedby'); delete el.dataset.opt; }
+  for (const t of optData) {
+    const el = t && OPT_ON[t.on] ? OPT_ON[t.on]() : null;
+    if (!el) continue;
+    el.classList.add('opt'); el.tabIndex = 0; el.setAttribute('role', 'button'); el.setAttribute('aria-describedby', 'opt-pop'); el.dataset.opt = t.id;
+  }
+  if (optOpen && !document.querySelector('#week .opt[data-opt="' + optOpen + '"]')) closeOpt();
+}
+function optPop() {
+  let pop = $('opt-pop');
+  if (!pop) {
+    pop = document.createElement('div'); pop.id = 'opt-pop'; pop.className = 'tip opt-pop'; pop.setAttribute('role', 'dialog'); pop.hidden = true;
+    pop.addEventListener('pointerenter', () => clearTimeout(optTimer));
+    pop.addEventListener('pointerleave', optLater);
+    document.body.appendChild(pop);
+  }
+  return pop;
+}
+function openOpt(el) {
+  clearTimeout(optTimer);
+  const t = optData.find((x) => x && x.id === el.dataset.opt);
+  if (!t || !t.measured) return;
+  optOpen = t.id;
+  const pop = optPop(), add = (tag, cls, text) => { const d = document.createElement(tag); if (cls) d.className = cls; if (text != null) d.textContent = text; return d; };
+  pop.textContent = '';
+  pop.setAttribute('aria-label', t.line || '');
+  const m = t.measured, times = m.unit === 'times';      // a share reads "N%" of its window; a count reads "N times"
+  pop.appendChild(add('div', 't-v', times ? m.value + ' times' : m.value + '%'));
+  if (m.basis) pop.appendChild(add('div', 't-h', (times ? 'in ' : 'of ') + m.basis));
+  pop.appendChild(add('div', 't-l', t.line));
+  if (t.change) {
+    const undo = t.state !== 'off', b = add('button', 'btn outline sm', undo ? 'Undo' : t.change.label);
+    b.type = 'button'; b.disabled = !undo && !t.can;
+    b.addEventListener('click', () => pressOpt(t.id, undo ? 'off' : t.change.key === 'dry' ? 'try' : 'on'));
+    pop.appendChild(b);
+  }
+  const said = optSaid && optSaid.id === t.id ? optSaid.says : !t.can && t.why_not;
+  if (said) pop.appendChild(add('div', 't-x', said));
+  for (const m of (optSaid && optSaid.id === t.id && optSaid.more) || []) pop.appendChild(add('div', 't-x', m));   // the press's other lines, under the first
+  pop.style.left = '0px'; pop.style.top = '0px'; pop.hidden = false;
+  placeOpt(el, pop);
+}
+// beside its number: under it, or over it when there is no room under it, never past the window's edges; placed in the
+// page (window.scrollX, scrollY), so a scroll moves it with its number and needs no event
+function placeOpt(el, pop) {
+  const r = el.getBoundingClientRect(), p = pop.getBoundingClientRect();
+  let top = r.bottom + 8;
+  if (top + p.height > window.innerHeight - 8) top = r.top - p.height - 8;
+  pop.style.left = Math.max(8, Math.min(r.left, window.innerWidth - p.width - 8)) + window.scrollX + 'px';
+  pop.style.top = Math.max(8, top) + window.scrollY + 'px';
+}
+function closeOpt() { clearTimeout(optTimer); optOpen = null; const pop = $('opt-pop'); if (pop) pop.hidden = true; }
+function optLater() { clearTimeout(optTimer); optTimer = setTimeout(closeOpt, 300); }
+// the takeaway's press, focused so a keyboard can reach it (the takeaway stands at the end of the page, not after its number)
+function optFocus() { const b = document.querySelector('#opt-pop button'); if (!b || b.disabled) return false; b.focus(); return true; }
+function pressOpt(id, how) {
+  post('/api/optimize', {id, do: how}).then((d) => { if (Array.isArray(d.takeaways)) optData = d.takeaways; optSaid = {id, says: d.says || '', more: Array.isArray(d.more) ? d.more : []}; })
+    .catch((e) => { optSaid = {id, says: e.message}; })
+    .then(() => { markOpt(); const el = document.querySelector('#week .opt[data-opt="' + id + '"]'); if (el) { openOpt(el); if (!optFocus()) el.focus(); } else closeOpt(); });
+}
+document.addEventListener('pointerover', (e) => { const el = e.target.closest && e.target.closest('#week .opt'); if (el) openOpt(el); });
+document.addEventListener('pointerout', (e) => { const el = e.target.closest && e.target.closest('#week .opt'); if (el && !el.contains(e.relatedTarget)) optLater(); });
+document.addEventListener('focusin', (e) => { const el = e.target.closest && e.target.closest('#week .opt');
+  if (el && !optSkip) openOpt(el); else if (e.target.closest && e.target.closest('#opt-pop')) clearTimeout(optTimer); });
+// focus leaving both the number and its takeaway closes it (not while the pointer is over the takeaway)
+document.addEventListener('focusout', (e) => {
+  const inOpt = (n) => !!(n && n.closest && (n.closest('#week .opt') || n.closest('#opt-pop')));
+  if (optOpen && inOpt(e.target) && !inOpt(e.relatedTarget) && !$('opt-pop').matches(':hover')) optLater(); });
+document.addEventListener('click', (e) => { const el = e.target.closest && e.target.closest('#week .opt'); if (el) openOpt(el);
+  else if (optOpen && !(e.target.closest && e.target.closest('#opt-pop'))) closeOpt(); });
+document.addEventListener('keydown', (e) => {
+  if (!optOpen && e.key !== 'Enter') return;
+  const el = e.target.closest && e.target.closest('#week .opt');
+  if (e.key === 'Enter' && el) { e.preventDefault(); openOpt(el); optFocus(); }
+  else if (e.key === 'Escape' && optOpen) { const back = document.querySelector('#week .opt[data-opt="' + optOpen + '"]'); closeOpt(); if (back && $('opt-pop').contains(e.target)) { optSkip = true; back.focus(); optSkip = false; } }
+});
 function chartIndex(ev) {
   const svgEl = document.querySelector('#wk-chart svg'); if (!svgEl || !G) return -1;
   const r = svgEl.getBoundingClientRect(), k = G.W / r.width, x = (ev.clientX - r.left) * k, yv = (ev.clientY - r.top) * k;
@@ -2070,7 +2413,7 @@ function tile(x, withOwner) {
   const meta = tileMeta(x, withOwner);
   return '<li class="tl"><a class="tile" href="' + esc(x.url) + '" data-do="open" data-url="' + esc(x.url) + '" data-id="' + esc(x.id) + '" data-k="file:' + esc(x.id) + '" data-meta="' + esc(meta) +
     '" title="' + esc(tip) + '" aria-label="' + esc('Open ' + title + ' as ' + (x.owner || 'its owner')) + '">' +
-    (pic ? '<span class="thumb"><img src="/api/preview/' + encodeURIComponent(x.id) + '" loading="lazy" alt="" data-id="' + esc(x.id) + '"></span>' : leafHTML(x)) +
+    (pic ? '<span class="thumb"><img ' + (pageKey ? 'data-preview="' + esc(x.id) + '"' : 'src="/api/preview/' + encodeURIComponent(x.id) + '" loading="lazy"') + ' alt="" data-id="' + esc(x.id) + '"></span>' : leafHTML(x)) +
     '<span class="tt"><span class="' + (x.title ? '' : 'untitled') + '">' + esc(title) + '</span>' + I.up + '</span><span class="tm">' + esc(meta) + '</span></a>' +
     '<button type="button" class="tcopy" data-do="copy" data-text="' + esc(x.url) + '" data-zone="pages" data-k="copy:' + esc(x.id) + '" aria-label="' + esc('Copy the link to ' + title) + '">Copy link</button></li>';
 }
@@ -2218,9 +2561,8 @@ function whoWords(w) {
 const sameWho = (x, y) => (!x && !y) || (!!x && !!y && (x.email || '') === (y.email || '') && (x.org || '') === (y.org || ''));
 const homeOf = (c) => (c.started && c.started.email) || null;
 const awayFrom = (c) => !!homeOf(c) && !sameWho(c.on, c.started) && !c.own_login;
-// The Accounts table's Chats, and the sidebar's: chats written in the last day (those that started on the account,
-// for its row). Nothing until the first look has read every chat: never a count part of the way through.
-const chatsHome = (email) => (chatsReady() ? chatList().filter((c) => homeOf(c) === email && lately(c)).length : 0);
+// The sidebar's Chats: chats written in the last day. Nothing until the first look has read every chat: never a
+// count part of the way through.
 const chatsCount = () => (chatsReady() ? chatList().filter(lately).length : '');
 // One group per account, the one Claude Code is on first, then the page's order; homes Switchboard doesn't keep, or
 // not known, in one last group. A chat not read far enough to know its home is left to the reading line.
@@ -2333,7 +2675,7 @@ function drawChats() {
   focusChat();
 }
 function loadChats() {
-  if (chatsLoading) return;
+  if (chatsLoading || locked) return;                    // a locked page asks nothing more
   chatsLoading = true;
   getJSON('/api/chats').then((d) => {
     chatsGot = Date.now();
@@ -2435,8 +2777,12 @@ function profilePick(a) {
 function pairsHTML() {
   return '<ul class="pairs" aria-label="Accounts and their Chrome profiles">' + managed().map((a) => {
     const f = linkFact(a), tip = [f.line, ((a.link || {}).chrome || {}).line].filter(Boolean).join('\n');   // its link, then Claude in Chrome there
+    const when = f.ok && (a.link || {}).checked     // "last checked <date>": the page load that last proved its link
+      ? '<span class="ln" data-k="checked:' + esc(a.email) + '">' + esc(a.link.checked) + '</span>' : '';
+    const v = f.ok ? I.check + profilePick(a) + when
+      : '<span class="ln">' + esc(f.line) + '</span>' + (f.btn || '') + profilePick(a);
     return '<li><span class="pk">' + esc(a.email) + '</span><span class="pv" data-link="' + esc((a.link || {}).link || '') + '"' + (tip ? ' title="' + esc(tip) + '"' : '') + '>' +
-      (f.ok ? I.check + profilePick(a) : '<span class="ln">' + esc(f.line) + '</span>' + (f.btn || '') + profilePick(a)) + '</span></li>';
+      v + '</span></li>';
   }).join('') + '</ul>';
 }
 const matchedCount = () => managed().filter((a) => linkFact(a).ok).length;
@@ -2505,11 +2851,19 @@ function rulesHTML() {
 function modelPicks() {
   const a = au(), counted = (Array.isArray(a.models) && a.models.length ? a.models : a.model ? [a.model] : []).map(String);
   const seen = (a.models_seen || []).map(String), all = seen.concat(counted.filter((m) => !seen.some((s) => s.toLowerCase() === m.toLowerCase())));
-  if (!all.length) return '<span class="muted">None reported yet</span>';
+  // with none ticked, auto-switch follows the models the chats ask for when that part is in the build (/api/keep's
+  // `follows`): the picker then says so; without it, its own words
+  const follows = !!(keepData || {}).follows;
+  if (!all.length) return '<span class="muted" data-k="model-none">' + (follows ? 'The models your chats use' : 'None reported yet') + '</span>';
   return '<span class="mpicks">' + all.map((m) => '<label class="mpick"><input type="checkbox" data-change="models" data-zone="set" data-k="model:' + esc(m) + '" value="' + esc(m) + '"' +
-    (counted.some((c) => c.toLowerCase() === m.toLowerCase()) ? ' checked' : '') + '>' + esc(m) + '</label>').join('') + '</span>';
+    (counted.some((c) => c.toLowerCase() === m.toLowerCase()) ? ' checked' : '') + '>' + esc(m) + '</label>').join('') +
+    (counted.length || !follows ? '' : '<span class="muted" data-k="model-none">None ticked: the models your chats use</span>') + '</span>';
 }
 const checkRunning = () => !!(S.check || {}).running || !!busy.check;
+// CLAUDE_CODE_EFFORT_LEVEL set somewhere beats every helper's effort line and CLAUDE_CODE_SUBAGENT_EFFORT: both Models
+// rows say so (term.effort_first_line says the same in the terminal).
+const effortFirst = () => { const l = modelsData && modelsData.effort_level;
+  return l ? hint(esc('CLAUDE_CODE_EFFORT_LEVEL=' + l.value + ' in ' + l.where + ' comes first: every helper runs at that effort.')) : ''; };
 const GROUPS = [
   {id: 'switching', title: 'Switching', note: () => SB, rows: [
     {id: 'auto', title: 'Auto-switch', desc: 'Moves Claude Code to another account before it reaches a line. Off, the accounts are still read.',
@@ -2537,7 +2891,7 @@ const GROUPS = [
       ctl: () => { const m = S.mac || {}; return m.awake === null ? '<span class="muted">' + UNREADABLE + '</span>' : m.awake ? '<span class="badge soft">Automatic</span>'
         : '<span class="badge">Off</span><button type="button" class="btn outline xs" data-do="awake" data-on="1" data-zone="set" data-k="awake:on">Turn on</button>'; },
       keys: () => [['awake', SB, null, 'awake, in ' + SB + ': false turns it off']]},
-    {id: 'notify', title: 'Notifications', desc: 'A switch, a limit near or refilled, done, and needs you.',
+    {id: 'notify', title: 'Notifications', desc: 'A switch, a limit near or refilled, and needs you. Done after a long turn: switchboard notify done on.',
       ctl: () => { const m = S.mac || {}; return m.notify === null ? '<span class="muted">' + UNREADABLE + '</span>'
         : '<button type="button" class="btn ghost xs quiet" data-do="noteTest" data-k="noteTest"' + (m.notify ? '' : ' disabled') + '>Test</button>' + sw('notify', !!m.notify, 'Notifications'); },
       extra: () => {
@@ -2551,19 +2905,31 @@ const GROUPS = [
     {id: 'chrome', title: 'Claude in Chrome', desc: 'Works as the account Claude Code is on, in the profiles that have the extension.',
       ctl: () => chromeRow().badge, extra: chromeExtra},
   ]},
-  {id: 'code', title: 'In Claude Code', note: () => CC + ' and CLAUDE.md. Off takes out exactly what it added.', rows: [
+  {id: 'code', title: 'In Claude Code', note: () => CC + ', CLAUDE.md and helper files. Off takes out exactly what it added.', rows: [
     {id: 'statusline', title: 'Status line', desc: 'The account, % left and refill time under each Claude Code window.',
       ctl: () => { const m = S.mac || {}; return m.statusline === null ? '<span class="muted">' + UNREADABLE + '</span>'
         : (!m.statusline && m.statusline_theirs ? '<span class="muted">Replaces yours</span>' : '') + sw('statusline', !!m.statusline, 'Status line in Claude Code'); },
       keys: () => [['statusLine', CC]], cmds: () => ['switchboard statusline ' + ((S.mac || {}).statusline ? 'on' : 'off')]},
-    {id: 'models', title: () => ((modelsData && modelsData.model) || 'Sonnet') + ' for helpers', desc: 'Helpers and workflow steps that name no model run on Sonnet. The chat keeps its own.',
+    {id: 'helpers', title: 'Models by the job', desc: 'Four helpers, each on the model that fits its job: lookups on Haiku, reading, review and checks on Sonnet.',
+      ctl: () => {
+        const h = (modelsData && modelsData.helpers) || null, why = h && !h.enabled ? h.blocked || '' : '';
+        if (h && h.enabled === null) return '<span class="muted">' + UNREADABLE + '</span>';
+        return (why ? '<span class="muted">' + esc(why) + '</span>' : '') + sw('helpers', !!(h && h.enabled), 'Models by the job', !h || (!!why && !h.enabled));
+      },
+      extra: () => { const h = (modelsData && modelsData.helpers) || {}, left = (h.enabled && h.left_out) || [];   // a helper of yours with its name stays
+        return (left.length ? hint(esc('Left out: ' + left.map((x) => x.name + ' (' + x.why + ')').join(', ') + '.')) : '') + effortFirst(); },
+      keys: () => [['switchboard-*.md', '~/.claude/agents/ (four helpers) and ~/.claude/rules/ (one note)']],
+      cmds: () => ['switchboard models ' + (modelsData && modelsData.helpers && modelsData.helpers.enabled ? 'on' : 'off')]},
+    {id: 'models', title: () => ((modelsData && modelsData.model) || 'Sonnet') + ' for helpers',
+      desc: () => 'Helpers and workflow steps that name no model run on Sonnet' + (modelsData && modelsData.effort ? ' at ' + modelsData.effort + ' effort' : '') + '. The chat keeps its own.',
       ctl: () => {
         const d = modelsData, label = ((d && d.model) || 'Sonnet') + ' for helpers', by = d && d.decided_by;
         const why = by ? (by.what === 'force' ? 'One model for every helper is set in ' : 'Already set in ') + by.where + '.' : (d && !d.enabled ? d.blocked || '' : '');
         if (d && d.enabled === null) return '<span class="muted">' + UNREADABLE + '</span>';
         return (why ? '<span class="muted">' + esc(why) + '</span>' : '') + sw('models', !!(d && d.enabled), label, !d || (!!why && !d.enabled));
       },
-      keys: () => [['env.CLAUDE_CODE_SUBAGENT_MODEL', CC]], cmds: () => ['switchboard models ' + (modelsData && modelsData.enabled ? 'on' : 'off')]},
+      extra: () => effortFirst(),
+      keys: () => [['env.CLAUDE_CODE_SUBAGENT_MODEL', CC], ['env.CLAUDE_CODE_SUBAGENT_EFFORT', CC]], cmds: () => ['switchboard models sonnet ' + (modelsData && modelsData.enabled ? 'on' : 'off')]},
     {id: 'house', title: 'House rules', desc: 'A short block of working rules at the top of CLAUDE.md.',
       ctl: () => { const hr = (codeData && codeData.house) || {};
         return '<button type="button" class="btn ghost xs quiet" data-do="houseView" data-k="houseView" aria-expanded="' + houseShown + '">' + (houseShown ? 'Hide' : 'View') + '</button>' +
@@ -2613,7 +2979,7 @@ const GROUPS = [
       keys: () => [['home-profile.txt', '~/.switchboard/home-profile.txt', '~/.switchboard/home-profile.txt']]},
     {id: 'bookmark', title: 'Bookmarklet', desc: 'For a link clicked inside Chrome: drag it to the bookmarks bar, and press it on a tab that says “Page not found”.',
       ctl: () => { const l = S.links || {};
-        const bm = 'javascript:location.href=\'' + location.protocol + '//localhost:' + location.port + '/go?k=' + encodeURIComponent(l.key || '') + '#\'+encodeURIComponent(location.href)';
+        const bm = 'javascript:location.href=\'' + location.protocol + '//127.0.0.1:' + location.port + '/go?k=' + encodeURIComponent(bookmarkKey || l.key || '') + '#\'+encodeURIComponent(location.href)';
         return '<a class="bm" href="' + esc(bm) + '" data-k="bm" data-do="bm" title="Drag to your bookmarks bar. Press it on any “Page not found”.">Open as owner</a>'; },
       extra: () => ((S.links || {}).handlers ? hint(esc(S.links.handlers), ' data-k="handlers"') : ''),     // other apps that take clicked links
       cmds: () => ['switchboard open LINK', 'switchboard owner LINK']},
@@ -2690,7 +3056,7 @@ function drawSettings() {
       (g.top && !ql ? g.top() : '') + rows.map(rowHTML).join(''));
   }
   $('set-none').hidden = shown > 0;
-  paint($('about'), S ? esc('Switchboard ' + S.version + ' · ' + (S.demo ? 'demo · ' : '') + 'localhost:' + location.port) : '');
+  paint($('about'), S ? esc('Switchboard ' + S.version + ' · ' + (S.demo ? 'demo · ' : '') + '127.0.0.1:' + location.port) : '');
   paint($('newer'), S && S.newer ? esc(S.newer) : '');      // a newer version is out: one quiet line under the version
   paint($('chips'), [['', 'All']].concat(GROUPS.map((g) => [g.id, g.title])).map(([id, t]) =>
     '<button type="button" class="chip" data-do="chip" data-g="' + id + '" data-k="chip:' + id + '" aria-pressed="' + (filterGroup === id) + '">' + esc(t) + '</button>').join(''));
@@ -2717,7 +3083,8 @@ function commands() {
   ].concat(ruled().map((a) => 'switchboard auto ' + ruleOf(a) + ' ' + cfgWord(a.email)), tunedCmds(), [
     'switchboard notify ' + (m.notify ? 'on' : 'off'),
     'switchboard statusline ' + (m.statusline ? 'on' : 'off'),
-    'switchboard models ' + (d && d.enabled ? 'on' : 'off'),
+    'switchboard models ' + (d && d.helpers && d.helpers.enabled ? 'on' : 'off'),
+    'switchboard models sonnet ' + (d && d.enabled ? 'on' : 'off'),
   ], configLines()).join('\n') + '\n';
 }
 // The rest as `switchboard config set KEY VALUE`, word for word what `switchboard config --as-commands` prints for the
@@ -2798,67 +3165,6 @@ function firstHTML() {
   return h + (w ? '<div class="below"><div class="notes">' + w + '</div></div>' : '') + note('first') + '</div>';
 }
 
-// ---------- Providers: every assistant in the person's order, under the accounts (S.providers, providers/view.py) ----------
-//
-// Each added provider is a line on the accounts list's own columns: its name with its plan under it, its limits drawn
-// by the accounts' own useCell (a window the accounts have keeps their words, "5-hour" and "Weekly"; another keeps the
-// provider's own, "3-day"), and its state in a few words. The provider the accounts above are is one line that says
-// so: its rows are not drawn twice. When a chat can be carried on, the command to type, as text to select and copy.
-// With no other provider added: one quiet line when another is on this Mac, else nothing. Nothing here starts
-// anything: no button runs a move, a job or an ask.
-const PV_WINDOWS = {'5-hour': ['five', '5-hour'], weekly: ['week', 'Weekly']};
-const pvSeats = (p) => (Array.isArray(p.seats) ? p.seats.filter((s) => s && typeof s === 'object') : []);
-function pvState(p) {
-  if (p.state === 'room') return num(p.read_at) && S.now - p.read_at > 3600 ? 'Had room when last read ' + ago(S.now - p.read_at) + ' ago' : 'Has room';
-  if (p.state === 'out') return !num(p.back_at) ? 'Out; when it refills is not known'
-    : ((p.count || pvSeats(p).length) > 1 ? 'Every account is out' : 'Out') + (pvRefillSaid(p) ? '' : ' until ' + refillWords(p.back_at * 1000));
-  return {signed_out: 'Not signed in', not_installed: 'Not on this Mac', not_added: 'Not added'}[p.state] || 'Numbers not known';
-}
-// Whether a limit line drawn in the provider's rows (pvLimit, useCell's "Refills ...") already says the time it is out
-// until: then its state says "Out" alone, so one row never says the same refill twice.
-function pvRefillSaid(p) {
-  const when = refillWords(p.back_at * 1000);
-  return !p.account_list && pvSeats(p).some((s) => (Array.isArray(s.windows) ? s.windows : []).some((w) => w && typeof w === 'object' &&
-    num(w.used_pct) && num(w.resets_at) && w.resets_at > S.now && w.resets_at * 1000 > nowMs() && refillWords(w.resets_at * 1000) === when));
-}
-// One window as an account's limit line (useCell): its use, its bar with the line it is counted out at, its refill.
-function pvLimit(w) {
-  const [kind, label] = PV_WINDOWS[w.label] || ['week', String(w.label || '')];
-  const used = num(w.used_pct) && !(num(w.resets_at) && w.resets_at <= S.now) ? w.used_pct : null, line = num(w.line) ? w.line : null;
-  // As on the account rows: a 5-hour window with no number to show has no line (useCell's hidden cell says why).
-  const l = {kind, label, short: label, line, used, unknown: used == null, pct: used == null ? null : Math.round(used),
-    none: kind === 'five' && used == null ? label + ' not known' : '',
-    w: {used, started: used != null, resets: num(w.resets_at) ? new Date(w.resets_at * 1000).toISOString() : null}};
-  l.over = !l.unknown && line != null && l.pct >= line;
-  return useCell(l, esc(label), false);
-}
-function pvRow(p, seat, first) {
-  const name = first ? esc(p.name || p.id) : '', what = [p.app, p.version].filter(Boolean).join(' ');
-  const sub = p.account_list ? p.app : seat && pvSeats(p).length > 1 ? seat.label : p.plan;
-  const lims = p.account_list ? '<span class="pv-above">The accounts above</span>' : (seat && Array.isArray(seat.windows) ? seat.windows : []).filter((w) => w && typeof w === 'object').map(pvLimit).join('');
-  return '<div class="ag pv-row" role="row" data-provider="' + esc(p.id) + '"><div class="pv-who" role="cell">' +
-    (name ? '<span class="em" title="' + esc(what) + '">' + name + '</span>' : '') + (sub ? '<span class="sub">' + esc(sub) + '</span>' : '') + '</div>' +
-    '<div class="pv-lims" role="cell">' + lims + '</div>' +
-    '<div class="pv-state' + (p.state === 'out' ? ' out' : '') + '" role="cell">' + (first ? esc(pvState(p)) : '') + '</div></div>';
-}
-function providersHTML() {
-  const b = S.providers;
-  if (!b || !Array.isArray(b.providers)) return '';
-  const shown = b.providers.filter((p) => p && typeof p === 'object' && p.id);
-  const add = (Array.isArray(b.add) ? b.add : []).filter((a) => a && a.id).map((a) => '<p class="pv-go">' + esc(a.app || a.name || a.id) +
-    ' is on this Mac too: <code class="pv-cmd">switchboard add ' + esc(a.id) + '</code> adds it.</p>').join('');
-  if (!(shown.length > 1 || shown.some((p) => !p.account_list))) return add ? '<div class="pv-foot">' + add + '</div>' : '';
-  const rows = shown.map((p) => (p.account_list || !pvSeats(p).length ? [pvRow(p, null, true)]
-    : pvSeats(p).map((s, i) => pvRow(p, s, i === 0))).join('')).join('');
-  const go = b.carry ? '<p class="pv-go">To carry a chat on in the next one with room, type in its folder: <code class="pv-cmd">switchboard continue</code></p>' : '';
-  return '<h2 class="h2 pv-head" id="h-pv">Providers<span class="muted">in your order</span></h2><div class="pv-list" role="table" aria-labelledby="h-pv">' + rows + '</div>' +
-    (go || add ? '<div class="pv-foot">' + go + add + '</div>' : '');
-}
-function drawProviders() {
-  const el = $('providers');
-  if (el) paint(el, providersHTML());
-}
-
 // ---------- drawing ----------
 
 function board() {                                        // the views, made once; each block is then repainted on its own
@@ -2872,9 +3178,9 @@ function board() {                                        // the views, made onc
       '<div class="acc" role="table" aria-label="Accounts"><div id="strip-box"></div>' +
         '<div class="ahead sr" role="row"><span role="columnheader">Account</span><span role="columnheader">5-hour</span>' +
         '<span role="columnheader">Weekly</span><span role="columnheader">State</span></div>' +
-        '<div id="acc"></div></div>' +
-      '<div class="acc-foot" id="acc-foot"></div><div class="below" id="below"></div>' +
-      '<section class="pv" id="providers" aria-label="Providers"></section></div>' +
+        '<div id="acc-mk"></div><div id="acc"></div><div id="acc-other"></div></div>' +
+      '<div class="acc-foot" id="acc-foot"></div><div class="below" id="below"></div></div>' +
+      '<section class="keep" id="keep" aria-labelledby="h-keep"></section>' +
       '<section class="week" id="week" aria-labelledby="h-week">' + weekHead() + '</section></section>' +
     '<section class="sec" id="sec-chats" aria-labelledby="h-ch" hidden><div class="sec-head"><div><h1 id="h-ch">Chats</h1><p class="lede" id="ch-lede"></p></div>' +
       '<div class="tools" id="ch-tools"></div></div><div class="ch-list" id="ch-list"></div></section>' +
@@ -2915,6 +3221,7 @@ function board() {                                        // the views, made onc
   if (ui.sec === 'settings') { loadCode(); loadKeys(); loadMore(); }
 }
 function draw() {
+  if (locked) return;
   try {
     drawNav();
     if (!S) { if (mode) return; const b = $('boot'); if (b) b.textContent = !lost ? 'Reading accounts…' : down ? 'Switchboard isn’t running' : 'Switchboard is busy. Asking again…'; return; }
@@ -2984,15 +3291,16 @@ function replaced(s) {
   return true;
 }
 function load() {
-  if (loading) return Promise.resolve();
+  if (loading || locked || !keyReady) return Promise.resolve();
   loading = true;
-  return fetch('/api/state', {signal: timed(8000)}).then((r) => (r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)))).then((s) => {
+  return api('/api/state', {signal: timed(8000)}).then((r) => (r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)))).then((s) => {
     if (!s || !Array.isArray(s.accounts)) throw new Error('bad state');
+    if (!s.demo && !pageKey && !keyless) { lock(); return; }   // the page opens only with its key (the demo has none)
     if (replaced(s)) return;
     const age = s.answer && num(s.answer.age) ? Math.max(0, s.answer.age) : 0;
     misses = 0; down = false; goodAt = Date.now() - age * 1000;
     render(s);
-    if (first) { first = false; loadExtras(true); loadHistory(); }
+    if (first) { first = false; loadExtras(true); loadHistory(); getJSON('/api/bookmark').then((d) => { if (d && typeof d.key === 'string') { bookmarkKey = d.key; draw(); } }); }
   }).catch((e) => { misses++; down = !!e && e.name === 'TypeError'; lost = true; draw(); })
     .finally(() => { loading = false; nextLoad = Date.now() + retryIn(); });
 }
@@ -3004,10 +3312,11 @@ function retryIn() {                                      // every 5 s; after a 
 function soon(times = 6) { quick = times; }
 let extrasLoading = false, usageMisses = 0;
 function loadExtras(force) {
+  if (locked) return;                                   // a locked page asks nothing more
   if (extrasLoading || (!force && Date.now() - extrasAt < 60000)) return;
   extrasAt = Date.now();
   extrasLoading = true;
-  Promise.all([getJSON('/api/usage' + (force ? '?fresh=1' : '')), getJSON('/api/models')]).finally(() => { extrasLoading = false; usageAsked = true; }).then(([u, m]) => {
+  Promise.all([getJSON('/api/usage' + (force ? '?fresh=1' : '')), getJSON('/api/models'), getJSON('/api/optimize')]).finally(() => { extrasLoading = false; usageAsked = true; }).then(([u, m, o]) => {
     if (u && u.state === 'reading') { usageMisses = 0; extrasAt = 0; if (!usageData || usageData.state === 'reading') usageData = u; }   // ask again on the next beat
     // no answer (a very busy Mac can take longer than the 8 s) and no week yet: still reading, asked again at the first
     // beat 10 s on; only six in a row (a minute or two) say the week can't be read
@@ -3015,6 +3324,13 @@ function loadExtras(force) {
     // an answer, or nothing to keep: drawn as it is (a failed read says so); with no answer the last week stays
     else if (u || !(usageData && usageData.series)) { if (u) usageMisses = 0; usageData = u && u.cuts && typeof u.cuts === 'object' ? u : null; }
     modelsData = m && 'enabled' in m ? m : null;
+    if (o && Array.isArray(o.takeaways)) optData = o.takeaways;
+    draw();
+    markOpt();
+  });
+  getJSON('/api/keep' + (force ? '?fresh=1' : '')).then((k) => {
+    if (k && (k.week || k.state === 'reading')) keepData = k;
+    if (k && k.state === 'reading') extrasAt = Math.min(extrasAt, Date.now() - 50000);   // asked again at the next beat
     draw();
   });
 }
@@ -3158,6 +3474,16 @@ const actions = {
     }).catch((e) => { if (switching === mine) switching = null; fail(zone || 'acc')(e); load(); });
     setTimeout(() => { if (switching === mine) { switching = null; draw(); } }, 10000);   // whatever happens, the server's word after 10 s
   },
+  carry({provider, zone}) {                               // Continue here: the provider's own app opens on the chat
+    if (carrying || !others().some((p) => p.provider === provider)) return;
+    carrying = provider; runLine = null; draw();
+    const p = others().find((x) => x.provider === provider), mark = p && p.chat ? p.chat.mark : null;
+    post('/api/continue', {provider, mark}).then((d) => {   // the mark of the chat the row shows: that one goes
+      const text = (Array.isArray(d.said) ? d.said : []).join(' ');
+      if (d.run) runLine = {text, line: d.run, provider, n: rowNumber(provider)}; else if (text) say(zone || 'acc', text, 15000);
+    }).catch(fail(zone || 'acc')).finally(() => { carrying = null; draw(); load(); });
+  },
+  hideRun() { runLine = null; draw(); },
   relogin({email, zone}) {
     const a = acct(email);
     closeMenu();
@@ -3193,6 +3519,20 @@ const actions = {
   keys() { sideMenu(false); openKeys(); },
   sideMenu() { sideMenu(!$('side').classList.contains('open')); },
   weekTable() { wk.table = !wk.table; hideTip(); weekSig = ''; drawWeek(); },
+  keepAll() { kp.all = !kp.all; draw(); },
+  // a step's press: the action it names, then the section is asked again until its answer is the new one
+  keepDo(ds, b) { if (ds.act === 'keepDo' || !actions[ds.act]) return; actions[ds.act]({on: ds.on, zone: 'keep'}, b); keepAgain(); },
+  keepRun({on, zone}) {
+    post('/api/running', {on: !!on}).then((r) => {
+      const st = r && r.running, now = keepData && keepData.now;
+      if (st && now) {                                   // the switch and the step follow at once; the new answer confirms
+        now.on = !!st.on;
+        if (now.on) keepData.steps = (keepData.steps || []).filter((x) => x.key !== 'on');
+        draw();
+      }
+      return r;
+    }).then(did(zone || 'keep')).then(() => keepAgain()).catch(fail(zone || 'keep'));
+  },
   // settings
   awake({on}) { post('/api/awake', {on: !!on}).then(did('set')).then(() => load()).catch(fail('set')); },
   notify({on}) { post('/api/notify', {on: !!on}).then(did('set')).then(() => load()).catch(fail('set')); },
@@ -3203,6 +3543,10 @@ const actions = {
       if (d.note && MODELS_NOTE[d.note]) say('set', MODELS_NOTE[d.note], 9000);
       loadExtras(true);
     }).catch(fail('set'));
+  },
+  helpers({on}) {
+    if (!modelsData) return;
+    post('/api/models', {enabled: !!on, part: 'helpers'}).then(did('set')).then(() => loadExtras(true)).catch(fail('set'));
   },
   links({on, zone}) {
     const z = zone || 'set';
@@ -3549,6 +3893,22 @@ window.addEventListener('scroll', () => { closeMenu(); hideTip(); }, {passive: t
 
 // ---------- first draw ----------
 $('brand').innerHTML = BRAND;
+if (!keyReady) {                                          // a ticket: out of the address at once, then traded for the key
+  const t = ASK.get('t'), rest = new URLSearchParams(location.search);
+  rest.delete('t');
+  history.replaceState(null, '', location.pathname + (String(rest) ? '?' + rest : '') + location.hash);
+  traded = fetch('/api/ticket', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Switchboard': '1'}, body: JSON.stringify({t})})
+    .then((r) => (r.ok ? r.json() : null)).catch(() => null).then((d) => {
+      if (d && typeof d.key === 'string' && d.key) {
+        pageKey = d.key;
+        try { localStorage.setItem(KEY_AT, d.key); } catch (e) { /* no storage: the key lives in this tab only */ }
+      } else if (d && typeof d === 'object' && !('key' in d)) {
+        keyless = true;                                   // the server keeps no key here (the demo answers {})
+      }
+      keyReady = true;
+    });
+  traded.then(() => load());
+}
 if (!location.hash) {                                     // the old addresses still land in the right view
   if (ASK.get('folder')) history.replaceState(null, '', location.pathname + location.search + '#artifacts');
   else if (ASK.has('more')) history.replaceState(null, '', location.pathname + location.search + '#settings');

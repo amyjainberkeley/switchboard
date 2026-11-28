@@ -28,6 +28,13 @@ def when(t, now=NOW):
     return session_hooks._when(t, now)
 
 
+# The accounts with their numbers in `switchboard`'s list: the start note names an account by its number, never its
+# email; the notes said when something happens name it by its email.
+NUMBERED = {A: {'id': 'acct-a', 'opens': None, 'slot': 1, 'plan': 'Max 20x'},
+            B: {'id': 'acct-b', 'opens': None, 'slot': 2, 'plan': 'Pro'},
+            C: {'id': 'acct-c', 'opens': None, 'slot': 3, 'plan': None}}
+
+
 class ChatCase(HookSandbox):
     """A chat file in the made-up Claude Code folder, chats.json with the accounts' organizations, and the hook fed as
     Claude Code feeds it (the chat's id and its file's path)."""
@@ -127,25 +134,28 @@ class AResumedChatHearsWhereItBegan(ChatCase):
     def test_started_under_and_last_request_exactly(self):
         self.chat.add(owner_line(ORG_A), org_line(ORG_A, NOW - 9000), said('x', NOW - 8000),
                       org_line(ORG_C, NOW - 5000))
-        self.owners(active=B, timeline=[[B, NOW - 3000]])
+        self.owners(active=B, timeline=[[B, NOW - 3000]], accounts=NUMBERED)
         got = self.hook(self.ev('SessionStart', source='resume'))
-        self.assertIn('This chat started under %s, and its last request was under %s; what it made under each of %s, '
-                      '%s belongs to that account.' % (A, C, A, C), got)
+        self.assertIn('This chat started under account 1, and its last request was under account 3; what it made '
+                      'under each of account 1, account 3 belongs to that account.', got)
         self.assertNotIn('This chat was on', got)
+        self.assertNotIn('@', got)
 
     def test_a_chat_that_started_elsewhere_and_came_back(self):
         self.chat.add(owner_line(ORG_A), org_line(ORG_A, NOW - 9000), org_line(ORG_C, NOW - 5000),
                       org_line(ORG_B, NOW - 3000))
-        self.owners(active=B, timeline=[[B, NOW - 3000]])
+        self.owners(active=B, timeline=[[B, NOW - 3000]], accounts=NUMBERED)
         got = self.hook(self.ev('SessionStart', source='resume'))
-        self.assertIn('This chat started under %s, and is on %s now; what it made under each of %s, %s belongs to '
-                      'that account.' % (A, B, A, C), got)
+        self.assertIn('This chat started under account 1, and is on account 2 now; what it made under each of '
+                      'account 1, account 3 belongs to that account.', got)
+        self.assertNotIn('@', got)
 
-    def test_the_pointer_to_every_accounts_chats(self):
-        self.owners(active=A)
+    def test_the_start_is_short_and_names_no_address(self):
+        self.owners(active=A, accounts=NUMBERED)
         got = self.hook(self.ev('SessionStart', source='startup'))
-        self.assertIn("`switchboard chats` shows what every account's chats are doing.", got)
-        self.assertLess(len(got), session_hooks.CAP)
+        self.assertIn("(now account 1 in `switchboard`'s list, Max 20x)", got)
+        self.assertNotIn('@', got)
+        self.assertLessEqual(len(got), 400)
         own = self.hook(self.ev('SessionStart', source='startup'),
                         env={'CLAUDE_CONFIG_DIR': os.path.join(self.tmp, 'own-login')})
         self.assertIn('runs on its own login', own)                     # a chat on its own login: as it was
@@ -208,10 +218,11 @@ class TheCarriedRead(ChatCase):
         self.chat.scribble_head(saved - 1)              # what the page read already: junk now, never read again
         self.chat.add(said('new', NOW - 1100), org_line(ORG_C, NOW - 1000))
         write_index(self.data, chats={CHAT: entry(self.chat.path, saved, owner=ORG_A, steps=[(NOW - 9000, ORG_A)])})
-        self.owners(active=A, timeline=[[A, NOW - 9000]])
+        self.owners(active=A, timeline=[[A, NOW - 9000]], accounts=NUMBERED)
         got = self.hook(self.ev('SessionStart', source='resume'))
         self.assertEqual(self.reads, [(saved, self.chat.size())])
-        self.assertIn("This chat's last request was under %s; what it made under %s belongs to %s." % (C, C, C), got)
+        self.assertIn("This chat's last request was under account 3; what it made under account 3 belongs to "
+                      "account 3.", got)
         self.assertEqual([s[1] for s in self.record()['cf']['steps']], [ORG_A, ORG_C])
 
     def test_a_saved_look_for_another_file_or_a_cut_file_is_not_carried_on(self):
@@ -291,15 +302,15 @@ class ThroughTheRealCommand(ChatCase):
 
     def test_a_chat_behind_the_clock_through_the_shell(self):
         self.chat.add(owner_line(ORG_A), org_line(ORG_A, NOW - 7000))
-        self.owners(active=A, timeline=[[A, NOW - 9000]])
-        self.assertIn(CHATS_WORDS, self.run_hook(self.ev('SessionStart', source='startup')))
+        self.owners(active=A, timeline=[[A, NOW - 9000]], accounts=NUMBERED)
+        self.assertIn(START_WORDS, self.run_hook(self.ev('SessionStart', source='startup')))
         self.owners(active=B, timeline=[[A, NOW - 9000], [B, NOW - 60]])
         got = self.run_hook(self.ev('UserPromptSubmit'))
         self.assertIn("Switchboard moved Claude Code from %s to %s at %s; this chat's last request was still under %s."
                       % (A, B, when(NOW - 60), A), got)
 
 
-CHATS_WORDS = "`switchboard chats` shows what every account's chats are doing."
+START_WORDS = "when one runs low (now account 1 in `switchboard`'s list, Max 20x)."
 
 
 class StaysAsItWas(ChatCase):

@@ -27,7 +27,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SCRIPT = os.path.join(ROOT, 'uninstall.sh')
 KEYCHAIN_LINE = 'SECURITY=/usr/bin/security'
 # Every service the program keeps an item of Switchboard's own under, read from the code that writes them.
-OURS = (vault.SERVICE_CURRENT, vault.SERVICE_PREVIOUS, vault.SERVICE_RECOVERY, keys.SERVICE) + \
+OURS = (vault.SERVICE_CURRENT, vault.SERVICE_PREVIOUS, vault.SERVICE_RECOVERY, vault.SERVICE_SHARED, keys.SERVICE) + \
     tuple(bearer.SERVICES.values())
 NOT_OURS = [['Claude Code-credentials', 'tester'], ['Some other app', 'someone']]
 

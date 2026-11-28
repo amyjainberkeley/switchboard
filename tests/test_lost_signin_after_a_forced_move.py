@@ -44,9 +44,10 @@ class TheNight(unittest.TestCase):
         for aid in ('uuid-a', 'uuid-b'):                        # Anthropic turns every read away
             self.net.set(json.loads(self.rig.vault(aid))['claudeAiOauth']['accessToken'], 'timeout')
         self.told = []
+        self.moved = []                                         # the note of a move that keeps Claude Code signed in
         deps = autoloop.Deps(net=self.net, net_ready=lambda: True, load=lambda: 0.5, power=lambda: (True, 100),
                              procs=lambda: 1, disk_free=lambda: 10 ** 12, history_note=lambda *a, **k: None,
-                             notify=self.told.append)
+                             notify=self.told.append, notify_move=self.moved.append)
         self.loop = autoloop.Loop(deps=deps, clock=self.clock, rand=lambda: 0.5)
         self.spells = watch.Spells(mono=self.clock.mono, wall=self.clock.wall)
         self.page_notes = []

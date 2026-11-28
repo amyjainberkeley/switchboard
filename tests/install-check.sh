@@ -3,6 +3,9 @@
 # Never the real home: every run gets HOME (and CFFIXED_USER_HOME, the home macOS's own libraries use) set to a
 # fresh folder under $TMPDIR, a PATH that holds only that home's ~/.local/bin and the system folders, and the flags
 # that keep launchd and the browser out of it (--no-agent --no-open on every install, --no-agent on every uninstall).
+# Cases 29 to 31 leave out --no-agent: there a stand-in launchctl stands first on the PATH and only writes down what it
+# was asked (and, to load the background jobs, a stand-in dscl answers the throwaway home as the account's own), so
+# launchd is still never reached.
 # The link app is never really built: nearly every install passes --no-link-app as well, and the ones that show it is
 # built by default run with a stand-in swiftc (one that fails, or one that writes a made-up program), so nothing is
 # compiled, and with --no-agent nothing is registered with macOS.
@@ -15,7 +18,8 @@
 #                                                  cases: the numbers to run, as "11" or "3 11", default all)
 #
 # It downloads (Python 3.14 once with --own-python, and the menu bar's packages from PyPI), so it needs the internet
-# for cases 1 to 3, 10, 12 and 16; cases 4, 11 and 17 to 29 block it and run in seconds.
+# for cases 1 to 3, 10, 12 and 16; cases 4, 11 and 17 to 31 block it and run in seconds (30 and 31 in a few minutes:
+# each of their installs waits 10 s for a page that a stand-in launchctl never starts).
 # Prints one line per check and the times, and exits 1 on any failure. The first run at the end of an install is only ever a
 # stand-in (case 8): the real `switchboard setup` would read this Mac's own Claude Code login.
 set -u
@@ -217,6 +221,12 @@ check '[ -x "$H/.switchboard/bin/switchboard-menubar" ] && [ "$(sed -n 1p "$H/.s
   "the launcher is ~/.switchboard/bin/switchboard-menubar"
 check 'grep -q "^Start the menu bar item with: switchboard menubar$" "$T/install-1.log" && [ ! -e "$H/Library/LaunchAgents" ]' \
   "--no-agent: no background job for it either (no LaunchAgents folder), and one line says how to start it"
+if [ -f "$HERE/switchboard/accounts/signin_watch.py" ]; then
+check '[ -x "$H/.switchboard/bin/switchboard-watch" ] && [ "$(sed -n 1p "$H/.switchboard/bin/switchboard-watch")" = "#!/bin/sh" ]' \
+  "the sign-in watch's launcher is ~/.switchboard/bin/switchboard-watch (and --no-agent added no job for it)"
+else
+check '[ ! -e "$H/.switchboard/bin/switchboard-watch" ]' "a copy without the sign-in watch gets no launcher for it"
+fi
 check 'grep -q -e "^Building the link app… could not (details in ~/.switchboard/build.log)\. Everything else works without it\.$" -e "^Skipped the link app" "$T/install-1.log" && [ "$(grep -ci "link app" "$T/install-1.log")" = 1 ] && [ ! -e "$H/Applications" ]' \
   "the link app is built by default: here it can't be (its swiftc fails), so one line says so and nothing is left in ~/Applications"
 check '[ "$(cat "$H/.switchboard/app/choices")" = "--no-agent" ]' "app/choices: --no-agent alone"
@@ -299,6 +309,14 @@ assert v[\"setup\"][\"engine\"] is True, v[\"setup\"]
 # With the Python found on this Mac, offline: the program needs nothing downloaded; the menu bar item waits.
 run "$H" sh "$HERE/install.sh" --no-agent --no-open --no-link-app --no-menu-app --port "$PORT" > "$T/install-found.log" 2>&1; rc=$?
 check '[ $rc = 0 ] && ! grep -qi "download" "$T/install-found.log"' "offline with the Python found here: exit 0, nothing to download"
+if [ -f "$HERE/switchboard/accounts/signin_watch.py" ]; then
+check '[ -x "$H/.switchboard/bin/switchboard-watch" ] && [ ! -e "$H/Library/LaunchAgents/io.github.amyjainberkeley.switchboard.watch.plist" ] && grep -q "switchboard.accounts.signin_watch" "$H/.switchboard/bin/switchboard-watch"' \
+  "the sign-in watch's launcher is in place, and --no-agent added no job for it"
+check 'run "$H" env PYTHONPATH="$H/.switchboard/app" /usr/bin/python3 -B -c "
+from switchboard.accounts import signin_watch
+assert callable(signin_watch.main) and signin_watch.PAGE_AGENT == \"io.github.amyjainberkeley.switchboard\"
+"' "the installed copy has the sign-in watch, and it imports"
+fi
 run "$H" sh "$HERE/install.sh" --no-agent --no-open --no-link-app --port "$PORT" > "$T/install-menu.log" 2>&1; rc=$?
 sed 's/^/    /' "$T/install-menu.log"
 check '[ $rc = 0 ] && grep -q -e "^No menu bar item for now" -e "could not download it (no internet?)\. Everything else works without it\.$" "$T/install-menu.log" && [ ! -e "$H/.switchboard/bin/switchboard-menubar" ]' \
@@ -598,7 +616,7 @@ rm -rf "$T"
 fi
 
 if want 9; then
-echo "== 9. The two background jobs, as the installer writes them (read from install.sh; launchd is never asked)"
+echo "== 9. The background jobs, as the installer writes them (read from install.sh; launchd is never asked)"
 # Each plist, written out with a home whose name needs escaping, then read back by plutil.
 T="$(fresh_home)"
 eval "$(grep '^xml()' "$HERE/install.sh")"
@@ -607,6 +625,7 @@ job_plist() {      # job_plist VARIABLE: the plist install.sh writes to "$VARIAB
   [ -n "$body" ] || return 1
   ( HOME='/Users/a&b<c>'; DATA="$HOME/.switchboard"; LABEL=io.github.amyjainberkeley.switchboard; MENUBAR_LABEL="$LABEL.menubar"
     MENUBAR_CMD="$DATA/bin/switchboard-menubar"; PAGE_CMD="$DATA/bin/switchboard-page"; PY=/usr/bin/python3
+    WATCH_LABEL="$LABEL.watch"; WATCH_CMD="$DATA/bin/switchboard-watch"
     JOB_PATH="$HOME/.local/bin:/usr/bin:/bin"
     eval "cat <<EOF
 $body
@@ -623,6 +642,21 @@ check '[ "$(key "$T/menubar.plist" StandardErrorPath)" = "/Users/a&b<c>/.switchb
   "its log is ~/.switchboard/menubar.log"
 check '[ "$(key "$T/page.plist" ProgramArguments.0)" = "/Users/a&b<c>/.switchboard/bin/switchboard-page" ] && [ "$(plutil -extract ProgramArguments raw -o - "$T/page.plist")" = 1 ] && [ "$(key "$T/page.plist" KeepAlive)" = true ] && ! plutil -extract EnvironmentVariables.PYTHONPATH raw -o - "$T/page.plist" >/dev/null 2>&1' \
   "the page's job runs the page's launcher alone, kept alive, with no PYTHONPATH"
+# The sign-in watch's job, when this copy has the watch.
+if [ -f "$HERE/switchboard/accounts/signin_watch.py" ]; then
+job_plist WATCH_PLIST > "$T/watch.plist"
+check 'plutil -lint -s "$T/watch.plist"' "the sign-in watch's job is a well-formed plist too"
+check '[ "$(key "$T/watch.plist" Label)" = io.github.amyjainberkeley.switchboard.watch ] && [ "$(key "$T/watch.plist" ProgramArguments.0)" = "/Users/a&b<c>/.switchboard/bin/switchboard-watch" ] && [ "$(plutil -extract ProgramArguments raw -o - "$T/watch.plist")" = 1 ]' \
+  "the sign-in watch's job (io.github.amyjainberkeley.switchboard.watch) runs its launcher alone"
+check '[ "$(key "$T/watch.plist" RunAtLoad)" = true ] && [ "$(key "$T/watch.plist" KeepAlive)" = true ] && [ "$(key "$T/watch.plist" ThrottleInterval)" = 10 ] && ! plutil -extract ProcessType raw -o - "$T/watch.plist" >/dev/null 2>&1' \
+  "it starts at login, is started again whenever it exits, and runs at normal priority"
+check '[ "$(key "$T/watch.plist" StandardOutPath)" = "/Users/a&b<c>/.switchboard/signin-watch.out" ] && [ "$(key "$T/watch.plist" StandardErrorPath)" = "/Users/a&b<c>/.switchboard/signin-watch.out" ]' \
+  "its output goes to ~/.switchboard/signin-watch.out, never to the watch's own log"
+check '[ -n "$(key "$T/watch.plist" EnvironmentVariables.PATH)" ] && [ "$(key "$T/watch.plist" EnvironmentVariables.PATH)" = "$(key "$T/page.plist" EnvironmentVariables.PATH)" ]' \
+  "its PATH is the page's job's"
+check '! plutil -extract WorkingDirectory raw -o - "$T/watch.plist" >/dev/null 2>&1 && ! plutil -extract ExitTimeOut raw -o - "$T/watch.plist" >/dev/null 2>&1 && [ "$(key "$T/watch.plist" StandardOutPath)" != "$(key "$T/page.plist" StandardOutPath)" ]' \
+  "no WorkingDirectory and no ExitTimeOut (launchd's own 20 s), and an output file of its own, not the page's"
+fi
 # The page's launcher, as install.sh writes it: on the menu bar app's own Python when it is there, else the program's.
 launcher() {       # launcher APP_PY PY: the launcher install.sh writes, for this test's own data folder
   body="$(awk '$0 == "cat > \"$PAGE_CMD.new\" <<EOF" {on = 1; next} on && $0 == "EOF" {exit} on {print}' "$HERE/install.sh")"
@@ -712,7 +746,7 @@ check '[ $nrc = 0 ] && [ "$(grep -o "# switchboard notify" "$H/.claude/settings.
   "switchboard notify on (offline too): the three notification hooks go in beside the hook already there"
 run "$H" "$H/.switchboard/bin/switchboard" notify > "$T/notify-show.log" 2>&1
 check '[ "$(head -n 2 "$T/notify-show.log")" = "Notifications: on
-Done and needs you in Claude Code: on" ]' "switchboard notify says they are on, and run"
+Notification hooks in Claude Code: on" ]' "switchboard notify says they are on, and run"
 
 # The uninstaller from the installed copy: its last lines stay true after it has removed itself.
 run "$H" sh "$H/.switchboard/app/uninstall.sh" --no-agent > "$T/uninstall.log" 2>&1; urc=$?
@@ -1152,6 +1186,8 @@ assert \"--homebrew\" in f and \"--no-menu-app\" in f and \"--no-agent\" in f an
 run "$H" sh "$HERE/install.sh" --homebrew > "$T/brew-2.log" 2>&1
 check '[ ! -e "$T/launchctl.calls" ] && [ ! -e "$H/.switchboard/bin/switchboard-menubar" ] && [ ! -e "$H/Applications" ] && [ "$(cat "$H/.switchboard/app/choices")" = "--no-agent --no-menu-app --no-link-app --own-python --homebrew" ]' \
   "run as the cask runs it (--homebrew alone): the last install's --no-agent, --no-menu-app and --no-link-app are kept, and launchd is never asked"
+check '[ ! -e "$H/Library/LaunchAgents/io.github.amyjainberkeley.switchboard.watch.plist" ] && [ ! -e "$H/Library/LaunchAgents/io.github.amyjainberkeley.switchboard.plist" ]' \
+  "and no job file is written, for the page or for the sign-in watch"
 ln -s "$HERE/packaging/homebrew/launcher" "$T/brewbin/switchboard"
 ln -s "$HERE/packaging/homebrew/launcher" "$T/brewbin/launcher"
 V="$(sed -n "s/^VERSION = '\([^']*\)'.*/\1/p" "$HERE/switchboard/core.py" | head -n 1)"
@@ -1204,6 +1240,7 @@ check '[ $urc = 0 ] && [ ! -e "$H/.switchboard/app" ] && [ ! -e "$H/.switchboard
 run "$H" sh "$HERE/install.sh" --homebrew > "$T/brew-3.log" 2>&1
 check '[ ! -e "$T/launchctl.calls" ] && [ ! -e "$H/.switchboard/bin/switchboard-menubar" ] && [ "$(cat "$H/.switchboard/app/choices")" = "--no-agent --no-menu-app --no-link-app --own-python --homebrew" ]' \
   "brew install after it: the kept choices are read back (--own-python and --no-link-app with them), so launchd is still never asked"
+check '[ ! -e "$H/Library/LaunchAgents/io.github.amyjainberkeley.switchboard.watch.plist" ]' "and the sign-in watch has no job file"
 EXTRA_ENV=""
 rm -rf "$T"
 fi
@@ -1339,7 +1376,8 @@ stand_in() {
     && grep -qxF "TOOL = '$T/fake-security'" "$f" && ! grep -q "^TOOL = '/usr/bin/security'" "$f"
 }
 items() { /usr/bin/python3 -I -B -c 'import json, sys; print("\n".join(sorted(json.load(open(sys.argv[1])))))' "$KC/store.json" | tr '\t' '|'; }
-ours() { items | grep -c -e '^Switchboard login|' -e '^Switchboard login (previous)|' -e '^Switchboard recovery|'; }
+ours() { items | grep -c -e '^Switchboard login|' -e '^Switchboard login (previous)|' -e '^Switchboard recovery|' \
+                         -e '^Switchboard login (Mac-wide parts)|'; }
 EXTRA_ENV="$OFFLINE PATH=$T/guard:$H/.local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 run "$H" sh "$HERE/install.sh" --no-agent --no-open --no-link-app --no-menu-app --port "$PORT" > "$T/install-1.log" 2>&1; rc=$?
 if [ $rc = 0 ] && stand_in; then
@@ -1422,12 +1460,24 @@ EOF
   out="$(run "$H" "$SBIN/switchboard-page" 2>&1)"; prc=$?
   check '[ $prc = 1 ] && [ "$out" = "Switchboard: Apple'"'"'s /usr/bin/python3 needs its command line tools again. Install them with xcode-select --install, or install Switchboard again so it uses its own Python." ] && [ "$(cat "$T/sleep.calls" 2>/dev/null)" = "slept 300" ]' \
     "the page's launcher says the same in its log and waits 5 minutes before it stops, so its job's restarts don't fill the log"
+  # The sign-in watch's launcher runs the watch's module, not the stand-in program, so it runs here only where the
+  # check stops it or where Switchboard's own Python is a stand-in too.
+  if [ -x "$SBIN/switchboard-watch" ]; then
+    out="$(run "$H" "$SBIN/switchboard-watch" 2>&1)"; wrc=$?
+    check '[ $wrc = 1 ] && [ "$out" = "Switchboard: Apple'"'"'s /usr/bin/python3 needs its command line tools again. Install them with xcode-select --install, or install Switchboard again so it uses its own Python." ] && [ "$(grep -c "^slept 300$" "$T/sleep.calls" 2>/dev/null)" = 2 ]' \
+      "the sign-in watch's launcher says the same and waits 5 minutes too"
+  fi
   mkdir -p "$H/.switchboard/runtime/python/bin"
   printf '#!/bin/sh\necho "own-python $1 $2 $5 $6"\n' > "$H/.switchboard/runtime/python/bin/python3"
   chmod +x "$H/.switchboard/runtime/python/bin/python3"
   out1="$(run "$H" "$SBIN/switchboard" version 2>&1)"; out2="$(run "$H" "$SBIN/switchboard-page" 2>&1)"
   check '[ "$out1" = "own-python -I -B $H/.switchboard/app version" ] && [ "$out2" = "own-python -I -B $H/.switchboard/app serve" ]' \
     "with Switchboard's own Python there, both run the program on it instead (${out1:-nothing} / ${out2:-nothing})"
+  if [ -x "$SBIN/switchboard-watch" ]; then
+    out3="$(run "$H" "$SBIN/switchboard-watch" 2>&1)"
+    check '[ "$out3" = "own-python -I -B $H/.switchboard/app " ]' \
+      "and the sign-in watch's launcher runs the watch on it, from the installed copy (${out3:-nothing})"
+  fi
   EXTRA_ENV="$OFFLINE"
   out="$(run "$H" "$SBIN/switchboard" version 2>&1)"
   check 'case "$out" in "(stand-in) switchboard version, on /"*) true ;; *) false ;; esac' \
@@ -1702,13 +1752,15 @@ seed_keychain() {
     '["Switchboard login (previous)", "acct-maya"], ["Switchboard recovery", "safety:0123456789abcdef"],' \
     '["Switchboard recovery", "successor:acct-lost"], ["switchboard-gateway", "work"],' \
     '["Switchboard token", "bearer-1"], ["Switchboard API key", "bearer-2"],' \
+    '["Switchboard login (Mac-wide parts)", "Claude Code-credentials"],' \
     '["Claude Code-credentials", "me"], ["Some other app", "someone"]]' > "$KC/store.json"
   rm -f "$KC/calls.log" "$KC/locked"
 }
 left() { /usr/bin/python3 -I -B -c 'import json, sys; print(" + ".join(s for s, a in json.load(open(sys.argv[1]))))' "$KC/store.json"; }
-only_ours() {              # every Keychain call was a delete of one of Switchboard's six services, by service alone
+only_ours() {              # every Keychain call was a delete of one of Switchboard's seven services, by service alone
   ! grep -v -x -e "delete-generic-password -s Switchboard login" -e "delete-generic-password -s Switchboard login (previous)" \
     -e "delete-generic-password -s Switchboard recovery" -e "delete-generic-password -s switchboard-gateway" \
+    -e "delete-generic-password -s Switchboard login (Mac-wide parts)" \
     -e "delete-generic-password -s Switchboard token" -e "delete-generic-password -s Switchboard API key" "$KC/calls.log"
 }
 installed() {              # installed [launcher text]: settings, an account, a gateway key, the program, its folder
@@ -1735,8 +1787,8 @@ sh ~/.switchboard/uninstall.sh --all" ]' "a plain uninstall: its last line is th
   sed 's/^/    /' "$T/all.log"
   check '[ $urc = 0 ] && [ ! -e "$H/.switchboard" ] && [ "$(tail -n 2 "$T/all.log")" = "Removed ~/.switchboard with your settings, accounts and keys. Nothing of Switchboard is left.
 The login Claude Code is using was not touched." ]' "that command, with no program folder: it works, and ~/.switchboard is gone"
-  check '[ "$(left)" = "Claude Code-credentials + Some other app" ] && only_ours && [ "$(grep -c . "$KC/calls.log")" = 14 ]' \
-    "every item of Switchboard's six services left the Keychain, one call each, then one not-found per service; Claude Code's and another program's stay"
+  check '[ "$(left)" = "Claude Code-credentials + Some other app" ] && only_ours && [ "$(grep -c . "$KC/calls.log")" = 16 ]' \
+    "every item of Switchboard's seven services left the Keychain, one call each, then one not-found per service; Claude Code's and another program's stay"
   # Nothing to keep: the copy is not left either.
   mkdir -p "$H/.switchboard/app" "$H/.switchboard/bin"
   run "$H" sh "$T/u/uninstall.sh" --no-agent > "$T/empty.log" 2>&1; urc=$?
@@ -1884,6 +1936,316 @@ run "$H" sh "$H/.switchboard/app/uninstall.sh" > "$T/uninstall.log" 2>&1; urc=$?
 sed 's/^/    /' "$T/uninstall.log"
 check '[ $urc = 0 ] && grep -qxF "bootout gui/$(id -u)/io.github.amyjainberkeley.switchboard" "$T/launchctl.calls" && grep -qxF "bootout gui/$(id -u)/$MENUBAR_ID" "$T/launchctl.calls" && [ ! -e "$JOB" ]' \
   "and the uninstaller there asks launchd to stop both jobs, and the job's file goes"
+EXTRA_ENV=""
+rm -rf "$T"
+fi
+
+if want 30 && [ -f "$HERE/switchboard/accounts/signin_watch.py" ]; then
+echo "== 30. The jobs loaded, with launchd stood in for: the sign-in watch's job at an install, an update, a refusal and in a copy without it, the uninstaller's order, a watch started by hand, and its launcher run"
+# Offline as in case 11. The installs here leave out --no-agent, and a stand-in dscl answers this home as the
+# account's own (as in case 29), so the jobs are written and loaded, but only by a stand-in launchctl first on the
+# PATH: it writes down every call and remembers which jobs are loaded, and refuses
+# the watch's job while $T/refuse-watch is there. Nothing reaches launchd. The page's port answers nothing, so each
+# such install waits its 10 s for the page and says so. Before anything of the installed program runs, its Keychain is
+# a stand-in that only notes the kind of each call and finds nothing (as in case 20), and a second stand-in named
+# security on the PATH notes that it ran: nothing here may reach the real tool. The watch's launcher runs for real
+# once, for a few seconds, in a home with no page job (so it could never ask launchd for the page), and is stopped
+# with TERM.
+OFFLINE="https_proxy=http://127.0.0.1:9 HTTPS_PROXY=http://127.0.0.1:9 http_proxy=http://127.0.0.1:9"
+T="$(fresh_home)"; H="$T/home"
+mkdir -p "$T/guard" "$T/loaded" "$T/sleeper"
+cat > "$T/guard/launchctl" <<EOF
+#!/bin/sh
+# A stand-in (tests/install-check.sh case 30): notes each call, keeps which labels are loaded in $T/loaded.
+echo "\$*" >> "$T/launchctl.calls"
+case "\$1" in
+  bootstrap) l="\$(sed -n 's|.*<key>Label</key><string>\(.*\)</string>.*|\1|p' "\$3" | head -n 1)"
+    case "\$l" in *.watch) [ ! -e "$T/refuse-watch" ] || exit 5 ;; esac
+    [ -n "\$l" ] && [ ! -e "$T/loaded/\$l" ] || exit 5
+    : > "$T/loaded/\$l" ;;
+  bootout) l="\$(basename "\$2")"; [ -e "$T/loaded/\$l" ] || exit 3; rm -f "$T/loaded/\$l" ;;
+  print) [ -e "$T/loaded/\$(basename "\$2")" ] || exit 113 ;;
+esac
+exit 0
+EOF
+printf '#!/bin/sh\necho "$1" >> "%s/path-security.calls"\nexit 1\n' "$T" > "$T/guard/security"
+printf '#!/bin/sh\necho "$1" >> "%s/tool.calls"\necho "security: The specified item could not be found in the keychain." >&2\nexit 44\n' "$T" > "$T/fake-security"
+printf '#!/bin/sh\necho "slept $*" >> "%s/sleep.calls"\n' "$T" > "$T/sleeper/sleep"
+printf '#!/bin/sh\necho "NFSHomeDirectory: %s"\n' "$H" > "$T/guard/dscl"
+chmod +x "$T/guard/launchctl" "$T/guard/security" "$T/guard/dscl" "$T/fake-security" "$T/sleeper/sleep"
+EXTRA_ENV="$OFFLINE PATH=$T/guard:$H/.local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+JOBS="$H/Library/LaunchAgents"; PAGE_L=io.github.amyjainberkeley.switchboard; WATCH_L="$PAGE_L.watch"
+W="$H/.switchboard/bin/switchboard-watch"; OUT="$H/.switchboard/signin-watch.out"
+agent_install() {   # agent_install LOG [TREE]: an install that loads its jobs (through the stand-in)
+  run "$H" sh "${2:-$HERE}/install.sh" --no-open --no-link-app --no-menu-app --no-setup --port "$PORT" > "$1" 2>&1
+}
+calls_for() {       # calls_for LABEL: the verbs of the calls about that job, in order
+  sed -n "s|^\([a-z]*\) .*/$1\(\.plist\)\{0,1\}\$|\1|p" "$T/launchctl.calls" | tr '\n' ' '
+}
+line_of() { grep -n "$1" "$T/launchctl.calls" | head -n 1 | cut -d: -f1; }
+tool_stand_in() {   # the installed copy's engine runs $T/fake-security, never /usr/bin/security; 0 only when it took
+  f="$H/.switchboard/app/switchboard/accounts/keychain.py"
+  [ -f "$f" ] && sed -i '' "s|^TOOL = '/usr/bin/security'\$|TOOL = '$T/fake-security'|" "$f" \
+    && grep -qxF "TOOL = '$T/fake-security'" "$f" && ! grep -q "^TOOL = '/usr/bin/security'" "$f"
+}
+gone() { s="$(ps -o stat= -p "$1" 2>/dev/null)"; case "$s" in ''|Z*) true ;; *) false ;; esac; }
+check 'sh -n "$HERE/install.sh" && sh -n "$HERE/uninstall.sh" && /usr/bin/python3 -I -B -c "import ast, sys; ast.parse(open(sys.argv[1]).read(), feature_version=(3, 9))" "$HERE/switchboard/accounts/signin_watch.py"' \
+  "sh reads both scripts, and the watch's module is Python 3.9 ($(/usr/bin/python3 -I -B -c 'import sys; print("%d.%d" % sys.version_info[:2])'))"
+
+# A first install, then the same again (an update), then one where macOS refuses the watch's job.
+agent_install "$T/i1.log"; rc=$?
+sed 's/^/    /' "$T/i1.log"
+pb="$(line_of "^bootstrap .*/$PAGE_L\.plist\$")"; wb="$(line_of "^bootstrap .*/$WATCH_L\.plist\$")"
+check '[ $rc = 0 ] && [ -f "$JOBS/$WATCH_L.plist" ] && [ -e "$T/loaded/$PAGE_L" ] && [ -e "$T/loaded/$WATCH_L" ] && grep -qx "The sign-in watch is running, and starts at every login." "$T/i1.log"' \
+  "an install without --no-agent: the page's job and the sign-in watch's are written and loaded"
+check '[ -n "$pb" ] && [ -n "$wb" ] && [ "$pb" -lt "$wb" ] && [ "$(calls_for "$WATCH_L")" = "bootout print bootstrap print " ]' \
+  "the page's job is loaded first, then the watch's: $(calls_for "$WATCH_L")"
+check '! grep -q -e "^kickstart" -e " -k" -e kill "$T/launchctl.calls"' "no kickstart, no -k and no kill"
+: > "$T/launchctl.calls"
+agent_install "$T/i2.log"; rc=$?
+pb="$(line_of "^bootstrap .*/$PAGE_L\.plist\$")"; wo="$(line_of "/$WATCH_L\$")"
+check '[ $rc = 0 ] && [ "$(calls_for "$WATCH_L")" = "bootout print bootstrap print " ] && [ -n "$pb" ] && [ -n "$wo" ] && [ "$pb" -lt "$wo" ] && [ -e "$T/loaded/$WATCH_L" ]' \
+  "a second install: the old watch is booted out and waited for, then loaded again, after the page: $(calls_for "$WATCH_L")"
+: > "$T/launchctl.calls"; : > "$T/refuse-watch"
+agent_install "$T/i3.log"; rc=$?
+rm -f "$T/refuse-watch"
+check '[ $rc = 0 ] && grep -qx "Added the sign-in watch.s background job, but macOS would not start it. The page starts it again." "$T/i3.log" && [ "$(grep -c "^bootstrap .*/$WATCH_L\.plist\$" "$T/launchctl.calls")" = 5 ] && [ -e "$T/loaded/$PAGE_L" ] && [ ! -e "$T/loaded/$WATCH_L" ]' \
+  "macOS refusing the watch's job: exactly 5 tries, one line, the install exits 0 and the page's job is loaded"
+
+# A copy without the watch, over one with it: with the jobs, then with --no-agent.
+C="$T/clone"; clone_tree "$C"; rm -f "$C/switchboard/accounts/signin_watch.py"
+agent_install "$T/i4.log"; : > "$T/launchctl.calls"
+agent_install "$T/i5.log" "$C"; rc=$?
+check '[ $rc = 0 ] && [ ! -e "$JOBS/$WATCH_L.plist" ] && [ ! -e "$W" ] && [ ! -e "$T/loaded/$WATCH_L" ] && [ "$(calls_for "$WATCH_L")" = "bootout " ] && grep -qx "Removed the sign-in watch: this copy of Switchboard does not have it." "$T/i5.log"' \
+  "a copy without the watch: its job is booted out, its plist and launcher removed, with one line ($(calls_for "$WATCH_L"))"
+agent_install "$T/i6.log"; : > "$T/launchctl.calls"
+run "$H" sh "$C/install.sh" --no-agent --no-open --no-link-app --no-menu-app --port "$PORT" > "$T/i7.log" 2>&1; rc=$?
+check '[ $rc = 0 ] && [ ! -e "$JOBS/$WATCH_L.plist" ] && [ ! -e "$W" ] && [ ! -s "$T/launchctl.calls" ] && grep -qx "Removed the sign-in watch: this copy of Switchboard does not have it." "$T/i7.log"' \
+  "the same with --no-agent: the plist and launcher go, and launchd is not asked at all"
+
+# The uninstaller, with the jobs: the menu bar's, then the watch's, then the page's; the watch's files go by name.
+agent_install "$T/i8.log"
+if tool_stand_in; then
+  for f in signin-watch.json signin-watch.lease signin-watch.out signin-watch.log signin-watch.log.3 \
+           signin-record.jsonl signin-record.jsonl.3; do : > "$H/.switchboard/$f"; done
+  : > "$T/launchctl.calls"
+  run "$H" sh "$H/.switchboard/app/uninstall.sh" > "$T/u1.log" 2>&1; urc=$?
+  sed 's/^/    /' "$T/u1.log"
+  check '[ $urc = 0 ] && [ "$(sed -n "s|^bootout .*/||p" "$T/launchctl.calls" | tr "\n" " ")" = "$PAGE_L.menubar $WATCH_L $PAGE_L " ]' \
+    "uninstall: the menu bar's job is booted out first, then the sign-in watch's, then the page's"
+  check '[ ! -e "$JOBS/$WATCH_L.plist" ] && [ ! -e "$JOBS/$PAGE_L.plist" ] && [ ! -e "$T/loaded/$WATCH_L" ] && [ ! -e "$T/loaded/$PAGE_L" ]' \
+    "both job files are gone, and neither job is loaded"
+  left=""
+  for f in signin-watch.json signin-watch.lease signin-watch.out signin-watch.log signin-watch.log.3 \
+           signin-record.jsonl signin-record.jsonl.3; do [ ! -e "$H/.switchboard/$f" ] || left="$left $f"; done
+  check '[ -z "$left" ] && [ -f "$H/.switchboard/settings.json" ]' \
+    "the watch's heartbeat, lease, output, logs and record go with the program; the settings stay${left:+ (left:$left)}"
+else
+  no "the stand-in Keychain did not take in the installed copy: the uninstaller was not run"
+fi
+
+# The watch's launcher, run for real (installed with --no-agent: no page job, so its watch can never ask launchd).
+run "$H" sh "$HERE/install.sh" --no-agent --no-open --no-link-app --no-menu-app --port "$PORT" > "$T/i9.log" 2>&1; rc=$?
+launcher_empties() { grep -qxF "OUT=\"$OUT\"" "$W" && grep -qF -- '-le 1048576 ] || : > "$OUT"' "$W"; }
+check '[ $rc = 0 ] && launcher_empties' "the watch's launcher empties its output file once it passes 1 MB, before it starts the watch"
+if [ $rc = 0 ] && [ ! -e "$JOBS/$PAGE_L.plist" ] && tool_stand_in; then
+  run "$H" env PYTHONPATH="$H/.switchboard/app" /usr/bin/python3 -B -c "from switchboard.core import set_setting; set_setting('notify', False)"
+  head -c 2097152 /dev/zero > "$OUT"
+  ( exec env -i HOME="$H" CFFIXED_USER_HOME="$H" PATH="$T/guard:$H/.local/bin:/usr/bin:/bin:/usr/sbin:/sbin" \
+      LANG=en_US.UTF-8 TMPDIR="$T/tmp/" SWITCHBOARD_APPLICATIONS="$T/Applications" $OFFLINE "$W" ) >> "$OUT" 2>&1 &
+  WPID=$!
+  sleep 5
+  i=0; while [ $i -lt 240 ] && [ ! -s "$H/.switchboard/signin-watch.json" ]; do i=$((i + 1)); sleep 0.25; done
+  kill -TERM "$WPID" 2>/dev/null
+  i=0; while [ $i -lt 240 ] && kill -0 "$WPID" 2>/dev/null && ! gone "$WPID"; do i=$((i + 1)); sleep 0.25; done
+  [ $i -lt 240 ] || kill -KILL "$WPID" 2>/dev/null
+  wait "$WPID"; wrc=$?
+  check '[ $wrc = 0 ]' "its launcher, run for real and stopped with TERM: the watch exits 0"
+  check '/usr/bin/python3 -I -B -c "import json, sys; h = json.load(open(sys.argv[1])); sys.exit(0 if h.get(\"pid\") == int(sys.argv[2]) and h.get(\"stopped_at\") else 1)" "$H/.switchboard/signin-watch.json" "$WPID"' \
+    "its last heartbeat names the process the launcher became (it hands over with exec), and says it stopped"
+  check '/usr/bin/python3 -I -B -c "import fcntl, os, sys; fcntl.flock(os.open(sys.argv[1], os.O_RDWR), fcntl.LOCK_EX | fcntl.LOCK_NB)" "$H/.switchboard/signin-watch.lease"' \
+    "its lease can be taken at once: nothing holds it any more"
+  check '[ "$(wc -c < "$OUT" | tr -d " ")" -lt 1048576 ]' \
+    "the 2 MB output file was emptied before the watch started ($(wc -c < "$OUT" | tr -d ' ') bytes after the run)"
+  mv "$H/.switchboard/app/switchboard/accounts/signin_watch.py" "$T/signin_watch.py.away"
+  out="$(env -i HOME="$H" PATH="$T/sleeper:/usr/bin:/bin" "$W" 2>&1)"; mrc=$?
+  mv "$T/signin_watch.py.away" "$H/.switchboard/app/switchboard/accounts/signin_watch.py"
+  check '[ $mrc = 1 ] && [ "$out" = "Switchboard: this copy has no sign-in watch. Install Switchboard again." ] && [ "$(cat "$T/sleep.calls" 2>/dev/null)" = "slept 300" ]' \
+    "with its module gone, the launcher says so in one line, waits 5 minutes (a stand-in sleep here), and exits 1"
+else
+  no "the install with --no-agent, or the stand-in Keychain in it, did not take: the watch's launcher was not run"
+fi
+
+# A watch started by hand: the uninstaller stops this install's and leaves another install's alone.
+mkdir -p "$T/other/.switchboard/app"
+/usr/bin/python3 -I -B -c 'import time; x = "switchboard.accounts.signin_watch"; time.sleep(120)' "$H/.switchboard/app" & D1=$!
+/usr/bin/python3 -I -B -c 'import time; x = "switchboard.accounts.signin_watch"; time.sleep(120)' "$T/other/.switchboard/app" & D2=$!
+sleep 1
+: > "$T/launchctl.calls"
+if tool_stand_in; then
+  run "$H" sh "$H/.switchboard/app/uninstall.sh" --no-agent > "$T/u2.log" 2>&1; urc=$?
+  sleep 0.5
+  check '[ $urc = 0 ] && grep -qx "Stopped the sign-in watch." "$T/u2.log" && gone "$D1" && ! gone "$D2" && [ ! -s "$T/launchctl.calls" ]' \
+    "uninstall --no-agent: a watch started by hand from this install is stopped, another install's is left alone, launchd is not asked"
+else
+  no "the stand-in Keychain did not take in the installed copy: the uninstaller was not run"
+fi
+gone "$D2" || kill "$D2" 2>/dev/null
+gone "$D1" || kill "$D1" 2>/dev/null
+wait "$D1" "$D2" 2>/dev/null
+asked="$(sort "$T/tool.calls" 2>/dev/null | uniq -c | tr -s ' \n' ' ')"
+check '[ ! -e "$T/path-security.calls" ]' "nothing ran security from the PATH (the stand-in Keychain was asked:${asked:- nothing})"
+EXTRA_ENV=""
+rm -rf "$T"
+fi
+
+if want 31; then
+echo "== 31. An older install under the names Switchboard had before (io.github.claude-switchboard): moved once, with its link app kept while it is the default browser, and swept by the uninstaller"
+# Offline as in case 11, on the Python found here. The home holds what an older install left: its three jobs' files,
+# loaded (a stand-in launchctl first on the PATH remembers which labels are loaded, as in case 30), its menu bar app in
+# this test's Applications folder, made for this data folder, another older menu bar app made for another data folder,
+# and its link app at ~/Applications/Switchboard Links.app, the default browser. A stand-in dscl answers this home as
+# the account's own, so the jobs are added. The menu bar's Python, xcode-select, swiftc and codesign are stand-ins
+# too, so the menu bar item's job is added and the link app is "built" (a made-up program) with nothing downloaded or
+# compiled. Every made-up link app answers --status the way macOS keeps the default browser, by bundle identifier
+# ($T/seat), so the seat follows an app that is moved. Nothing reaches launchd, Launch Services or the real Keychain.
+OFFLINE="https_proxy=http://127.0.0.1:9 HTTPS_PROXY=http://127.0.0.1:9 http_proxy=http://127.0.0.1:9"
+T="$(fresh_home)"; H="$T/home"
+PAGE_PY="$(/usr/bin/python3 -I -B -c 'import sys; print(sys.executable)')"
+OLD_L=io.github.claude-switchboard; NEW_L=io.github.amyjainberkeley.switchboard
+JOBS="$H/Library/LaunchAgents"; APPS="$T/Applications"; HA="$H/Applications"
+NEW_LINKS="$HA/Switchboard Links.app"; ASIDE="$HA/Switchboard Links (old).app"
+mkdir -p "$T/guard" "$T/loaded" "$T/dev" "$JOBS" "$HA" "$H/.switchboard"
+printf '{"port": %s}\n' "$PORT" > "$H/.switchboard/settings.json"
+{ printf '#!/bin/sh\nT="%s"\n' "$T"; cat <<'EOF'
+# A stand-in (tests/install-check.sh case 31): notes each call, keeps which labels are loaded in $T/loaded.
+echo "$*" >> "$T/launchctl.calls"
+case "$1" in
+  bootstrap) l="$(sed -n 's|.*<key>Label</key><string>\(.*\)</string>.*|\1|p' "$3" | head -n 1)"
+    [ -n "$l" ] && [ ! -e "$T/loaded/$l" ] || exit 5
+    : > "$T/loaded/$l" ;;
+  bootout) l="$(basename "$2")"; [ -e "$T/loaded/$l" ] || exit 3; rm -f "$T/loaded/$l" ;;
+  print) [ -e "$T/loaded/$(basename "$2")" ] || exit 113 ;;
+esac
+exit 0
+EOF
+} > "$T/guard/launchctl"
+cat > "$T/guard/python3.14" <<'EOF'
+#!/bin/sh
+# A stand-in Python for the menu bar (tests/install-check.sh case 31): its environment is a copy of itself, it says a
+# version, and every check and install passes. Nothing is downloaded.
+case " $* " in
+  *" -m venv "*) for a in "$@"; do d="$a"; done; mkdir -p "$d/bin" && cp "$0" "$d/bin/python" && chmod +x "$d/bin/python" ;;
+  *python_version*) echo 3.14.0 ;;
+esac
+exit 0
+EOF
+{ printf '#!/bin/sh\nT="%s"\n' "$T"; cat <<'EOF'
+# A made-up link app (tests/install-check.sh case 31): it notes how it was run. The default browser is kept by bundle
+# identifier in $T/seat, as macOS keeps it, so --status names whichever app in ~/Applications has that identifier.
+echo "$*" >> "$T/links.calls"
+id_of() { /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$1/Contents/Info.plist" 2>/dev/null; }
+case "$1" in
+  --status) for a in "$HOME/Applications/"*.app; do
+      if [ "$(id_of "$a")" = "$(cat "$T/seat")" ]; then echo "$a"; break; fi
+    done ;;
+  --make-default) id_of "$(cd "$(dirname "$0")/../.." && pwd)" > "$T/seat" ;;
+  --restore) echo com.example.other > "$T/seat" ;;
+esac
+exit 0
+EOF
+} > "$T/links-program"
+printf '#!/bin/sh\necho "NFSHomeDirectory: %s"\n' "$H" > "$T/guard/dscl"
+printf '#!/bin/sh\necho "%s/dev"\n' "$T" > "$T/guard/xcode-select"
+printf '#!/bin/sh\ncp "%s/links-program" "$3" && chmod +x "$3"\n' "$T" > "$T/guard/swiftc"
+printf '#!/bin/sh\nexit 0\n' > "$T/guard/codesign"
+printf '#!/bin/sh\necho "$1" >> "%s/path-security.calls"\nexit 1\n' "$T" > "$T/guard/security"
+printf '#!/bin/sh\necho "$1" >> "%s/tool.calls"\necho "security: The specified item could not be found in the keychain." >&2\nexit 44\n' "$T" > "$T/fake-security"
+chmod +x "$T/guard/"* "$T/links-program" "$T/fake-security"
+older_install() {   # what an older install left: its three jobs (files and loaded) and its menu bar app
+  for l in "$OLD_L" "$OLD_L.watch" "$OLD_L.menubar"; do
+    printf '<plist version="1.0"><dict><key>Label</key><string>%s</string></dict></plist>\n' "$l" > "$JOBS/$l.plist"
+    : > "$T/loaded/$l"
+  done
+  fake_app "$APPS/Switchboard.app" "$OLD_L.menubar" python "<key>SwitchboardData</key><string>$H/.switchboard</string>"
+  printf '#!/bin/sh\nexit 0\n' > "$APPS/Switchboard.app/Contents/MacOS/python"; chmod +x "$APPS/Switchboard.app/Contents/MacOS/python"
+}
+older_link_app() {  # older_link_app PATH: its link app, the default browser
+  fake_app "$1" "$OLD_L.links" SwitchboardLinks '<key>CFBundleName</key><string>Switchboard Links</string>'
+  cp "$T/links-program" "$1/Contents/MacOS/SwitchboardLinks"
+  printf '%s\n' "$OLD_L.links" > "$T/seat"
+}
+older_install
+older_link_app "$NEW_LINKS"
+fake_app "$HA/Switchboard.app" "$OLD_L.menubar" python '<key>SwitchboardData</key><string>/Users/someone-else/.switchboard</string>'
+fake_app "$HA/Other.app" com.example.other Other
+other_sum="$(cksum < "$HA/Switchboard.app/Contents/Info.plist")"
+id_at() { plutil -extract CFBundleIdentifier raw -o - "$1/Contents/Info.plist" 2>/dev/null; }
+old_bootouts() { sed -n "s|^bootout gui/[0-9]*/\($OLD_L.*\)\$|\1|p" "$T/launchctl.calls" | tr '\n' ' '; }
+EXTRA_ENV="$OFFLINE SWITCHBOARD_PAGE_PYTHON=$PAGE_PY PATH=$T/guard:$H/.local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+run "$H" sh "$HERE/install.sh" --no-setup --no-open --port "$PORT" > "$T/i1.log" 2>&1; rc=$?
+sed 's/^/    /' "$T/i1.log"
+first_new="$(grep -n "^bootstrap " "$T/launchctl.calls" | head -n 1 | cut -d: -f1)"
+last_old="$(grep -n "^bootout gui/[0-9]*/$OLD_L" "$T/launchctl.calls" | tail -n 1 | cut -d: -f1)"
+check '[ $rc = 0 ] && [ "$(old_bootouts)" = "$OLD_L.watch $OLD_L.menubar $OLD_L " ] && [ -n "$first_new" ] && [ -n "$last_old" ] && [ "$last_old" -lt "$first_new" ]' \
+  "the older install's jobs are booted out first, in order (its sign-in watch, its menu bar item, its page), before any new job is loaded: $(old_bootouts)"
+left=""
+for l in "$OLD_L" "$OLD_L.watch" "$OLD_L.menubar"; do [ ! -e "$T/loaded/$l" ] && [ ! -e "$JOBS/$l.plist" ] || left="$left $l"; done
+check '[ -z "$left" ]' "none of them is loaded any more, and their job files are gone${left:+ (left:$left)}"
+check '[ -e "$T/loaded/$NEW_L" ] && [ -e "$T/loaded/$NEW_L.watch" ] && [ -e "$T/loaded/$NEW_L.menubar" ] && [ -f "$JOBS/$NEW_L.plist" ] && [ -f "$JOBS/$NEW_L.watch.plist" ] && [ -f "$JOBS/$NEW_L.menubar.plist" ]' \
+  "the three new jobs are written and loaded: the page's, the sign-in watch's and the menu bar item's"
+check '[ ! -e "$APPS/Switchboard.app" ] && [ "$(cksum < "$HA/Switchboard.app/Contents/Info.plist")" = "$other_sum" ]' \
+  "the older menu bar app made for this data folder is gone from Applications; one made for another data folder is left alone"
+check 'grep -q "^Building the link app" "$T/i1.log" && [ "$(id_at "$NEW_LINKS")" = "$LINKS_ID" ] && [ "$(id_at "$ASIDE")" = "$OLD_L.links" ] && [ -x "$ASIDE/Contents/MacOS/SwitchboardLinks" ]' \
+  "the older link app, the default browser, is kept whole beside the new one, as Switchboard Links (old).app, under its own bundle identifier"
+check '[ "$(run "$H" "$NEW_LINKS/Contents/MacOS/SwitchboardLinks" --status)" = "$ASIDE" ] && [ "$(cat "$T/seat")" = "$OLD_L.links" ] && ! grep -q -e "--make-default" -e "--restore" "$T/links.calls"' \
+  "it is still the default browser: the installer never asked macOS for the seat, nor gave it back"
+check 'grep -qx "Moved the background jobs to Switchboard.s new names: the older install.s are stopped, and their files removed\." "$T/i1.log" && grep -q "^Removed the older install.s Switchboard.app from " "$T/i1.log" && grep -q "^Your default browser is still the older Switchboard Links, and it works as before\." "$T/i1.log"' \
+  "one line says the jobs moved, one that the older menu bar app went, and one how to finish the move of the default browser"
+check 'last_line "$T/i1.log" | grep -q "^Done in [0-9][0-9]* s\. Next: sb$"' "its last line is still the next step"
+
+# Again (an update): nothing of the older install is left to move, so launchd is only asked whether it has the older
+# jobs, and nothing is said about them; the older link app is still the default browser, so it stays.
+: > "$T/launchctl.calls"
+run "$H" sh "$HERE/install.sh" --no-setup --no-open --port "$PORT" > "$T/i2.log" 2>&1; rc=$?
+check '[ $rc = 0 ] && [ -z "$(old_bootouts)" ] && [ "$(grep -c "^print gui/[0-9]*/$OLD_L" "$T/launchctl.calls")" = 3 ] && ! grep -q -e "older install" -e "Moved the background jobs" "$T/i2.log" && [ "$(id_at "$ASIDE")" = "$OLD_L.links" ]' \
+  "a second install: launchd is only asked whether it has the older jobs (3 looks), nothing is said about them, and the older link app stays"
+# The person makes the new one the default browser (the page's button: macOS asks, and they say yes).
+run "$H" "$NEW_LINKS/Contents/MacOS/SwitchboardLinks" --make-default
+run "$H" sh "$HERE/install.sh" --no-setup --no-open --port "$PORT" > "$T/i3.log" 2>&1; rc=$?
+check '[ $rc = 0 ] && [ ! -e "$ASIDE" ] && grep -qx "Removed the older Switchboard Links: another app is the default browser now\." "$T/i3.log" && [ "$(id_at "$NEW_LINKS")" = "$LINKS_ID" ] && ! grep -q "^Your default browser is still" "$T/i3.log"' \
+  "once the new one holds the seat, the next install takes the older link app out, in one line"
+
+# The uninstaller over what an older install left (its jobs, its menu bar app, its link app aside and the default
+# browser) beside this install: the older jobs go first, the seat is given back before any link app goes. The
+# installed copy's Keychain is a stand-in first (as in case 30), and so is its Launch Services tool (as case 26 does
+# with the Keychain tool): with the jobs, the uninstaller tells Launch Services each app that goes.
+older_install
+older_link_app "$ASIDE"
+f="$H/.switchboard/app/switchboard/accounts/keychain.py"; U="$H/.switchboard/app/uninstall.sh"
+printf '#!/bin/sh\necho "$*" >> "%s/lsregister.calls"\n' "$T" > "$T/lsregister"; chmod +x "$T/lsregister"
+sed -i '' "s|^LSREGISTER=/System/.*/lsregister\$|LSREGISTER=$T/lsregister|" "$U"
+if [ -f "$f" ] && sed -i '' "s|^TOOL = '/usr/bin/security'\$|TOOL = '$T/fake-security'|" "$f" \
+   && grep -qxF "TOOL = '$T/fake-security'" "$f" && ! grep -q "^TOOL = '/usr/bin/security'" "$f" \
+   && grep -qxF "LSREGISTER=$T/lsregister" "$U" && [ "$(grep -c "^LSREGISTER=" "$U")" = 1 ]; then
+  : > "$T/launchctl.calls"; : > "$T/links.calls"
+  run "$H" sh "$U" > "$T/u.log" 2>&1; urc=$?
+  sed 's/^/    /' "$T/u.log"
+  gone_order="$(sed -n "s|^bootout gui/[0-9]*/||p" "$T/launchctl.calls" | tr '\n' ' ')"
+  check '[ $urc = 0 ] && [ "$gone_order" = "$OLD_L.watch $OLD_L.menubar $OLD_L $NEW_L.menubar $NEW_L.watch $NEW_L " ]' \
+    "uninstall: the older install's jobs go first (its watch, its menu bar item, its page), then this install's: $gone_order"
+  check '[ -z "$(ls -A "$JOBS")" ] && [ -z "$(ls -A "$T/loaded")" ] && [ "$(grep -c "^Removed an older install.s background job " "$T/u.log")" = 3 ]' \
+    "no job file is left and no job is loaded, and one line names each older job"
+  check '[ ! -e "$APPS/Switchboard.app" ] && [ "$(cksum < "$HA/Switchboard.app/Contents/Info.plist")" = "$other_sum" ]' \
+    "the older menu bar app made for this data folder goes; the one made for another data folder stays"
+  check 'grep -qx -- "--restore" "$T/links.calls" && [ ! -e "$ASIDE" ] && [ ! -e "$NEW_LINKS" ] && [ -d "$HA/Other.app" ]' \
+    "the older link app was the default browser: the seat is given back first (macOS asks), then both link apps go, and another app stays"
+  check 'grep -qxF -- "-u $APPS/Switchboard.app" "$T/lsregister.calls" && grep -qxF -- "-u $ASIDE" "$T/lsregister.calls" && ! grep -qF "$HA/Switchboard.app" "$T/lsregister.calls"' \
+    "Launch Services (a stand-in) is told each of them went, and nothing about the other data folder's app"
+else
+  no "the stand-in Keychain or Launch Services tool did not take in the installed copy: the uninstaller was not run"
+fi
+check '[ ! -e "$T/path-security.calls" ]' "nothing ran security from the PATH"
 EXTRA_ENV=""
 rm -rf "$T"
 fi

@@ -140,9 +140,10 @@ def current(args):
     when it is known). It reads Claude Code's own config and Switchboard's list of accounts, nothing else: no
     network, no page, and no Keychain unless a one-year token is kept. Then, as `status --json` does, it asks whether
     Claude Code is on one (bearers.rows): on a token kept for an account it names that account, on a token of its own
-    that token's name (its label), with kind 'one_year'."""
+    that token's name (its label), with kind 'one_year'. On a login no account here is (a token no record owns), it
+    names no account, as the page does: the engine's sentence on standard error and exit 1."""
     as_json = '--json' in args
-    kind = label = None
+    kind = label = other = None
     if without_json(args) or args.count('--json') > 1:
         if as_json:
             return wrong_words('switchboard current [--json]')
@@ -155,7 +156,10 @@ def current(args):
         number, short = a.get('slot'), a.get('alias')
     else:
         from . import bearers
-        tok = next((t for t in bearers.rows() if t.get('active')), None)
+        kept = bearers.rows()
+        tok = next((t for t in kept if t.get('active')), None)
+        if kept and tok is None:                # Claude Code's login item was read for those (as status --json does)
+            other = _not_kept()
         me = engine.identity()
         email = me[0] if me else None
         held, number, short = False, None, None
@@ -177,9 +181,13 @@ def current(args):
                 email, held, number, short, label = None, True, None, tok.get('alias') or None, \
                     tok.get('label') or tok.get('name')
     if as_json:
-        _print(report.current(email, held, number=number, short_name=short, kind=kind, label=label))
-    elif email or label:
+        _print(report.current(email, held, number=number, short_name=short, kind=kind, label=label,
+                              other=bool(other)))
+    elif (email or label) and not other:
         print(email or label)
+    if other:
+        sys.stderr.write('%s.\n' % other.rstrip('.'))
+        return 1
     if not email and not label:
         sys.stderr.write('Claude Code is not signed in. Run /login in Claude Code.\n')
         return 1
@@ -187,4 +195,19 @@ def current(args):
         sys.stderr.write('%s is not in Switchboard yet. Add it with: switchboard add\n' % email)
         return 1
     return 0
+
+
+def _not_kept():
+    """The engine's sentence when Claude Code is on a login no account here is and no kept token (api.live state
+    'other' with no token of Switchboard's: the page then marks no account in use), else None. Asked only after
+    bearers.rows read the live view for a kept token; that view is cached, so this is the same read."""
+    from .accounts import api
+    try:
+        lv = api.live()
+    except (api.AccountsError, NotImplementedError, AttributeError) as e:
+        core.log('current: reading the live login: %r' % e)
+        return None
+    if getattr(lv, 'state', None) == 'other' and not getattr(lv, 'bearer', None):
+        return lv.why or 'Claude Code is on a login Switchboard does not keep'
+    return None
 

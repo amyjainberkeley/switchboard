@@ -66,9 +66,11 @@ class OurOrder(unittest.TestCase):
         ranked = dict((a['name'], a) for a in plan.order(five_accounts(), lines('most-room', ['Fable']), NOW))
         self.assertEqual([(ranked[n]['rank'], ranked[n]['usable'], ranked[n]['reason'], ranked[n]['left_pct'])
                           for n in ('in-use', 'unused', 'seventeen', 'fable-92', 'ninety-three')],
-                         [(1, True, None, 86), (2, True, None, 95), (3, True, None, 78), (4, False, 'not enough room', 3),
+                         [(1, True, None, 86), (2, True, None, 95), (3, True, None, 78), (4, True, None, 30),
                           (5, False, 'not enough room', 2)])
-        self.assertEqual((ranked['fable-92']['blocked_by'], ranked['fable-92']['back_at']), (['Fable'], NOW + 2 * D))
+        # a counted model's week is a note and an order, never a reason (the lead's rule, Nov 27)
+        self.assertEqual((ranked['fable-92']['blocked_by'], ranked['fable-92']['back_at'], ranked['fable-92']['notes']),
+                         ([], None, ['no room for Fable']))
         self.assertEqual((ranked['ninety-three']['blocked_by'], ranked['ninety-three']['back_at']), (['weekly'], NOW + 3 * D))
         self.assertFalse(any(a['fallback'] for a in ranked.values()))      # nothing is landed on over a line
 
@@ -76,7 +78,10 @@ class OurOrder(unittest.TestCase):
         a = [acct('me', 10, 1, active=True), acct('other', 10, 2, scoped=[{'name': 'Opus', 'used_pct': 99,
                                                                           'resets_at': NOW + D}])]
         self.assertEqual(plan.next_account(a, lines('refills-first', ['Fable']), NOW)['account']['name'], 'other')
-        self.assertIsNone(plan.next_account(a, lines('refills-first', ['opus']), NOW)['account'])   # names: any case
+        # names: any case; a counted week over its line is a note, and the account is still the next (no other)
+        ranked = dict((x['name'], x) for x in plan.order(a, lines('refills-first', ['opus']), NOW))
+        self.assertEqual((ranked['other']['usable'], ranked['other']['notes']), (True, ['no room for Opus']))
+        self.assertEqual(plan.next_account(a, lines('refills-first', ['opus']), NOW)['account']['name'], 'other')
         self.assertEqual(plan.next_account(a, lines('refills-first', ['none']), NOW)['account']['name'], 'other')
 
     def test_inputs_are_not_changed(self):

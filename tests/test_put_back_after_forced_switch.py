@@ -4,7 +4,8 @@ account's sign-in back when a chat writes its name into the settings and the ite
 An emptied login (its tokens blank after Anthropic refused it) proves no account by itself. Claude Code's settings
 named the account, and that is the account the switch left: the switch's record says so, for the put-back's rule
 "never put back the account a switch just left". What the switch keeps of the outgoing login does not change (an
-emptied login is never saved), History says what it said before, and every other switch's record is as it was.
+emptied login is never saved), History says what it said before, and every other switch's record is as it was (each
+record now also keeps the sign-in end of the login it left, 'left_rx', when that is known).
 Made-up *.example accounts on the engine's stand-ins (tests/fakes_accounts.py).
 """
 import _isolate  # noqa: F401  (first: it gives switchboard a throwaway data folder)
@@ -69,6 +70,14 @@ class Case(unittest.TestCase):
         rec.pop('at')
         return rec
 
+    @staticmethod
+    def as_before(rec, left=None):
+        """The record as before, plus the one key a switch's record carries now: 'left_rx', the sign-in end of the
+        login it left, so the put-back can tell a new sign-in of that account from a renewal (no key when that end is
+        not known)."""
+        rx = json.loads(left)['claudeAiOauth'].get('refreshTokenExpiresAt') if left else None
+        return dict(rec, left_rx=rx) if rx else dict(rec)
+
 
 class AForcedSwitchFromAnEmptiedLogin(Case):
     def test_the_put_back_never_writes_the_account_it_left(self):
@@ -80,8 +89,9 @@ class AForcedSwitchFromAnEmptiedLogin(Case):
                 roster.forget_live()
                 res = switcher.switch(self.ctx, 'uuid-a', kind='forced', source='auto', interactive=True)
                 self.assertTrue(res.ok)
-                self.assertEqual(self.last_switch(), {'from': 'uuid-b', 'to': 'uuid-a', 'kind': 'forced',
-                                                      'source': 'auto'})
+                self.assertEqual(self.last_switch(), self.as_before({'from': 'uuid-b', 'to': 'uuid-a', 'kind': 'forced',
+                                                                     'source': 'auto'},
+                                                                    emptied(self.held_b, keep_date)))
                 self.assertIsNone(res.from_id)                          # what the switch returns is as before
                 self.assertEqual([e[2].get('from') for e in self.rig.events if e[2].get('h') == 'switch'], [None])
                 self.clock.advance(60)
@@ -101,13 +111,15 @@ class AForcedSwitchFromAnEmptiedLogin(Case):
 class EveryOtherSwitchIsRecordedAsBefore(Case):
     def test_a_switch_from_a_working_login(self):
         self.assertTrue(switcher.switch(self.ctx, 'uuid-a', kind='manual', source='cli', interactive=True).ok)
-        self.assertEqual(self.last_switch(), {'from': 'uuid-b', 'to': 'uuid-a', 'kind': 'manual', 'source': 'cli'})
+        self.assertEqual(self.last_switch(), self.as_before({'from': 'uuid-b', 'to': 'uuid-a', 'kind': 'manual',
+                                                             'source': 'cli'}, self.held_b))
 
     def test_a_switch_from_a_login_of_no_kept_account(self):
-        self.rig.sign_in('uuid-c', 'c@other.example', 'org-c')       # an account Switchboard does not keep
+        c = self.rig.sign_in('uuid-c', 'c@other.example', 'org-c')   # an account Switchboard does not keep
         roster.forget_live()
         self.assertTrue(switcher.switch(self.ctx, 'uuid-a', kind='manual', source='cli', interactive=True).ok)
-        self.assertEqual(self.last_switch(), {'from': None, 'to': 'uuid-a', 'kind': 'manual', 'source': 'cli'})
+        self.assertEqual(self.last_switch(), self.as_before({'from': None, 'to': 'uuid-a', 'kind': 'manual',
+                                                             'source': 'cli'}, c))
 
 
 if __name__ == '__main__':

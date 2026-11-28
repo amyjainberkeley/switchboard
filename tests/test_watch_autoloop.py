@@ -1,8 +1,8 @@
 import _isolate  # noqa: F401  (first: it gives switchboard a throwaway data folder)
 # The automatic loop's own watch on itself: a stage still running after many passes ends the loop (so its host starts
 # a fresh one), a few skipped passes never do; a switch cut off part-way is settled by a later pass, not only at a
-# start, and not while the Mac settles after a wake; the heartbeat hands the host the wait it planned. Every outside
-# thing is fake (tests/fakes_autoswitch.py); nothing is switched for real.
+# start, and the upkeep's settler leaves it while the Mac settles after a wake; the heartbeat hands the host the wait
+# it planned. Every outside thing is fake (tests/fakes_autoswitch.py); nothing is switched for real.
 import os
 import sys
 import unittest
@@ -75,13 +75,20 @@ class AStageThatNeverComesBack(LoopCase):
 
 
 class ACutOffSwitchSettledLater(LoopCase):
+    # Two settlers share this one folder: hers at the start of each pass (_settle_journal: an old journal every pass,
+    # her rules in test_loop_settles_a_cut_off_switch) and the upkeep's (_settle_cut_off). Both leave a journal
+    # JOURNAL_STALE_S old or younger, so the journal here is older. self.settled counts every call, self.upkeep the
+    # upkeep's settler's calls only.
     def setUp(self):
         super().setUp()
         self.answers(ok(20.0, 40.0), ok(20.0, 40.0), ok(20.0, 40.0))
         self.settled = []
+        self.upkeep = []
+        self.ages = []                  # the older_than the upkeep's settler gave the engine, per call
+        self.in_upkeep = False
 
-        def resolve():
-            self.settled.append(self.clock.mono())
+        def resolve(older_than=None):
+            self.called(older_than)
             try:
                 os.remove(core.data_path(autoloop.JOURNAL))
             except OSError:
@@ -89,8 +96,29 @@ class ACutOffSwitchSettledLater(LoopCase):
             return 'Finished a switch that was cut off.'
         self.engine.resolve_journal = resolve
 
+    def called(self, older_than):
+        self.settled.append(self.clock.mono())
+        if self.in_upkeep:
+            self.upkeep.append(self.clock.mono())
+            self.ages.append(older_than)
+
+    def loop(self, **kw):
+        loop = LoopCase.loop(self, **kw)
+        real = loop._settle_cut_off
+
+        def by_upkeep(settling):
+            self.in_upkeep = True
+            try:
+                return real(settling)
+            finally:
+                self.in_upkeep = False
+        loop._settle_cut_off = by_upkeep
+        return loop
+
     def journal(self):
         core.write_json(core.data_path(autoloop.JOURNAL), {'to_id': 'a2'})
+        old = self.clock.wall() - autoloop.JOURNAL_STALE_S - 60      # a switch cut off three minutes ago
+        os.utime(core.data_path(autoloop.JOURNAL), (old, old))
 
     def test_it_is_the_engines_own_file(self):
         self.assertEqual(autoloop.JOURNAL, switcher.JOURNAL)
@@ -105,23 +133,29 @@ class ACutOffSwitchSettledLater(LoopCase):
         self.assertEqual(len(self.settled), 1)
         self.assertIn('Finished a switch that was cut off.', self.log_text())
 
+    def not_yet(self, older_than=None):
+        self.called(older_than)
+        return 'A switch was cut off; Switchboard will settle it as soon as the Keychain answers.'
+
     def test_one_that_cannot_be_settled_yet_is_tried_again_after_a_while_not_every_pass(self):
-        self.engine.resolve_journal = lambda: self.settled.append(self.clock.mono()) or \
-            'A switch was cut off; Switchboard will settle it as soon as the Keychain answers.'
+        self.engine.resolve_journal = self.not_yet
         self.journal()
         loop = self.loop()
         for _ in range(10):
             loop.run_pass()
             self.clock.advance(60)
-        self.assertEqual(len(self.settled), 2)              # at 0 and after JOURNAL_AGAIN, not ten times
-        self.assertGreaterEqual(self.settled[1] - self.settled[0], autoloop.JOURNAL_AGAIN)
+        self.assertEqual(len(self.upkeep), 2)               # at 0 and after JOURNAL_AGAIN, not ten times
+        self.assertGreaterEqual(self.upkeep[1] - self.upkeep[0], autoloop.JOURNAL_AGAIN)
+        self.assertEqual(self.ages, [autoloop.JOURNAL_STALE_S] * 2)     # the engine judges the age again, locked
 
     def test_not_while_the_mac_settles_after_a_wake(self):
+        self.engine.resolve_journal = self.not_yet           # her settler leaves it there: the upkeep's finds it
         self.journal()
         loop = self.loop()
         loop.waking = True                                  # just woke: the network and the Keychain come back slowly
         loop.run_pass()
-        self.assertEqual(self.settled, [])
+        self.assertTrue(os.path.exists(core.data_path(autoloop.JOURNAL)))
+        self.assertEqual(self.upkeep, [])
 
 
 class TheHeartbeatHandsOverItsPlan(LoopCase):

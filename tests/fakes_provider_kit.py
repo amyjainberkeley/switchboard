@@ -38,13 +38,15 @@ OTHER = 'another assistant'          # the from_name the stand-in adapters write
 
 
 class FakeChoices:
-    def __init__(self, added=None, order=None):
+    def __init__(self, added=None, order=None, noticed=None):
+        """noticed: the providers whose notice was said (default: every one given in added, as an add says it)."""
         self._added = {'claude': 0}
         self._added.update(added or {})
         self._order = list(order) if order else None
         self.folders = {}
         self._ask_ok = {}
         self._hand_ack = None
+        self._notice = dict(added or {}) if noticed is None else {p: NOW for p in noticed}
         self._open_with = {}
         self.budget = 96000
 
@@ -67,6 +69,15 @@ class FakeChoices:
 
     def add(self, pid, now):
         self._added[pid] = now
+
+    def remove(self, pid):
+        if pid == 'claude':
+            raise ValueError('the first provider is always added')
+        was = self._added.pop(pid, None) is not None
+        if self._order:
+            self._order = [p for p in self._order if p != pid]
+        self._notice.pop(pid, None)
+        return was
 
     def consent(self, folder, pid):
         got = self._entry(folder)['consent'].get(pid)
@@ -114,6 +125,12 @@ class FakeChoices:
     def set_hand_ack(self, now, pid):
         self._hand_ack = dict(self._hand_ack or {}, **{pid: now})
 
+    def notice_said(self, pid):
+        return pid in self._notice
+
+    def set_notice_said(self, now, pid):
+        self._notice[pid] = now
+
     def open_with(self, pid):
         return self._open_with.get(pid, contract.IN_TERMINAL)
 
@@ -134,6 +151,7 @@ class FakeTasks:
         self.all = []           # Hops, oldest first
         self.made = 0
         self.pruned = []        # the now of each prune()
+        self.rows = {}          # task rows begun by switchboard do, by id
 
     def new_hop_id(self):
         return 'h-' + secrets.token_hex(4)
@@ -184,6 +202,17 @@ class FakeTasks:
         rows = [h for h in reversed(self.all) if folder is None or h.folder == folder]
         return rows[:limit]
 
+    def add_task(self, task_id, folder, job, at):
+        """tasks.add_task: a task begun by switchboard do, with how it was picked (kept in self.rows)."""
+        from switchboard.providers import tasks as real            # the same check of the job's fields
+        self.rows[task_id] = {'id': task_id, 'folder': folder, 'made_at': at, 'job': real._job(job)}
+        return task_id
+
+    def update_task(self, task_id, **changes):
+        from switchboard.providers import tasks as real
+        self.rows[task_id]['job'].update(real._job(changes))
+        return dict(self.rows[task_id])
+
 
 # ---------- the note (handoff.py, section 10) ----------
 
@@ -199,6 +228,7 @@ class FakeHandoff:
         self.fail = None        # a ProviderError kind to raise from make()
         self.stood = []         # each folder where_things_stand() was asked of
         self.pruned = []        # (reach, now) of each prune()
+        self.tasks_written = [] # each task file write_task() made
 
     def fact(self, value, cap=200):
         return words.span(value, cap)
@@ -230,6 +260,15 @@ class FakeHandoff:
 
     def reusable(self, hop, chat, reader):
         return None
+
+    def write_task(self, text, *, hop, task, to_name, kind_line, asked=(), folder, reach):
+        """The real task file (handoff.write_task is pure but for its one file under the notes folder), so the
+        commands' tests read what an app would read."""
+        from switchboard.providers import handoff as real
+        note = real.write_task(text, hop=hop, task=task, to_name=to_name, kind_line=kind_line, asked=asked,
+                               folder=folder, reach=reach)
+        self.tasks_written.append(note)
+        return note
 
     def answer_path(self, task, hop, reach):
         folder = os.path.join(notes_root(reach), task)
@@ -404,7 +443,7 @@ SPEC = {'claude': ('Claude', 'Anthropic', frozenset((contract.DETECT, contract.S
 # What the shared modules ask an adapter instead of testing its id (contract.Provider): a stand-in copies each from the
 # real adapter of the same id, so the commands say what they say for the real one.
 ADAPTER_FACTS = ('app_name', 'sign_in', 'billing_prefixes', 'cannot', 'job_question', 'own_rules', 'account_list',
-                 'session_env', 'rule_files', 'rule_dirs')
+                 'session_env', 'rule_files', 'rule_dirs', 'plan_phrase')
 
 
 class FakeProvider(Provider):
@@ -439,6 +478,15 @@ class FakeProvider(Provider):
 
     def seats(self):
         return self.seats_
+
+    def started_in(self, path):
+        """As the real adapter whose chats are carried over from tells it: the folder a chat file's first lines name
+        (Claude Code's reader), None when the file cannot tell or this stand-in is not that adapter."""
+        from switchboard.providers import claude_chats
+        if not self.account_list or not isinstance(path, str) or not os.path.isfile(path):
+            return None
+        said = claude_chats._head_facts(path).get('cwd')
+        return said if isinstance(said, str) and os.path.isabs(said) else None
 
     def limits(self, ask=False):
         if ask and contract.ASK not in self.can:
@@ -479,6 +527,16 @@ class FakeProvider(Provider):
         return Launch(self.id, how, prog, argv, env=env, cwd=folder,
                       line=provider_run.shell_line(argv, folder, self.reach.env), first_words=first)
 
+    def open_here(self, folder, how):
+        """As codex.py's open_here builds it: the terminal app in folder with no first message (Codex: -C folder)."""
+        if how not in (contract.IN_TERMINAL, contract.PRINT) or not os.path.isabs(folder or ''):
+            raise ValueError('a terminal start or the line to print, in an absolute folder')
+        prog = self._program()
+        argv = (prog.path, '-C', folder) if self.id == 'codex' else (prog.path,)
+        env = provider_run.child_env(self.reach.env)
+        return Launch(self.id, how, prog, argv, env=env, cwd=folder,
+                      line=provider_run.shell_line(argv, folder, self.reach.env))
+
     def resume(self, chat, handoff, how):
         if self.busy:
             raise ProviderError('busy', 'That chat is open in a window; close it first.')
@@ -491,6 +549,29 @@ class FakeProvider(Provider):
         env = provider_run.child_env(self.reach.env)
         return Launch(self.id, how, prog, argv, env=env, cwd=chat.folder,
                       line=provider_run.shell_line(argv, chat.folder, self.reach.env), first_words=back)
+
+    def start_task(self, folder, hop, path, how, extra=()):
+        """As the real adapters build and check it (codex.py, claude.py start_task, with their own checks of the
+        extra words): the program, -C folder for Codex, the model and effort words, then the fixed first message
+        naming the task file. Any other extra word, a hop id of another shape or a relative path is refused as the
+        adapters refuse it (ValueError); neither app's desktop link takes a new task."""
+        import re
+        from switchboard.providers.claude import ClaudeProvider
+        from switchboard.providers.codex import CodexProvider
+        if how == contract.IN_APP:
+            return self._unsupported(contract.START_APP, codex_facts.NO_APP_TASK if self.id == 'codex'
+                                     else words.NO_CLAUDE_LINK)
+        if not os.path.isabs(folder or '') or not os.path.isabs(path or '') or \
+                not re.match(r'^h-[0-9a-f]{8}\Z', str(hop)):
+            raise ValueError('an absolute folder and task file, and a hop id')
+        extra = (CodexProvider if self.id == 'codex' else ClaudeProvider)._task_words(extra)
+        prog = self._program()
+        first = words.TASK_WORDS.format(hop=hop, path=path)
+        head = (prog.path, '-C', folder) if self.id == 'codex' else (prog.path,)
+        argv = head + tuple(extra) + (first,)
+        env = provider_run.child_env(self.reach.env)
+        return Launch(self.id, how, prog, argv, env=env, cwd=folder,
+                      line=provider_run.shell_line(argv, folder, self.reach.env), first_words=first)
 
     def job(self, folder, prompt, out_path, timeout=900.0):
         if contract.JOB not in self.can:
@@ -586,7 +667,7 @@ class Rig:
     History lines (rig.said), and the Reach's own record (rig.calls: execs, links, runs)."""
 
     def __init__(self, root, tty=False, answers=(), env=None, added=None, order=None, execve=None, open_url=None,
-                 run=None):
+                 run=None, noticed=None):
         self.root = root
         self.folder = os.path.realpath(os.path.join(root, 'site'))
         os.makedirs(self.folder, exist_ok=True)
@@ -600,7 +681,7 @@ class Rig:
         self.answers = list(answers)
         self.asked = []
         self.said = []
-        self.choices = FakeChoices(added=added, order=order)
+        self.choices = FakeChoices(added=added, order=order, noticed=noticed)
         self.tasks = FakeTasks()
         self.handoff = FakeHandoff()
         self.place = FakePlace()
@@ -662,8 +743,9 @@ class KitCase:
 
     def rig(self, codex=True, codex_added=True, codex_found_=None, claude_chats=(), codex_chats=(), **kw):
         """A Rig with Claude (five accounts, two under their lines) and, unless codex=False, Codex (ChatGPT Pro,
-        weekly 42%, read 12 minutes ago), added a day ago unless codex_added=False. Chats are built against the rig's
-        folder: pass functions folder -> ChatRef."""
+        weekly 42%, read 12 minutes ago), added a day ago unless codex_added=False, its notice said then (noticed=()
+        for one added on an older build, which never said it). Chats are built against the rig's folder: pass
+        functions folder -> ChatRef."""
         added = {'codex': NOW - 86400} if codex and codex_added else {}
         added.update(kw.pop('added', {}) or {})
         r = Rig(self.root, added=added, **kw)

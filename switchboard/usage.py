@@ -34,12 +34,14 @@ How it counts:
   the requests from series_since to until_ts, and every request is in exactly one hour.
 
 Shares are by weighted tokens (WEIGHTS below), not by Anthropic's own limit accounting,
-which is not published per model. The weights are today's prices against an input token
-(Opus 5.5 and Sonnet 5.5): a cache read is 0.05 ($0.20 against $4, $0.10 against $2), a cache
-write 1.25 for a 5-minute write and 2 for a 1-hour one (WRITE_1H; a write whose kind the
-transcript doesn't say counts as a 5-minute one), output 5. Token counts by kind stay in the
-result (cache_write_1h is the part of cache_write written for an hour), so the weighting can
-change later.
+which is not published per model. The weights are today's prices against an input token of
+the request's own model: a cache read is 0.05 on Opus 5.5 and Sonnet 5.5 ($0.20 against $4,
+$0.10 against $2) and on any model whose price is not known, 0.025 on Fable 5.2 and Mythos 5.2
+($0.20 against $8; CACHE_READ_BY_MODEL); a cache write 1.25 for a 5-minute write and 2 for a
+1-hour one (WRITE_1H; a write whose kind the transcript doesn't say counts as a 5-minute one),
+output 5. Token counts by kind stay in the result (cache_write_1h is the part of cache_write
+written for an hour, cache_read_low the part of cache_read read at 0.025), so the weighting can
+change later. A Fable token and an Opus token of the same kind still count the same.
 
 Speed: a per-file cache keyed on (path, size, mtime) keeps only per-file numbers. A file
 that changed is read again whole. The cache is JSON, written atomically, rebuilt if broken.
@@ -61,8 +63,17 @@ CACHE_VERSION = 2              # 2: each request also keeps its 1-hour cache wri
 TOKEN_KINDS = ('input', 'output', 'cache_write', 'cache_read')
 WEIGHTS = {'input': 1.0, 'output': 5.0, 'cache_write': 1.25, 'cache_read': 0.05}
 WRITE_1H = 2.0                      # a 1-hour cache write, against an input token (a 5-minute one is WEIGHTS' 1.25)
-TOKENS = TOKEN_KINDS + ('cache_write_1h',)  # what a request keeps: cache_write_1h is the part of cache_write kept an hour
-WEIGHT_FORMULA = 'input + 1.25 x cache write (2 x for a 1-hour write) + 0.05 x cache read + 5 x output'
+# The models whose cache read has a weight of its own, against an input token of the same model. From Anthropic's
+# published model prices (its API reference, read 2026-11-03), dollars a million tokens: Fable 5.2 and Mythos 5.2
+# input $8, cache read $0.20 (0.025); Opus 5.5 $4 and $0.20, Sonnet 5.5 $2 and $0.10 (both WEIGHTS' 0.05). Output,
+# 5-minute and 1-hour writes are the same against input on all of them. A model not named here keeps 0.05.
+CACHE_READ_LOW = 0.025
+CACHE_READ_BY_MODEL = {'claude-fable-5-2': CACHE_READ_LOW, 'claude-mythos-5-2': CACHE_READ_LOW}
+# What a request keeps: cache_write_1h is the part of cache_write kept an hour, cache_read_low the part of cache_read
+# read on a model of CACHE_READ_BY_MODEL.
+TOKENS = TOKEN_KINDS + ('cache_write_1h', 'cache_read_low')
+WEIGHT_FORMULA = ('input + 1.25 x cache write (2 x for a 1-hour write) + 0.05 x cache read '
+                  '(0.025 x on Fable 5.2 and Mythos 5.2) + 5 x output')
 WEIGHT_NOTE = ("Shares are by weighted tokens (%s), not by Anthropic's own limit accounting, "
                'which is not published per model.' % WEIGHT_FORMULA)
 
@@ -113,18 +124,34 @@ _TS = re.compile(r'(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2}):(\d{2})(?:[.,](\d+
 # ---------------------------------------------------------------- small pure helpers
 
 def weighted(tokens):
-    """{input, output, cache_write, cache_read}: each kind's weighted tokens, a 1-hour write at WRITE_1H. From a dict
-    or a list in TOKENS order (a 4-list: no 1-hour writes)."""
+    """{input, output, cache_write, cache_read}: each kind's weighted tokens, a 1-hour write at WRITE_1H and a cache
+    read on a model of CACHE_READ_BY_MODEL (cache_read_low) at CACHE_READ_LOW. From a dict or a list in TOKENS order
+    (a 4-list: no 1-hour writes; a list without the sixth: every cache read at 0.05)."""
     if not isinstance(tokens, dict):
         tokens = dict(zip(TOKENS, tokens))
     out = dict((k, WEIGHTS[k] * (tokens.get(k) or 0)) for k in TOKEN_KINDS)
     out['cache_write'] += (WRITE_1H - WEIGHTS['cache_write']) * (tokens.get('cache_write_1h') or 0)
+    out['cache_read'] += (CACHE_READ_LOW - WEIGHTS['cache_read']) * (tokens.get('cache_read_low') or 0)
     return out
 
 
 def weight(tokens):
     """Weighted tokens for a dict or a list in TOKENS order (a 4-list in TOKEN_KINDS order has no 1-hour writes)."""
     return sum(weighted(tokens).values())
+
+
+_LOW_MODELS = tuple(re.compile(re.escape(m) + r'(?![0-9])') for m in sorted(CACHE_READ_BY_MODEL))
+
+
+def cache_read_weight(model):
+    """A cache read's weight on this model, against its own input token. The model id is matched the way family()
+    matches, any case and anywhere in the id, so 'claude-fable-5-2[1m]' is Fable 5.2; a following digit is a
+    different model ('claude-fable-5-20' is not 'claude-fable-5-2'). Unknown or missing: WEIGHTS' 0.05."""
+    m = model.lower() if isinstance(model, str) else ''
+    for name, pattern in zip(sorted(CACHE_READ_BY_MODEL), _LOW_MODELS):
+        if pattern.search(m):
+            return CACHE_READ_BY_MODEL[name]
+    return WEIGHTS['cache_read']
 
 
 def family(model):
@@ -507,11 +534,11 @@ def _read_workflow_record(path):
 # ---------------------------------------------------------------- the summary
 
 def _tok():
-    return [0, 0, 0, 0, 0]
+    return [0] * len(TOKENS)
 
 
 def _add(acc, toks):
-    for i in range(5):
+    for i in range(len(TOKENS)):
         acc[i] += toks[i]
 
 
@@ -699,6 +726,7 @@ def summarize(root, since_ts, until_ts, cache_path=None, tz=None, series_since=N
         return h if h is not False else hour_start(ts, tz)
 
     cells = {}
+    low = {}                    # model -> True when its cache reads count as cache_read_low
     for key, r in reqs.items():
         ts = r['ts']
         if ts is None:
@@ -712,7 +740,7 @@ def summarize(root, since_ts, until_ts, cache_path=None, tz=None, series_since=N
         ck = (r['path'], r['side'], r['model'], k, by, day_for(ts), hour, cut)
         c = cells.get(ck)
         if c is None:
-            c = cells[ck] = [[0, 0, 0, 0, 0], 0, 0]
+            c = cells[ck] = [_tok(), 0, 0]
         t = r['tok']
         acc = c[0]
         acc[0] += t[0]
@@ -720,6 +748,11 @@ def summarize(root, since_ts, until_ts, cache_path=None, tz=None, series_since=N
         acc[2] += t[2]
         acc[3] += t[3]
         acc[4] += t[4]
+        m_low = low.get(r['model'])
+        if m_low is None:
+            m_low = low[r['model']] = cache_read_weight(r['model']) != WEIGHTS['cache_read']
+        if m_low:
+            acc[5] += t[3]
         c[1] += 1
         c[2] += len(r['tools'])
 
@@ -962,7 +995,8 @@ def summarize(root, since_ts, until_ts, cache_path=None, tz=None, series_since=N
     stats['seconds'] = round(time.time() - t0, 3)
     out = {
         'window': {'since': since_ts, 'until': until_ts},
-        'weighting': {'formula': WEIGHT_FORMULA, 'factors': dict(WEIGHTS, cache_write_1h=WRITE_1H), 'note': WEIGHT_NOTE},
+        'weighting': {'formula': WEIGHT_FORMULA, 'factors': dict(WEIGHTS, cache_write_1h=WRITE_1H), 'note': WEIGHT_NOTE,
+                      'cache_read_by_model': dict(CACHE_READ_BY_MODEL)},
         'totals': {'requests': total.requests, 'weight': tw, 'tokens': _tokens(total.tok),
                    'chats': len(chats), 'helper_agents': len(agents['helpers']), 'workflows': len(wfs),
                    'workflow_agents': len(agents['workflows']), 'tool_calls': sum(who_tools.values())},

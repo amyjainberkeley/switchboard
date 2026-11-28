@@ -12,16 +12,26 @@ The shape (v 1):
     {"v": 1, "now": seconds, "order": [ids, the person's order], "carry": bool,
      "providers": [{"id", "name", "vendor", "app", "added", "account_list", "installed", "signed_in", "version",
                     "state", "why", "back_at", "read_at", "plan", "count", "with_room", "can_carry", "seats",
-                    "error"}],
+                    "error", "email", "has_app", "newest_seen", "fit_why", "fit_line"}],
      "add": [{"id", "name", "app", "version"}]}
 "providers" holds the added ones, in the person's order. A provider whose seats are the accounts Switchboard's own
 account list keeps ("account_list": true) has no seats here: those accounts are the rows above it on every surface, and
 "count" and "with_room" say how many there are and how many have room. Every other provider has one seat per account,
-each {"label", "plan", "in_use", "windows": [{"label", "used_pct", "resets_at", "length_min", "line"}]}. "carry": there
-is somewhere to carry a chat on (two or more added providers can start on a note, and one of them has room or numbers
-not known). "add": a provider on this Mac that is not added yet.
+each {"label", "plan", "in_use", "read_at", "state", "back_at", "windows": [{"label", "used_pct", "resets_at",
+"length_min", "line"}]}, its state and refill time from its own numbers. "carry": there is somewhere to carry a chat on
+(two or more added providers with no fit_why can start on a note, and one of them has room or numbers not known).
+"add": a provider on this Mac that is not added yet.
 
-state_words() and summary() say a provider in the words `switchboard providers` uses, at the moment given.
+What the numbered rows need of each entry, from the same Found and the same files: "email" (the account's email as the
+adapter last kept it, else None), "has_app" (a copy of its program is inside its desktop app), "newest_seen" (the
+newest version that wrote its chats, else None) and "fit_why": None when it can be continued to as far as files can
+tell, else why not in the list's own words (not on this Mac, no copy here can be run, older than the one that wrote
+your chats, not signed in, sign-in not seen here). A copy whose version was never read is fit until a press finds
+otherwise: building the board never runs a program to find out. "fit_line": the line under the list for it (fit_line:
+the fit_why, with the one step to take when there is one), None when it has a row.
+
+state_words() and summary() say a provider in the words `switchboard providers` uses, at the moment given;
+under_list() says what the numbered rows do not.
 """
 import copy
 import dataclasses
@@ -31,7 +41,6 @@ from . import contract, words
 from .contract import NOT_ADDED, NOT_INSTALLED, OUT, ROOM, SIGNED_OUT, UNKNOWN, ProviderError, Ran, Reach
 
 V = 1
-FRESH_WORDS_S = 3600.0          # "has room" only for numbers read within the hour; older ones say how old (cli's rule)
 FIVE_HOUR = '5-hour'            # the window named from a 300-minute length (contract.Window's label)
 
 
@@ -107,7 +116,7 @@ def _blank(ctx, pid) -> dict:
             'account_list': bool(getattr(ctx.prov(pid), 'account_list', False)), 'installed': None, 'signed_in': None,
             'version': None, 'state': UNKNOWN, 'why': words.STATE_UNKNOWN, 'back_at': None, 'read_at': None,
             'plan': None, 'count': 0, 'with_room': 0, 'can_carry': ctx.can(pid, contract.START), 'seats': [],
-            'error': None}
+            'error': None, 'email': None, 'has_app': False, 'newest_seen': None, 'fit_why': None, 'fit_line': None}
 
 
 def _entry(ctx, pid) -> dict:
@@ -115,13 +124,19 @@ def _entry(ctx, pid) -> dict:
     out = _blank(ctx, pid)
     try:
         if ctx.prov(pid) is None:
-            out['error'] = ctx.kit.load_errors.get(pid) or 'not loaded'
+            out.update(error=ctx.kit.load_errors.get(pid) or 'not loaded', fit_why=words.STATE_NOT_INSTALLED,
+                       fit_line=words.STATE_NOT_INSTALLED)
             return out
         found = ctx.found(pid)
         if found is not None:
             out['installed'] = bool(found.installed)
             out['signed_in'] = found.signed_in
             out['version'] = found.program.version if found.program else None
+            out.update(has_app=any(p.source == 'app' for p in found.programs), newest_seen=found.newest_seen)
+        out.update(fit_why=fit_why(found, out['account_list']), email=_email(ctx, pid))
+        refused = found.programs[0].refused if found is not None and found.program is None and found.programs \
+            else None
+        out['fit_line'] = fit_line(out['fit_why'], ctx.sign_in(pid), refused)
         room = ctx.room(pid)
         out.update(state=room.state, back_at=room.back_at, read_at=room.read_at, why=ctx.state_words(pid, room))
         if room.state in (NOT_INSTALLED, SIGNED_OUT):
@@ -133,17 +148,66 @@ def _entry(ctx, pid) -> dict:
             out['count'] = len(seats)
             out['with_room'] = sum(1 for s in seats if _seat_room(ctx, pid, lims, s.key) == ROOM)
             return out
-        out['seats'] = [_seat(s, lims) for s in seats]
+        out['seats'] = [dict(_seat(s, lims), **_seat_state(ctx, pid, lims, s.key)) for s in seats]
     except Exception as e:  # noqa: BLE001 - one provider that fails is "not known"; the others still show
         out.update(state=UNKNOWN, why=words.STATE_UNKNOWN, back_at=None, error=type(e).__name__)
         _log('providers view %s: %s' % (pid, type(e).__name__))
     return out
 
 
+def fit_why(found, account_list=False) -> Optional[str]:
+    """None when a provider can be continued to as far as its Found tells (no program is run to find out), else why
+    not, in the list's words. A copy whose version was never read (Program.unread: the board never runs one) is fit
+    until a press finds otherwise; a refused copy is not. The sign-in of a provider whose seats are the account
+    list's is its accounts' own, said on their rows, so it is not asked here."""
+    from . import cli
+    if found is None or not found.installed:
+        return words.STATE_NOT_INSTALLED
+    if found.program is None:
+        if not any(p.unread for p in found.programs):
+            return words.STATE_NO_COPY
+    elif cli._older(found.program.version, found.newest_seen):
+        return words.STATE_TOO_OLD
+    if account_list:
+        return None
+    if found.signed_in is False:
+        return words.STATE_SIGNED_OUT
+    if found.signed_in is not True:
+        return words.STATE_SIGN_IN_NOT_SEEN
+    return None
+
+
+def fit_line(why: Optional[str], how: str, refused: Optional[str] = None) -> Optional[str]:
+    """The line under the list for a provider with no row: its fit_why, with the one step to take (how: its adapter's
+    own sign-in words) or the reason its newest copy is refused (refused) when there is one; None when it has a row.
+    The faces and doctor say this same line."""
+    if why == words.STATE_SIGN_IN_NOT_SEEN:
+        return words.FIT_LINE_SIGN_IN_NOT_SEEN.format(state=why, how=how)
+    if why == words.STATE_NO_COPY and refused:
+        return words.FIT_LINE_NO_COPY.format(state=why, why=words.one_line(refused, 80))
+    return why
+
+
+def _email(ctx, pid) -> Optional[str]:
+    """The account's email as its adapter last kept it (account_email, a file read), or None."""
+    said = getattr(ctx.prov(pid), 'account_email', None)
+    try:
+        got = said() if callable(said) else None
+    except Exception:  # noqa: BLE001 - an adapter's own failure: the row is named by the app instead
+        return None
+    return words.one_line(got, 254) if isinstance(got, str) and got else None
+
+
 def _seat_room(ctx, pid, lims, key) -> str:
+    return _seat_state(ctx, pid, lims, key)['state']
+
+
+def _seat_state(ctx, pid, lims, key) -> dict:
+    """{'state', 'back_at'} of one seat, from its own numbers (place.room_of, as the provider's room is worked out)."""
     from . import cli
     mine = tuple(lim for lim in lims if lim.seat == key)
-    return ctx.kit.place.room_of(pid, ctx.name(pid), mine, ctx.now, cli._fresh(mine)).state
+    room = ctx.kit.place.room_of(pid, ctx.name(pid), mine, ctx.now, cli._fresh(mine))
+    return {'state': room.state, 'back_at': room.back_at}
 
 
 def _seat(seat, lims) -> dict:
@@ -169,7 +233,10 @@ def _offer(ctx, pid) -> Optional[dict]:
 
 
 def _carry(entries) -> bool:
-    starts = [p for p in entries if p.get('can_carry') and p.get('state') not in (NOT_INSTALLED, SIGNED_OUT)]
+    """Two or more added providers a chat can go to (each can start on a note, and none has a fit_why: the list
+    gives it a row, or it is the account list), and one of them has room or numbers not known."""
+    starts = [p for p in entries if p.get('can_carry') and p.get('fit_why') is None and
+              p.get('state') not in (NOT_INSTALLED, SIGNED_OUT)]
     return len(starts) >= 2 and any(p.get('state') in (ROOM, UNKNOWN) for p in starts)
 
 
@@ -179,10 +246,11 @@ def _carry(entries) -> bool:
 def state_words(p: dict, now: float) -> str:
     """'has room', 'had room when last read 2 hours ago', 'is out until Wed 2:00 AM', 'every account is out until
     4:10 PM', 'numbers not known', 'not signed in', 'not on this Mac'."""
+    from . import cli                   # cli.WORDS_FRESH_S: the one rule for "has room", as a row's fresh
     state = p.get('state')
     if state == ROOM:
         read = p.get('read_at')
-        if isinstance(read, (int, float)) and now - read > FRESH_WORDS_S:
+        if isinstance(read, (int, float)) and now - read > cli.WORDS_FRESH_S:
             return words.STATE_HAD_ROOM.format(ago=words.ago(now - read))
         return words.STATE_ROOM
     if state == OUT:
@@ -278,4 +346,34 @@ def lines(board: Optional[dict], now: float) -> List[tuple]:
         if a.get('id'):
             name = words.one_line(a.get('app') or a.get('name') or a['id'], 40)
             out.append(('add', name, words.BOARD_ADD.format(app=name, pid=words.one_line(a['id'], 16))))
+    return out
+
+
+def _fit_why_before(p: dict) -> Optional[str]:
+    """The fit_why of an entry from a board built before that field (a page started before an update): from what
+    every board has, as rows.from_board decides its row, so a provider with no row always has its line."""
+    if p.get('installed') is not True or p.get('state') == NOT_INSTALLED:
+        return words.STATE_NOT_INSTALLED
+    if p.get('signed_in') is False or p.get('state') == SIGNED_OUT:
+        return words.STATE_SIGNED_OUT
+    return None if p.get('signed_in') is True else words.STATE_SIGN_IN_NOT_SEEN
+
+
+def under_list(board: Optional[dict], now: float, rows=()) -> List[tuple]:
+    """What the numbered rows (rows.from_board) do not say, as (kind, name, words), for every face to put under its
+    list: ('provider', its name, its fit_line, else its fit_why) for each added provider that has no row because it
+    cannot be continued to; then ('add', its name, the line that adds it) for each provider on this Mac not added;
+    then ('carry', '', the line to type) when there is somewhere to carry a chat on and there is no row at all. []
+    for no board or a damaged one. rows: the rows the face draws. now: the moment, as lines() takes it (none of these
+    words depend on it)."""
+    if not isinstance(board, dict):
+        return []
+    whys = [(p, p['fit_why'] if 'fit_why' in p else _fit_why_before(p))
+            for p in _listed(board, 'providers') if not p.get('account_list')]
+    out = [('provider', words.one_line(p.get('name') or p.get('id') or '', 30),
+            words.one_line(p['fit_line'] if isinstance(p.get('fit_line'), str) else why, 160))
+           for p, why in whys if isinstance(why, str)]
+    out += [x for x in lines({'providers': [], 'add': board.get('add'), 'carry': False}, now) if x[0] == 'add']
+    if board.get('carry') and not rows:
+        out.append(('carry', '', '%s %s' % (words.BOARD_CARRY, words.BOARD_CARRY_COMMAND)))
     return out

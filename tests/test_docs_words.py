@@ -228,7 +228,7 @@ class NoPlanNobodyWasTold(unittest.TestCase):
     def test_no_5_hour_limit_is_said_without_a_plans_name(self):
         how = read(os.path.join('docs', 'how-it-works.md'))
         self.assertNotIn('verified Ultra', how)
-        self.assertIn('An account with no 5-hour limit (some plans report none) has no 5-hour line', how)
+        self.assertIn('An account with no 5-hour limit (some plans report none) says "No 5-hour limit on this plan"', how)
 
 
 class Commands(unittest.TestCase):

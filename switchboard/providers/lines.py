@@ -151,13 +151,13 @@ def _open(path):
 
 def head_line(path, cap: int = 1 << 20) -> Optional[bytes]:
     """The file's first line without its newline, or None when it is longer than cap or the file cannot be read (a
-    .zst file is read on a Python with compression.zstd)."""
+    .zst file is read on a Python with compression.zstd). Only that line is read, never more than cap + 1 bytes."""
     try:
         f = _open(path)
         if f is None:
             return None
         with f:
-            data = f.read(cap + 1)
+            data = f.readline(cap + 1)
     except read_errors():
         return None
     cut = data.find(b'\n')

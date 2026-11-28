@@ -9,6 +9,7 @@ from typing import Mapping, Optional, Sequence, Tuple, Union
 from .contract import NOT_ADDED, NOT_INSTALLED, OUT, ROOM, SIGNED_OUT, UNKNOWN, Limits, Room, Window
 
 FULL_AT = 100.0     # a window without a line of its own is full at 100%
+REACHED_KEEP_S = 7 * 86400.0    # a limit word with no window to age it by stands this long (the longest window)
 
 # pick()'s reason codes.
 REASONS = ('room',          # the provider picked has room
@@ -28,16 +29,35 @@ def _known(w: Window, now: float) -> bool:
 
 
 def _full(w: Window, now: float) -> bool:
-    return _known(w, now) and w.used_pct >= (w.line if w.line is not None else FULL_AT)
+    """A window that makes its seat out: at or over its line. A model's own week (seat_wide False) never does."""
+    return w.seat_wide and _known(w, now) and w.used_pct >= (w.line if w.line is not None else FULL_AT)
+
+
+def refilled(windows, now: float) -> bool:
+    """True when there is a window and every one has a reset time that has passed: whatever limit the app said was
+    reached when they were read has refilled since."""
+    windows = tuple(windows or ())
+    return bool(windows) and all(w.resets_at is not None and w.resets_at <= now for w in windows)
+
+
+def _reached(lim: Limits, windows, now: float) -> bool:
+    """The app's limit word still stands: some window has not refilled since, or, with no window to age it by, it
+    was read within REACHED_KEEP_S (a word with no reading time, an account's own status, stands)."""
+    if not lim.reached:
+        return False
+    if windows:
+        return not refilled(windows, now)
+    return lim.read_at is None or now - lim.read_at <= REACHED_KEEP_S
 
 
 def _seat(lim: Limits, now: float, fresh_s: float):
-    """(state of one seat, its refill time when out)."""
+    """(state of one seat, its refill time when out). A limit word that no longer stands is not known, never out."""
     windows = tuple(lim.windows or ())
     full = [w for w in windows if _full(w, now)]
-    if lim.reached and not full:
-        full = list(windows)        # the app says a limit is reached: every window counts until it refills
-    if full or lim.reached:
+    reached = _reached(lim, windows, now)
+    if reached and not full:        # the app says a limit is reached: each window that has not refilled counts
+        full = [w for w in windows if w.resets_at is None or w.resets_at > now]
+    if full or reached:
         resets = [w.resets_at for w in full]
         return OUT, (max(resets) if resets and None not in resets else None)
     fresh = lim.read_at is not None and now - lim.read_at <= fresh_s and not lim.error
@@ -47,7 +67,8 @@ def _seat(lim: Limits, now: float, fresh_s: float):
 
 
 def room_of(provider: str, name: str, limits, now: float, fresh_s: float) -> Room:
-    """DESIGN 8.4. A window is full when its number is at or over its line, or when the app says a limit is reached.
+    """DESIGN 8.4. A window is full when its number is at or over its line, or when the app says a limit is reached
+    and the window has not refilled since.
     A seat has room when its numbers are fresh (read within fresh_s, no error), no window is full and at least one is
     known; it is out when a window is full, until the latest reset among its full windows (None when one is not
     known). The provider is ROOM when any seat has room, else UNKNOWN when any seat is not known, else OUT until the

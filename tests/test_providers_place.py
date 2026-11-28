@@ -54,6 +54,27 @@ class RoomOf(unittest.TestCase):
         r = room(lim(win(20, NOW + H), win(99, NOW + 2 * D, 95.0, 'weekly'), reached='rate_limit_reached'))
         self.assertEqual((r.state, r.back_at), (c.OUT, NOW + 2 * D))
 
+    def test_a_reached_word_whose_windows_have_all_refilled_is_not_known(self):
+        # the app said a limit was reached, and every window has refilled since: nothing still says out
+        r = room(lim(win(None, NOW - 3 * D), win(None, NOW - 60, 95.0, 'weekly'), reached='rate_limit_reached',
+                     read_at=NOW - 4 * D), fresh=7 * D)
+        self.assertEqual((r.state, r.back_at), (c.UNKNOWN, None))
+
+    def test_a_reached_word_is_out_until_the_window_that_has_not_refilled(self):
+        r = room(lim(win(None, NOW - 60), win(40, NOW + D, 95.0, 'weekly'), reached='rate_limit_reached'))
+        self.assertEqual((r.state, r.back_at), (c.OUT, NOW + D))
+        self.assertTrue(place.refilled((win(None, NOW - 60), win(None, NOW - 1, 95.0, 'weekly')), NOW))
+        self.assertFalse(place.refilled((win(None, NOW - 60), win(40, NOW + D, 95.0, 'weekly')), NOW))
+        self.assertFalse(place.refilled((win(None, NOW - 60), win(40, None, 95.0, 'weekly')), NOW))
+        self.assertFalse(place.refilled((), NOW))
+
+    def test_a_reached_word_with_no_window_lasts_as_long_as_the_longest_window(self):
+        self.assertEqual(room(lim(reached='usage_not_allowed', read_at=NOW - D), fresh=7 * D).state, c.OUT)
+        r = room(lim(reached='usage_not_allowed', read_at=NOW - 8 * D), fresh=7 * D)
+        self.assertEqual((r.state, r.back_at), (c.UNKNOWN, None))
+        # a word with no reading time at all (an account's own status) has nothing to age by: it stands
+        self.assertEqual(room(lim(reached='needs_login', read_at=None)).state, c.OUT)
+
     def test_stale_numbers_are_not_room(self):
         r = room(lim(win(10, NOW + H), read_at=NOW - 2 * H))
         self.assertEqual((r.state, r.read_at), (c.UNKNOWN, NOW - 2 * H))

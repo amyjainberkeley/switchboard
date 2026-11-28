@@ -198,14 +198,16 @@ class Rows(unittest.TestCase):
         find(s, 'ana@fernhill.example')['trusted'] = False           # the engine would not decide on it
         find(s, 'ana@northwind.example')['usage'] = None
         find(s, 'ana@harbor.example')['usage']['weekly'] = {'resets': at(16, 15)}
-        # (no 5-hour row either: it is drawn only when there is a 5-hour number to show, so the row is a bar row less)
-        for email in ('ana@fernhill.example', 'ana@northwind.example'):
+        # (no 5-hour bar either: it is drawn only when there is a 5-hour number to show. A reading too old to show still
+        # tells the plan: fernhill's has no 5-hour window, so its 5-hour place says "No 5-hour limit"; northwind was
+        # never read, so its row is a bar row less)
+        for email, height in (('ana@fernhill.example', 72.0), ('ana@northwind.example', 54.0)):
             r = row_of(s, email)
             self.assertEqual((r['five'], menubar.pct_text(r['week'])), (None, '\u2014'))
-            self.assertEqual(menubar.row_height(r), 54.0)
+            self.assertEqual(menubar.row_height(r), height)
             self.assertFalse([op for op in menubar.row_ops(r) if op[0] == 'box' and op[-1] in ('fill', 'accent', 'red')])
         self.assertEqual(menubar.pct_text(row_of(s, 'ana@harbor.example')['week']), '\u2014')
-        self.assertEqual(menubar.row_height(row_of(s, 'ana@lab.example')), 54.0)      # known, with no 5-hour row
+        self.assertEqual(menubar.row_height(row_of(s, 'ana@lab.example')), 72.0)      # no 5-hour limit: its words
 
     def test_the_same_numbers_and_next_as_the_terminal(self):
         s = view()
@@ -215,8 +217,11 @@ class Rows(unittest.TestCase):
         self.assertEqual([r['email'] for r in ours], [a['email'] for a in theirs])
         for r, a in zip(ours, theirs):
             bars = [(x['pct'], x['over']) for x in (r['five'], r['week']) if x is not None]
-            self.assertEqual(r['five'] is None, a['limits'][0]['label'] != '5-hour')     # the same 5-hour row or none
-            self.assertEqual(bars, [(l['pct'], l['over']) for l in a['limits'][:len(bars)]])
+            self.assertEqual(r['five'] is None and not r['no_five'], a['limits'][0]['label'] != '5-hour')  # the same
+            self.assertEqual(r['no_five'].lower(), a['limits'][0]['words'] if a['limits'][0].get('none') else '')
+            drawn = [l for l in a['limits'] if not l.get('none')]                       # the words have no bar
+            self.assertEqual(bars, [(l['pct'], l['over']) for l in drawn[:len(bars)]])
+            self.assertEqual(drawn[len(bars):], [])                          # the terminal draws no model week
             self.assertEqual((r['next'], r['in_use']), (a['next'], a['active']))
 
 
@@ -845,7 +850,10 @@ MY_PORT = 7873          # a port of this file's own; a free one when another run
 
 class RawPage(object):
     """A stand-in on 127.0.0.1:7873 that reads each request whole, then answers these bytes and hangs up: a reply cut
-    off part-way (the page restarting under `switchboard update`), or one that is not HTTP (another program)."""
+    off part-way (the page restarting under `switchboard update`), or one that is not HTTP (another program). seen:
+    the first line of each request. A connection that sends nothing is no request (a look that only connects, as the
+    menu bar's watch on the page makes one): it is not in seen and gets no answer. wait_for(n): seen, once it holds
+    n requests."""
 
     def __init__(self, reply):
         self.reply = reply
@@ -858,7 +866,14 @@ class RawPage(object):
         self.sock.listen(8)
         self.port = self.sock.getsockname()[1]
         self.seen = []
+        self.came = threading.Condition()
         threading.Thread(target=self.serve, daemon=True).start()
+
+    def wait_for(self, n, within=60.0):
+        """seen, once it holds n requests (or what came within `within` seconds: the assertion then says what)."""
+        with self.came:
+            self.came.wait_for(lambda: len(self.seen) >= n, within)
+            return list(self.seen)
 
     def serve(self):
         while True:
@@ -883,7 +898,12 @@ class RawPage(object):
                         if not chunk:
                             break
                         body += chunk
-                    self.seen.append(head.split(b'\r\n')[0].decode())
+                    line = head.split(b'\r\n')[0].decode()
+                    if not line.strip():
+                        continue                    # nothing was asked: no request, no answer
+                    with self.came:
+                        self.seen.append(line)
+                        self.came.notify_all()
                     conn.sendall(self.reply)
                     conn.shutdown(socket.SHUT_WR)
                 except OSError:
@@ -914,9 +934,18 @@ class Replies(Sandbox):
             self.assertIsNone(menubar.get_state())
             self.assertEqual(menubar.post('/api/switch', {'email': 'ana@lab.example'}),
                              (False, "the page's answer could not be read"))
-            self.assertEqual([x.split()[0] for x in page.seen], ['GET', 'POST'])     # it was asked, and answered
+            # it was asked, and answered: its own two requests, waited for, never a time
+            self.assertEqual([x.split()[0] for x in page.wait_for(2)], ['GET', 'POST'])
         self.assertEqual(menubar.failed("Couldn't switch", menubar.UNREADABLE),
                          "Couldn't switch: the page's answer could not be read")
+
+    def test_a_look_that_only_connects_is_no_request(self):
+        # The menu bar's watch on the page only opens a connection and sends nothing (watch.page_answers): one that
+        # lands while a test talks to the stand-in is not among the requests it counts.
+        page = self.raw(NOT_JSON)
+        socket.create_connection(('127.0.0.1', page.port), timeout=5).close()
+        self.assertIsNone(menubar.get_state())
+        self.assertEqual([x.split()[0] for x in page.wait_for(1)], ['GET'])
 
     def test_nothing_on_the_port_is_still_not_running(self):
         os.environ['SWITCHBOARD_PORT'] = str(free_port())
@@ -998,13 +1027,25 @@ class AFailedStart(Sandbox):
 
     def run_it(self, at_terminal, error):
         out, err = io.StringIO(), io.StringIO()
+        # menubar.run() starts the menu bar's watch on the page first: here it is a stand-in, never a thread that
+        # outlives the test and opens a connection to whatever port a later test's stand-in holds, every 15 s
         with mock.patch.object(menubar_wrap, 'relaunch_inside', lambda args: 'a test'), \
+                mock.patch.object(menubar, '_watch_start', lambda: None), \
                 mock.patch.object(menubar, '_ui', mock.Mock(side_effect=error)), \
                 mock.patch.object(menubar, 'terminal', lambda: at_terminal), \
                 mock.patch.object(menubar.sys, 'stderr', err), redirect_stdout(out):
             code = menubar.run()
         menubar.release_lock()
         return code, out.getvalue()
+
+    def test_a_failed_start_leaves_no_watch_on_the_page_running(self):
+        # run() starts the watch first: a test's run must not leave one behind, opening a connection to whatever port
+        # a later test's stand-in holds
+        def watching():
+            return [t for t in threading.enumerate() if t.name == 'switchboard-page-watch' and t.is_alive()]
+        before = watching()
+        self.run_it(True, ImportError('made up'))
+        self.assertEqual(watching(), before)
 
     def test_one_line_and_the_right_exit(self):
         broken = ImportError("dlopen(_objc.cpython-312-darwin.so, 0x0002): Symbol not found: _PyFoo\n  Referenced from: ...")

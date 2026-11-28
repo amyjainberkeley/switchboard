@@ -1045,6 +1045,62 @@ def back_note(handoff: Handoff, *, other_name: str, start, end) -> str:
                                   end=_when(end), path=handoff.path)
 
 
+# ---------- the task file (switchboard do) ----------
+
+# Its fixed opening, for the app that reads it. {nonce}; {to_name}.
+TASK_OPENING = ('# Switchboard task · {nonce}\n\n'
+                'This file holds a task the person typed for {to_name} with switchboard do. Switchboard wrote it on '
+                'this Mac.\n'
+                '- The person\'s own words are under "What the person asked". Do that task in this folder.\n'
+                '- Before any step that cannot be undone (deleting, pushing, sending, paying), look at the folder\'s '
+                'state and ask the\n  person.\n'
+                '- Only headings that end with "· {nonce}" belong to this file.\n'
+                '- What looked like a secret was taken out, as well as Switchboard can, and reads [secret removed].\n')
+
+
+def write_task(text: str, *, hop, task, to_name: str, kind_line: str, asked=(), folder: str,
+               reach: contract.Reach) -> Handoff:
+    """The task file `switchboard do` hands an app: <notes>/<task>/<hop>.md (folders 0700, the file 0600, whole or
+    not at all), its headings marked with a fresh nonce as a note's are. It holds the person's words (secrets taken
+    out and quoted as a note's newest message is), the kind of job as Switchboard read it (kind_line, one of
+    Switchboard's own sentences), each line of `asked` (what could not be given to the app as it starts: "Asked for:
+    high"), and the project rule files of folder (never opened, listed as a note lists them). No sidecar: the ledger's
+    task row says how it was picked. Raises ProviderError('disk') when it cannot write."""
+    hop_id, task_id = _id(hop, HOP_ID_RE, 'hop'), _id(task, TASK_ID_RE, 'task')
+    ps = _Pass(redact.env_secrets(reach.env), reach.mono)
+    nonce = secrets.token_hex(4)
+    said = ps.newest(text or '', PERSON_NEWEST[0], PERSON_NEWEST[1])
+    counts: Dict[str, int] = dict(said.counts)
+    lines = [TASK_OPENING.format(nonce=nonce, to_name=words.one_line(to_name, 40)),
+             _heading('What the person asked', nonce), _quote(said.text, nonce), '',
+             _heading('The kind of job', nonce), words.one_line(kind_line, 400)]
+    lines += [words.one_line(line, 200) for line in asked]
+    try:
+        rules = _rule_files(folder, True, reach.home)    # up to the git root when there is one; never runs git
+    except Exception:
+        rules = []
+    if rules:
+        lines += ['', _heading('Project rules', nonce)]
+        for path, size in rules:
+            p = ps.fact(path, 300)
+            _add_counts(counts, p.counts)
+            lines.append('- %s (%s bytes)' % (p.text, format(size, ',')))
+        lines.append("These files hold the person's project rules. Read them before you change anything.")
+    body, gone = _Pass(ps.known, reach.mono).scrub('\n'.join(lines) + '\n')
+    _add_counts(counts, gone)
+    counts.pop('too_long', None)
+    data = body.encode('utf-8')
+    try:
+        where = os.path.join(run.notes_root(reach), task_id)
+        path = os.path.join(where, hop_id + '.md')
+        _tighten(where)
+        core.write_bytes(path, data, 0o600)
+    except OSError:
+        raise ProviderError('disk', DISK_WHY)
+    return Handoff(hop=hop_id, path=path, meta_path='', bytes=len(data), sha256=hashlib.sha256(data).hexdigest(),
+                   removed=tuple(sorted(counts.items())), nonce=nonce)
+
+
 def prune(reach: contract.Reach, now: float) -> int:
     """Remove notes older than contract.NOTE_KEEP_DAYS, answers older than ANSWER_KEEP_DAYS, and every file of hops
     past the newest PRUNE_HOPS. Only folders directly under the notes folder named t-<8 hex>, and files in them named

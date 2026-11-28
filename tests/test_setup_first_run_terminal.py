@@ -22,6 +22,7 @@ import os
 import plistlib
 import re
 import sys
+import tempfile
 import threading
 import unittest
 from contextlib import redirect_stdout
@@ -32,9 +33,23 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.join(HERE, '..')
 sys.path.insert(0, ROOT)
 
+from fakes_provider_kit import (CHAT_A, Rig, chat, claude_found, claude_limits, claude_seats, codex_found,
+                                codex_limits, codex_seat)
 from switchboard import __main__ as cli
 from switchboard import connect, core, firstrun, linkapp, server, term
+from switchboard.providers import cli as providers_cli
+from switchboard.providers import words as provider_words
 from test_keep import A, B, C, FakeTty, Sandbox
+
+REAL_ADD_SIGNED_IN = providers_cli.add_signed_in        # the providers code's own offer, before any test stands in
+REAL_PROVIDERS_MAIN = providers_cli.main
+# What the providers code says when it offers Codex: its notice (two lines), then its one question.
+CODEX_NOTICE = provider_words.NOTICE.format(name='Codex', vendor='OpenAI', plan='ChatGPT plan')
+CODEX_OFFER = provider_words.ADD_OFFER.format(name='Codex')
+CODEX_SHOW = provider_words.ADD_ASK.format(name='Codex')
+# Inside a step of the first run, the notice and its question are indented as the step's own lines (offer_codex).
+STEP_NOTICE = '\n'.join('  ' + x for x in CODEX_NOTICE.split('\n'))
+STEP_OFFER = '  ' + CODEX_OFFER
 
 CHROME_ID = 'com.google.Chrome'
 
@@ -142,10 +157,15 @@ def over(got=None, ok=True, why=None):
 
 class Setup(Sandbox):
     """A first run on this Mac: Claude Code signed in as A, the page running on its own port, the link app
-    installed with Google Chrome as the default browser, and no Codex."""
+    installed with Google Chrome as the default browser, and no Codex. The first run sees no router package
+    (no_router): these tests are of its other steps; RoutingSeam (a made-up router) and TheRealRouter (this copy's
+    own) test the routing step."""
 
     def setUp(self):
         super().setUp()
+        self.no_router = mock.patch.object(firstrun, 'router_parts', lambda: None)
+        self.no_router.start()
+        self.addCleanup(self.no_router.stop)
         self.signed_in(A)
         self.page = SigninPage(self)
         self.addCleanup(self.page.stop)
@@ -160,9 +180,13 @@ class Setup(Sandbox):
         linkapp.CACHE.update(at=0, value=None, path=None)
         self.addCleanup(linkapp.CACHE.update, at=0, value=None, path=None)
         self.codex = None
+        self.offered = []
+        self.kit_rig = None
         self.patch(firstrun, 'board', self.board)
-        from switchboard.providers import cli as providers_cli
         self.patch(providers_cli, 'main', self.add_codex)
+        self.patch(providers_cli, 'add_signed_in', self.add_signed_in)
+        self.patch(providers_cli, 'default_kit', lambda reach=None: self.providers_kit().kit)    # one stand-in Mac
+        self.patch(firstrun, 'make_default', self.make_default)
         self.link_app()
 
     def patch(self, target, name, value):
@@ -210,6 +234,20 @@ class Setup(Sandbox):
             self.links_app = self.app('Switchboard Links.app', linkapp.BUNDLE_ID, exe=script)
         return path
 
+    @staticmethod
+    def make_default(start=firstrun.make_default):
+        """The link app's --make-default, started for real; macOS is still asking the first time the run looks, as
+        when a person reads the question, so "macOS is asking" is said however fast the stand-in answers."""
+        proc = start()
+        looks = {'n': 0}
+        poll = proc.poll
+
+        def first_look_still_asking():
+            looks['n'] += 1
+            return None if looks['n'] == 1 else poll()
+        proc.poll = first_look_still_asking
+        return proc
+
     def no_link_app(self):
         import shutil
         shutil.rmtree(os.path.join(self.apps, 'Switchboard Links.app'))
@@ -243,6 +281,34 @@ class Setup(Sandbox):
                      words.ADD_SIGNED_IN):
             kit.out.write(line + '\n')
         return 0
+
+    def providers_kit(self, answers=('y', 'n'), signed_in=True):
+        """The stand-in Mac the providers code runs on (tests/fakes_provider_kit.py), made once per test: Claude with
+        a chat in its folder and, after with_codex(), Codex on this Mac, signed in and not added. Its terminal is this
+        test's: what it prints goes to standard output, and each question is printed with its answer, as a terminal
+        shows them. answers, in order: to adding Codex, then to showing its account. signed_in: Codex's own say."""
+        if self.kit_rig is None:
+            root = os.path.realpath(tempfile.mkdtemp(prefix='kit-', dir=self.tmp))
+            r = Rig(root, tty=True, answers=[answering(a) for a in answers])
+            r.out = ToStdout()
+            r.claude = r.provider('claude', found=claude_found(root), seats=claude_seats(), limits=claude_limits(),
+                                  chats=[chat('claude', r.folder, cid=CHAT_A, name='Upload retries')])
+            if self.codex == 'here':
+                r.codex = r.provider('codex', found=codex_found(root, signed_in=signed_in), seats=codex_seat(),
+                                     limits=codex_limits())
+            self.kit_rig = r
+        return self.kit_rig
+
+    def add_signed_in(self, kit=None):
+        """The providers code's own offer for a first run and a bare `switchboard add` (providers/cli.py,
+        add_signed_in), the real one, on the stand-in Mac of providers_kit(): Codex, when it is here and not added, is
+        offered with its notice and one question. Every road to Codex goes through it, once per run."""
+        self.offered.append(kit)
+        r = self.providers_kit()
+        n = REAL_ADD_SIGNED_IN(r.kit)
+        if 'codex' in r.choices.added():
+            self.codex = 'added'
+        return n
 
     def setup(self, *answers, args=('setup',)):
         tty = FakeTty(list(answers))
@@ -282,11 +348,10 @@ FULL = '''Switchboard setup.
   Your browser approved it. Keeping the login. Ctrl-C cancels.
   maya@ivy.example (Max 5x). Kept.
   Add another?  Enter opens your browser, s skips.  s
-  Codex is on this Mac too. Add it to your list?  Enter adds it, s skips.  
-  Added Codex. Your order: Claude, Codex.
-  Switchboard will run Codex 0.169.1 (/opt/homebrew/bin/codex). Codex keeps its own sign-in;
-  Switchboard never reads or keeps it.
-  It looks signed in.
+  Pressing the Codex row asks no more: it sends your folder's newest chat,
+  your words and files, to OpenAI under your ChatGPT plan and OpenAI's terms.
+  Add Codex too? [y/N] y
+  Show its account now? Codex's helper runs once and may renew its sign-in. [y/N] n
 
 3 of 5  See it move
   Claude Code is on maya@northwind.example. Switchboard moves it at your lines, and you can move it
@@ -305,8 +370,7 @@ FULL = '''Switchboard setup.
   Done. claude.ai links open as their owner. Everything else still opens in Google Chrome.
 
 5 of 5  Where to find it
-  Claude Code   a status line with the account and its limits, and a notification when a long turn
-                is done or it needs you
+  Claude Code   a status line with the account and its limits, and a notification when it needs you
   The page      switchboard page   (every account, chat and artifact, at 127.0.0.1:%d)
   Auto-switch is on: at 90%% of the 5-hour limit or 95%% of the week, Claude Code moves to the next
   account.
@@ -331,10 +395,11 @@ class TheWholeFirstRun(Setup):
         self.with_codex()
         self.page.plans[B] = 'Max 5x'
         self.page.sign_in(WAIT, WAIT, KEEP, over(B), got=B)
-        code, out = self.setup('', 's', '', '', '')
+        code, out = self.setup('', 's', '', '')                  # Codex's question is the providers code's own
         self.assertEqual(code, 0, out)
         self.assertEqual(out, FULL % self.page.server_address[1])
-        self.assertEqual(cli.identity()[0], B)                      # "See it move" moved it
+        self.assertEqual(self.offered, [None])                          # Codex: one place, once
+        self.assertEqual(cli.identity()[0], B)                          # "See it move" moved it
         self.assertEqual(self.fake.emails(), [A, B])
         self.assertEqual(self.posts('/api/connect'), [{'email': '', 'profile': '+new'}])   # a new browser profile
         self.assertEqual(self.asked_macos(), 1)
@@ -502,11 +567,22 @@ class SeeItMove(Setup):
 
 
 class RoutingSeam(Setup):
-    """The routing step: a seam for a `switchboard.router` package this copy does not have."""
+    """The routing step: a seam for a `switchboard.router` package, made up here (this copy's own: TheRealRouter)."""
 
     def setUp(self):
         super().setUp()
+        self.no_router.stop()                   # the real seam, router_parts, finds what sys.modules holds
         self.no_link_app()
+
+    def no_package(self):
+        """A copy whose switchboard.router has neither of the two names the first run imports (an empty package, and
+        neither module loaded: sys.modules is put back as it was when the test ends)."""
+        import types
+        p = mock.patch.dict(sys.modules, {'switchboard.router': types.ModuleType('switchboard.router')})
+        p.start()
+        self.addCleanup(p.stop)
+        for name in ('switchboard.router.wire', 'switchboard.router.hand_words'):
+            sys.modules.pop(name, None)
 
     def router(self, turn_on):
         import types
@@ -521,6 +597,7 @@ class RoutingSeam(Setup):
         self.addCleanup(p.stop)
 
     def test_without_a_router_package_nothing_changes(self):
+        self.no_package()
         self.assertIsNone(firstrun.router_parts())
         with redirect_stdout(io.StringIO()) as said:
             self.assertFalse(firstrun.routing_step(cli, None, firstrun.Out(cli)))
@@ -547,7 +624,8 @@ class RoutingSeam(Setup):
         code, out = self.setup('s')
         self.assertEqual(code, 0, out)
         self.assertSaid('  Routing could not be turned on: the made-up router is broken. Turn it on later with: '
-                        'switchboard router on\n\n5 of 5  Where to find it', out)
+                        'switchboard routing on\n\n5 of 5  Where to find it', out)
+        self.assertIn('switchboard routing [on|off]', cli.__doc__)      # the command it names is one there is
 
     def test_it_runs_with_yes_and_never_in_the_one_line_form(self):
         self.router(lambda: ['Made-up: turned on.'])
@@ -555,6 +633,53 @@ class RoutingSeam(Setup):
         self.assertIn('Routing', [t for n, m, t in self.steps(out)])
         code, out = self.run_cli('setup')
         self.assertNotIn('Made-up', out)
+
+
+class TheRealRouter(Setup):
+    """This copy's own router in the first run (the seam meets switchboard.router's wire and hand_words): its step is
+    counted in its place, says the router's first-run lines and turns routing on, and keeps the rules every other
+    step keeps."""
+
+    def setUp(self):
+        super().setUp()
+        self.no_router.stop()
+        self.no_link_app()
+
+    def test_its_step_is_counted_in_its_place_and_turns_routing_on(self):
+        from switchboard.router import hand_words, settings as routing
+        code, out = self.setup('s')
+        self.assertEqual(code, 0, out)
+        self.assertEqual([t for n, m, t in self.steps(out)], ['Your account', 'Your other accounts', 'See it move',
+                                                             'Routing', 'Where to find it'])
+        self.assertIn(' '.join(hand_words.FIRST_RUN), ' '.join(out.split()))
+        self.assertIs(routing.read()['on'], True)
+
+    def test_its_step_says_at_most_three_lines(self):
+        # The list's own sentence, then each change with its undo: the router's turn_on, nothing of the first run's
+        # own. Counted as the lines the step was given (the terminal may wrap one of them in two).
+        from switchboard.router import hand_words, wire
+        seen, real = [], wire.turn_on
+
+        def spy(*args, **kw):
+            got = real(*args, **kw)
+            seen.append(got)
+            return got
+
+        with mock.patch.object(wire, 'turn_on', spy):
+            code, out = self.setup('s')
+        self.assertEqual(code, 0, out)
+        self.assertEqual(len(seen), 1, out)
+        self.assertLessEqual(len(hand_words.FIRST_RUN) + len(seen[0]), 3, seen)
+        for line in seen[0]:
+            self.assertSaid(line, out)
+        self.assertNotIn('not in this version', out)
+
+    def test_with_no_codex_on_this_mac_it_says_nothing_of_codex(self):
+        # As every other step (OneAccountOnly): Codex not on this Mac is not a word. Waits for the router's first-run
+        # words for a Mac without Codex (hand_words.FIRST_RUN and wire.turn_on's lines name Codex today).
+        code, out = self.setup('s')
+        self.assertEqual(code, 0, out)
+        self.assertNotIn('Codex', out)
 
 
 class EveryChangeWithItsUndo(Setup):
@@ -678,13 +803,23 @@ class OneAccountOnly(Setup):
         self.assertEqual(self.posts('/api/connect'), [])
         self.assertNotIn('Auto-switch is on', out)                      # one account: nothing to switch to
 
-    def test_codex_present_and_skipped(self):
+    def test_codex_present_is_reached_once_through_the_providers_own_add(self):
+        # The first run and a bare `switchboard add` reach Codex through one place (firstrun.offer_codex calls
+        # add_others, which is the providers code's add_signed_in): one notice, one question, none of its own.
         self.no_link_app()
         self.with_codex()
-        code, out = self.setup('s', 's')
-        self.assertIn('  Codex is on this Mac too. Add it to your list?  Enter adds it, s skips.  s\n', out)
-        self.assertEqual(self.codex, 'here')
-        self.assertTrue(out.endswith('1 Claude account. Type switchboard to see it.\n'), out)
+        code, out = self.setup('s')
+        self.assertEqual(self.offered, [None])
+        self.assertNotIn('Add it to your list?', out)
+        self.assertEqual((out.count(STEP_NOTICE), out.count(STEP_OFFER)), (1, 1))      # inside step 2, indented
+        self.assertEqual(self.codex, 'added')
+        self.assertTrue(out.endswith('1 Claude account and Codex. Type switchboard to see them.\n'), out)
+
+    def test_codex_absent_reaches_the_providers_own_add_once_and_says_nothing(self):
+        self.no_link_app()
+        code, out = self.setup('s')
+        self.assertEqual(self.offered, [None])
+        self.assertNotIn('Codex', out)
 
 
 class TheSameAccount(Setup):
@@ -882,6 +1017,20 @@ class WhereToFindIt(Setup):
         code, out = self.setup('s')
         self.assertNotIn('Menu bar', out)
 
+    def test_done_after_a_long_turn_is_named_only_while_it_is_on(self):
+        # "done" after a long turn is a setting of its own, off on a new install; "needs you" comes with
+        # notifications. The line says what is on.
+        from switchboard import keep
+        self.no_link_app()
+        code, out = self.setup('s')
+        self.assertSaid('Claude Code a status line with the account and its limits, and ' + firstrun.WHERE_NEEDS_YOU,
+                        out)
+        self.assertNotIn('long turn', ' '.join(out.split()))
+        keep.notify_done_by_you(True)                       # switchboard notify done on
+        code, out = self.setup('s')
+        self.assertSaid('Claude Code a status line with the account and its limits, and ' + firstrun.WHERE_NOTIFY,
+                        out)
+
     def test_the_page_line_is_always_there(self):
         self.no_link_app()
         code, out = self.setup('s')
@@ -944,6 +1093,24 @@ class ThePageNotRunning(Setup):
         self.assertEqual(self.page_starts, ['job'])
         self.assertSaid('Run switchboard doctor', out)
         self.assertNotIn('switchboard serve', out)
+
+
+class ToStdout(object):
+    """Writes to whatever standard output is when it is written to (run_cli captures it)."""
+
+    def write(self, text):
+        return sys.stdout.write(text)
+
+    def flush(self):
+        pass
+
+
+def answering(said):
+    """An answer for the stand-in Mac's terminal: the question and the answer printed, as a terminal shows them."""
+    def answer(prompt):
+        sys.stdout.write(prompt + said + '\n')
+        return said
+    return answer
 
 
 def cli_free_port():
@@ -1026,17 +1193,29 @@ class NoDeadEndWithoutClaudeCode(Setup):
         self.with_codex()
 
     def test_not_installed_codex_is_offered_and_added(self):
+        # The step is Codex's, and its question is the providers code's one offer: the notice, one question (y here).
         self.patch(connect, 'claude_bin', lambda: None)
-        code, out = self.setup('')
+        code, out = self.setup()
         self.assertEqual(code, 0, out)
         self.assertEqual(self.steps(out), [('1', '2', 'Your account'), ('2', '2', 'Codex')])
-        self.assertIn('  Codex is on this Mac too. Add it to your list?  Enter adds it, s skips.  \n'
-                      '  Added Codex. Your order: Claude, Codex.\n', out)
-        self.assertEqual(self.codex, 'added')
+        self.assertEqual((out.count(STEP_NOTICE), out.count(STEP_OFFER)), (1, 1))
+        self.assertLess(out.index('2 of 2  Codex'), out.index(STEP_NOTICE))
+        self.assertEqual((self.offered, self.codex), ([None], 'added'))
 
     def test_not_signed_in_codex_is_offered_and_skipped(self):
-        code, out = self.setup('s')
+        self.providers_kit(answers=('n',))
+        code, out = self.setup()
         self.assertEqual(self.steps(out), [('1', '2', 'Your account'), ('2', '2', 'Codex')])
+        self.assertEqual((out.count(STEP_NOTICE), out.count(STEP_OFFER)), (1, 1))
+        self.assertEqual((self.offered, self.codex), ([None], 'here'))
+
+    def test_a_codex_the_offer_would_not_ask_about_is_no_step(self):
+        # Codex here but not signed in by its own say: the one offer asks nothing about it (bare add adds only a
+        # signed-in one), so the first run plans no step for it rather than a step with nothing in it.
+        self.providers_kit(signed_in=None)
+        code, out = self.setup()
+        self.assertEqual(self.steps(out), [('1', '1', 'Your account')])
+        self.assertNotIn(CODEX_NOTICE.split('\n')[0], out)               # its first line: in a step or not
         self.assertEqual(self.codex, 'here')
 
     def test_without_codex_it_is_the_one_step(self):
@@ -1060,8 +1239,9 @@ class NoDeadEndWithoutClaudeCode(Setup):
         for args in (('setup',), ('setup', '--yes')):
             with self.subTest(args=args):
                 code, out = self.run_cli(*args)
-                self.assertNotIn('Add it to your list?', out)
-        self.assertEqual(self.codex, 'here')
+                self.assertNotIn(CODEX_NOTICE.split('\n')[0], out)
+                self.assertNotIn(CODEX_OFFER, out)
+        self.assertEqual((self.offered, self.codex), ([], 'here'))
 
 
 class SwitchboardAdd(Setup):
@@ -1077,6 +1257,18 @@ class SwitchboardAdd(Setup):
                               '%s\n'
                               '2 accounts. Type switchboard to see them.\n' % term.AUTO_ON)
         self.assertEqual(self.fake.emails(), [A, B])
+        self.assertEqual(self.offered, [None])                          # Codex: one place, once
+
+    def test_add_with_codex_here_asks_about_it_once_after_the_accounts(self):
+        self.fake.hold(A)
+        self.with_codex()
+        self.page.sign_in(WAIT, over(B), got=B)
+        code, out = self.setup('s', args=('add',))
+        self.assertEqual(code, 0)
+        self.assertEqual(self.offered, [None])
+        self.assertEqual((out.count(CODEX_NOTICE), out.count(CODEX_OFFER)), (1, 1))
+        self.assertNotIn('Add it to your list?', out)
+        self.assertLess(out.index('Add another?'), out.index(CODEX_NOTICE))     # the accounts first, then Codex
 
     def test_add_without_the_page_says_why_it_uses_login_and_hints_at_the_same_account(self):
         self.page.stop()
@@ -1094,6 +1286,7 @@ class SwitchboardAdd(Setup):
                 self.signed_in(B)
         self.patch(cli, '_sleep', sleep)
         code, out = self.setup('n', args=('add',))
+        self.assertEqual(self.offered, [None])                          # Codex: one place, once
         self.assertIn(cli.ADD_WITHOUT_PAGE + '\n', out)
         self.assertIn('Claude Code signed in as maya@northwind.example, which is already here. Run /login again and '
                       'sign in as another account.\n', out)
@@ -1195,14 +1388,17 @@ LOGIN_KEPT = {
     'switchboard/server.py': 1,         # a comment
     'switchboard/places.py': 1,         # a comment
     'switchboard/keep.py': 3,           # comments: a /login is kept by itself
+    'switchboard/keeprun.py': 1,        # a pattern that reads Claude Code's own signed-out words, not a message
     'switchboard/providers/claude.py': 1,   # how Claude Code itself signs in, when it is signed out
     'switchboard/browser.py': 1,        # a claude.ai path, not a message
     'switchboard/engine.py': 1,         # an engine without browser sign-ins
-    'switchboard/session_hooks.py': 12,     # "do not run /login" to a chat
+    'switchboard/session_hooks.py': 13,     # "do not run /login" to a chat
     'switchboard/history.py': 2,        # comments
-    'switchboard/accounts/putback.py': 3,   # renewing the account in use after its login was lost four times
+    'switchboard/accounts/putback.py': 4,   # renewing the account in use after its login was lost four times;
+                                            # a docstring that names Claude Code's own /login (no person sees it)
     'switchboard/accounts/capture.py': 2,   # comments
     'switchboard/accounts/roster.py': 3,    # the engine's add_current: Claude Code itself is signed out
+    'switchboard/router/hand.py': 1,        # a pattern that reads a signed-out app's own words, not a message
 }
 
 

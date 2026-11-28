@@ -70,18 +70,23 @@ def said(v):
     return '%s (%s)' % v if v[1] else v[0]
 
 
-def update_line(before, after, code):
+def update_line(before, after, code, behind=None):
     """The last line of `switchboard update`. before and after are (version, build) or None when not known; code is
-    the installer's exit code. It never guesses: a version it could not read is said to be unknown."""
+    the installer's exit code; behind is a newer version that is out and that Homebrew does not have yet (only for an
+    install by Homebrew: homebrew_behind). It never guesses: a version it could not read is said to be unknown."""
     if after is None:
         if before is None:
             return 'Could not read which version is installed now.'
         return 'Could not read which version is installed now. Before the update it was %s.' % said(before)
+    still = ' Homebrew does not have Switchboard %s yet; switchboard update takes it once it does.' % behind \
+        if behind else ''
     if before is None:
-        return 'Switchboard is now %s.' % said(after)
+        return 'Switchboard is now %s.%s' % (said(after), still)
     if before == after:
+        if still and code == 0:
+            return 'Switchboard %s is the newest Homebrew has.%s' % (said(after), still)
         return ('Switchboard %s was already the newest.' if code == 0 else 'Switchboard is still %s.') % said(after)
-    return 'Updated Switchboard from %s to %s.' % (said(before), said(after))
+    return 'Updated Switchboard from %s to %s.%s' % (said(before), said(after), still)
 
 
 # ---------- whether a newer version exists ----------
@@ -181,6 +186,38 @@ def _from_homebrew(find_brew):
     if compare(version, '0') is None:
         raise NotKnown('Homebrew lists no version Switchboard could read')
     return version
+
+
+_REPO_LINE = re.compile(r'^REPO="\$\{SWITCHBOARD_REPO:-([A-Za-z0-9._-]+/[A-Za-z0-9._-]+)\}"', re.M)
+_URL_LINE = re.compile(r'^INSTALL_URL="(https://[^"$]*)\$REPO(/[^"$]*)"', re.M)
+
+
+def installer_address(folder):
+    """The address the one-line installer in folder (a copy of the repository: Homebrew's) is fetched from, as its
+    install.sh sets it (INSTALL_URL with REPO); None when it can't be read or REPO still holds its placeholder."""
+    text = core.read_text(os.path.join(folder, 'install.sh'))
+    repo, url = _REPO_LINE.search(text), _URL_LINE.search(text)
+    if not repo or not url or repo.group(1).startswith('OWNER/'):
+        return None
+    return url.group(1) + repo.group(1) + url.group(2)
+
+
+def homebrew_behind(after):
+    """For an install by Homebrew, after an update to after ((version, build) or None): the newest version the place
+    an install from the web updates from names (_from_web, beside installer_address of Homebrew's copy), when it is
+    newer than after; else None, also when it can't look. A release reaches Homebrew when its cask is updated, which
+    comes after the release itself."""
+    how, where = source()
+    if how != 'homebrew' or after is None:
+        return None
+    installer = installer_address(where)
+    if installer is None:
+        return None
+    try:
+        newest = _from_web(installer)
+    except NotKnown:
+        return None
+    return newest if compare(newest, after[0]) == 1 else None
 
 
 def _brew_path():

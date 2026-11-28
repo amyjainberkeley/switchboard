@@ -1,0 +1,64 @@
+{
+ "v": 1,
+ "about": "What each provider's app can be asked for when Switchboard starts it for a person: the words its own model option takes, the efforts it takes, and how each is given on its command line. Every entry says where it was read and on which day. A model's line is the maker's own, from the maker's own list of its models.",
+ "providers": {
+  "claude": {
+   "models": [
+    {"id": "haiku", "name": "Haiku", "says": "fast and efficient Haiku model for simple tasks",
+     "source": "https://code.claude.com/docs/en/model-config (the table of model aliases: the words claude --model takes)", "read": "2026-11-25"},
+    {"id": "sonnet", "name": "Sonnet", "says": "latest Sonnet model for daily coding tasks",
+     "source": "https://code.claude.com/docs/en/model-config (the table of model aliases: the words claude --model takes)", "read": "2026-11-25"},
+    {"id": "opus", "name": "Opus", "says": "latest Opus model for complex reasoning tasks",
+     "source": "https://code.claude.com/docs/en/model-config (the table of model aliases: the words claude --model takes)", "read": "2026-11-25"},
+    {"id": "fable", "name": "Fable", "says": "For demanding reasoning and long-horizon agentic work",
+     "source": "https://platform.claude.com/docs/en/about-claude/models/overview (the Description row, for Fable 5.2); the alias fable is in the table of model aliases at https://code.claude.com/docs/en/model-config, and Fable 5.2 needs Claude Code 2.1.321 or newer", "read": "2026-11-25"}
+   ],
+   "efforts": {"values": ["low", "medium", "high", "xhigh", "max"],
+               "source": "claude --help, Claude Code 2.1.309: --effort <level> (low, medium, high, xhigh, max); https://code.claude.com/docs/en/model-config: the levels depend on the model",
+               "read": "2026-11-25"},
+   "start": {
+    "model": {"args": ["--model", "{model}"], "since": "2.1.309",
+              "source": "claude --help, Claude Code 2.1.309: --model <model>, Model for the current session (an alias such as fable, opus or sonnet, or a model's full name)",
+              "read": "2026-11-23"},
+    "effort": {"args": ["--effort", "{effort}"], "since": "2.1.309",
+               "source": "claude --help, Claude Code 2.1.309: --effort <level>, Effort level for the current session",
+               "read": "2026-11-23"}
+   }
+  },
+  "codex": {
+   "models": [
+    {"id": "gpt-6.2-astra", "name": "GPT-6.2 Astra", "says": "Our most capable model for complex coding and professional work.",
+     "source": "OpenAI's own list of models as Codex 0.169.1 keeps it (~/.codex/models_cache.json), compared with https://learn.chatgpt.com/docs/models", "read": "2026-11-25"},
+    {"id": "gpt-6.2-sol", "name": "GPT-6.2 Sol", "says": "Fast, go-to model for coding and everyday work.",
+     "source": "OpenAI's own list of models as Codex 0.169.1 keeps it (~/.codex/models_cache.json), compared with https://learn.chatgpt.com/docs/models", "read": "2026-11-25"},
+    {"id": "gpt-6.1-terra", "name": "GPT-6.1 Terra", "says": "Efficient model that excels at visual understanding and computer use.",
+     "source": "OpenAI's own list of models as Codex 0.169.1 keeps it (~/.codex/models_cache.json), compared with https://learn.chatgpt.com/docs/models", "read": "2026-11-25"},
+    {"id": "gpt-6.1-sol", "name": "GPT-6.1 Sol", "says": "Previous generation model for coding and everyday work.",
+     "source": "OpenAI's own list of models as Codex 0.169.1 keeps it (~/.codex/models_cache.json), compared with https://learn.chatgpt.com/docs/models", "read": "2026-11-25"},
+    {"id": "gpt-6-astra", "name": "GPT-6 Astra", "says": "Previous generation model for complex coding and professional work.",
+     "source": "OpenAI's own list of models as Codex 0.169.1 keeps it (~/.codex/models_cache.json), compared with https://learn.chatgpt.com/docs/models", "read": "2026-11-25"},
+    {"id": "gpt-6-sol", "name": "GPT-6 Sol", "says": "Legacy model for coding and everyday work.",
+     "source": "OpenAI's own list of models as Codex 0.169.1 keeps it (~/.codex/models_cache.json), compared with https://learn.chatgpt.com/docs/models", "read": "2026-11-25"},
+    {"id": "gpt-6-luna", "name": "GPT-6 Luna", "says": "Fast and affordable model for easier tasks.",
+     "source": "OpenAI's own list of models as Codex 0.169.1 keeps it (~/.codex/models_cache.json), compared with https://learn.chatgpt.com/docs/models", "read": "2026-11-25"},
+    {"id": "gpt-5.6-sol", "name": "GPT-5.6 Sol", "says": "Legacy model for coding and everyday work.",
+     "source": "OpenAI's own list of models as Codex 0.169.1 keeps it (~/.codex/models_cache.json)", "read": "2026-11-25"},
+    {"id": "gpt-5.6-terra", "name": "GPT-5.6 Terra", "says": "Legacy balanced model for agentic coding.",
+     "source": "OpenAI's own list of models as Codex 0.169.1 keeps it (~/.codex/models_cache.json)", "read": "2026-11-25"},
+    {"id": "gpt-5.6-luna", "name": "GPT-5.6 Luna", "says": "Legacy fast model for simpler tasks.",
+     "source": "OpenAI's own list of models as Codex 0.169.1 keeps it (~/.codex/models_cache.json)", "read": "2026-11-25"}
+   ],
+   "efforts": {"values": ["low", "medium", "high", "xhigh", "max", "ultra"],
+               "source": "OpenAI's own list of models as Codex 0.169.1 keeps it (~/.codex/models_cache.json): low to max on every model, and ultra on most (GPT-6 Luna and GPT-5.6 Luna stop at max); https://learn.chatgpt.com/docs/config-file/config-reference: model_reasoning_effort",
+               "read": "2026-11-25"},
+   "start": {
+    "model": {"args": ["--model", "{model}"], "since": "0.155.1",
+              "source": "codex --help, codex-cli 0.155.1 and 0.169.1: -m, --model <MODEL>, Model the agent should use",
+              "read": "2026-11-23"},
+    "effort": {"args": ["-c", "model_reasoning_effort=\"{effort}\""], "since": "0.169.1",
+               "source": "The configuration key model_reasoning_effort: https://learn.chatgpt.com/docs/config-file/config-reference. The option that sets a key for one start, -c, --config <key=value>: the installed program's own help, codex --help, codex-cli 0.169.1",
+               "read": "2026-11-25"}
+   }
+  }
+ }
+}

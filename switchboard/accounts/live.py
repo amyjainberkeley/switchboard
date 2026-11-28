@@ -7,12 +7,14 @@ item is not there (an authoritative answer), the file is what Claude Code itself
 
 What a login can be (Login.kind): 'oauth' (an account login with at least one token), 'wiped' (the login object with
 both tokens emptied: what Claude Code leaves after the server refused its refresh), 'no_login' (an object with no
-login in it, e.g. only MCP logins), 'api_key' (a bare console key), 'empty', 'unparseable'. Only an 'oauth' login
-with both tokens may ever be kept in a slot.
+login in it, e.g. only MCP logins), 'sealed' (no login in the item, and Claude Code's overflow pointer says the
+login sits encrypted in one of its overflow items: a login Switchboard cannot read), 'api_key' (a bare console key),
+'empty', 'unparseable'. Only an 'oauth' login with both tokens may ever be kept in a slot.
 
 Writing: the target's saved login, with the live item's machine-wide siblings (facts.SHARED_SIBLINGS) kept from the
 live item as they are (present or absent): everything else travels with the account. Then the plaintext file gets
-the same bytes when it exists, so a running Claude Code notices at once.
+the same bytes when it exists, so a running Claude Code notices at once. Both are made under Claude Code's save lock
+on its item (ccfiles.storage_lock), so they never land beside one of its own saves.
 """
 import hashlib
 import json
@@ -21,7 +23,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Optional, Tuple
 
-from . import ccfiles, facts
+from . import ccfiles, facts, keychain
 from .api import ABSENT, PRESENT, UNREADABLE, Read
 
 
@@ -96,6 +98,11 @@ def parse(text):
         return Login(text=text, kind='unparseable')
     oauth = blob.get(facts.OAUTH_KEY)
     if not isinstance(oauth, dict):
+        pointer = blob.get(facts.OVERFLOW_KEY)
+        if isinstance(pointer, dict) and 'login' in pointer:
+            # Claude Code 2.1.331 moved the login itself into an overflow item (it does so only for a sign-in that
+            # also holds organization entries): signed in, in a form Switchboard does not read
+            return Login(text=text, kind='sealed', blob=blob)
         return Login(text=text, kind='no_login', blob=blob)
     access, refresh = oauth.get('accessToken'), oauth.get('refreshToken')
     has_access = isinstance(access, str) and bool(access)
@@ -163,9 +170,10 @@ def dump(blob):
 
 def compose(target_blob, live_blob):
     """What a switch writes: the target's login and everything that travels with it, plus the live item's machine-wide
-    siblings as they are now (a sibling the live item no longer has is not brought back from the saved copy)."""
+    siblings as they are now (a sibling the live item no longer has is not brought back from the saved copy). Claude
+    Code's overflow pointer is never taken from the saved copy, also when there is no live item at all."""
     if not isinstance(live_blob, dict):
-        return dict(target_blob)
+        return dict((k, v) for k, v in target_blob.items() if k != facts.OVERFLOW_KEY)
     out = dict((k, v) for k, v in target_blob.items() if k not in facts.SHARED_SIBLINGS)
     for k in facts.SHARED_SIBLINGS:
         if k in live_blob:
@@ -228,7 +236,8 @@ def read_live(ctx, fresh=True, interactive=False, env=None):
     service = facts.keychain_service(env)
     account = facts.keychain_account(env)
     kc = ctx.keychain.read(service, account, fresh=fresh, interactive=interactive)
-    if kc.kind == UNREADABLE and fresh and kc.why not in ('timeout', 'busy', 'no_tool', 'no_keychain', 'dialog'):
+    if kc.kind == UNREADABLE and fresh and kc.why not in ('timeout', 'busy', 'no_tool', 'test_run', 'no_keychain',
+                                                          'dialog'):
         ctx.sleep(0.3)                                      # one more try for a passing failure
         kc = ctx.keychain.read(service, account, fresh=True, interactive=True)
     if kc.kind == PRESENT and (kc.value or '').strip():
@@ -267,13 +276,80 @@ def read_live(ctx, fresh=True, interactive=False, env=None):
     return LiveRead(Read(ABSENT), None, service)
 
 
-def write_live(ctx, text, interactive=True, env=None):
-    """Put a login in Claude Code's live item (and its plaintext file when one exists). keychain.Done."""
+NOT_KNOWN = object()        # write_live's `before` when the caller does not say what the item held
+
+
+def ended_write(back, text, before=NOT_KNOWN):
+    """What a write that was ended at its deadline did, told by a read of the item itself right after (a Read):
+    'landed' (it holds text), 'unchanged' (it holds what it held before the write: the text `before`, or no item when
+    before is None), or None (anything else, no answer, or `before` not known)."""
+    if back.kind == PRESENT and back.value == text:
+        return 'landed'
+    if before is NOT_KNOWN:
+        return None
+    if (back.kind == ABSENT and before is None) or (back.kind == PRESENT and before is not None and
+                                                    back.value == before):
+        return 'unchanged'
+    return None
+
+
+def write_live(ctx, text, interactive=True, env=None, create_only=False, held=None, before=NOT_KNOWN, wrote=None,
+               keep_file=False):
+    """Put a login in Claude Code's live item (and its plaintext file when one exists). keychain.Done.
+
+    Made under Claude Code's save lock on the item. held: that lock, when the caller already holds it (a caller that
+    reads, decides and writes under it); else it is taken here, and ccfiles.LockBusy is raised when Claude Code keeps
+    it past its budget, or when the lock given is no longer this process's (taken over as stale, or let go by
+    ccfiles.release_all on the way out): nothing was written. create_only: only create the item (Done(False,
+    'exists') when it is there). A write ended at its deadline (Done.ended: it can no longer land) is read back at
+    once, in the same hold: holding `text`, it landed (Done(True)); holding `before` (the item's text before the
+    write, None for no item), it did not (Done(False, 'unchanged')); anything else is not known, and the Keychain's
+    answer is returned as it was. wrote (a dict, when given) gets 'file' once the write landed: the stamp of the
+    plaintext file this write put there (ccfiles.bump_credentials_file), None when it rewrote none. Claude Code's plain
+    login file, when the sign-in hold put it there (putback.hold_drop), is removed instead: the item holds the login.
+    keep_file (a promote's write, and a put-back's with the sign-in hold on: the processes told "no such item" read
+    their login from that file for a while yet): that file is never removed here. When it holds text byte for byte it
+    is left exactly as it is; else it is rewritten with text (an older login in it must not be what a process on its
+    way to the file finds). wrote['file'] is the stamp of the file as it stands after that; the caller says what
+    becomes of it."""
     env = ctx.env if env is None else env
-    done = ctx.keychain.write(facts.keychain_service(env), facts.keychain_account(env), text, interactive=interactive)
+    if held is None:
+        with storage_lock(ctx, env) as lock:
+            return write_live(ctx, text, interactive=interactive, env=env, create_only=create_only, held=lock,
+                              before=before, wrote=wrote, keep_file=keep_file)
+    if not held.still_held():
+        raise ccfiles.LockBusy(held.path)
+    more = {'create_only': True} if create_only else {}
+    service, account = facts.keychain_service(env), facts.keychain_account(env)
+    done = ctx.keychain.write(service, account, text, interactive=interactive, **more)
+    if not done.ok and getattr(done, 'ended', False):
+        did = ended_write(ctx.keychain.read(service, account, fresh=True, interactive=True), text, before)
+        if did == 'landed':
+            done = keychain.Done(True)
+        elif did == 'unchanged':
+            done = keychain.Done(False, 'unchanged')
     if done.ok:
-        ccfiles.bump_credentials_file(env, ctx.home, text, log=ctx.log)
+        from . import putback               # a plain login file the sign-in hold put there goes; it is never rewritten
+        if keep_file:
+            path = facts.credentials_file(env, ctx.home)
+            stamp = putback.file_stamp(path)
+            fr, raw = ccfiles.read_bytes(path)
+            if stamp is None or fr.kind != PRESENT or raw != text.encode('utf-8') or \
+                    putback.file_stamp(path) != stamp:
+                stamp = ccfiles.bump_credentials_file(env, ctx.home, text, log=ctx.log,
+                                                      announce=lambda st: putback.hold_own(ctx, st))
+        else:
+            stamp = None if putback.hold_drop(ctx, env) else ccfiles.bump_credentials_file(
+                env, ctx.home, text, log=ctx.log, announce=lambda st: putback.hold_own(ctx, st))
+        if wrote is not None:
+            wrote['file'] = stamp
     return done
+
+
+def storage_lock(ctx, env=None, budget_s=facts.STORAGE_LOCK_BUDGET_S):
+    """Claude Code's save lock on the live item for this environment (ccfiles.storage_lock), waiting on ctx's clock."""
+    env = ctx.env if env is None else env
+    return ccfiles.storage_lock(env, ctx.home, budget_s=budget_s, mono=ctx.mono, sleep=ctx.sleep, log=ctx.log)
 
 
 _CONFIG_CACHE = {}

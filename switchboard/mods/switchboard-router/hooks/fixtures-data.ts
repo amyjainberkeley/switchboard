@@ -1,0 +1,25603 @@
+// fixtures.json as a module, since a test can import only code files. Remade from fixtures.json, never edited:
+//   { head -n 2 fixtures-data.ts; printf 'export default '; cat fixtures.json; } > new.ts && mv new.ts fixtures-data.ts
+export default [
+ {
+  "name": "no plan at all (null) does nothing: no_plan",
+  "plan": null,
+  "kind": "find",
+  "here": "claude",
+  "now": 1764239000.0,
+  "want": {
+   "do": "nothing",
+   "reason": "no_plan",
+   "kind": "find",
+   "passed": [],
+   "why": null
+  }
+ },
+ {
+  "name": "a plan that is a list, not an object: no_plan",
+  "plan": [
+   {
+    "v": 1,
+    "made_at": 1764239000.0,
+    "good_for_s": 180,
+    "on": true,
+    "dry": false,
+    "by": "switchboard 0.2.0 (abc1234)",
+    "order": [
+     "claude",
+     "codex"
+    ],
+    "agents": {
+     "claude": {
+      "can": true,
+      "why_not": null,
+      "room": "room",
+      "back_at": null,
+      "at_lines": false,
+      "line": {
+       "five_hour": 90,
+       "week": 95
+      },
+      "in_use": "1"
+     },
+     "codex": {
+      "can": true,
+      "why_not": null,
+      "room": "room",
+      "back_at": null,
+      "at_lines": false
+     }
+    },
+    "routes": {
+     "find": [
+      {
+       "agent": "claude",
+       "model": "haiku",
+       "effort": "medium"
+      },
+      {
+       "agent": "codex",
+       "model": "gpt-6-luna",
+       "effort": "medium"
+      }
+     ],
+     "review": [
+      {
+       "agent": "claude",
+       "model": "sonnet",
+       "effort": "high"
+      }
+     ],
+     "build": [
+      {
+       "agent": "codex",
+       "model": "gpt-6.2-astra",
+       "effort": "high"
+      },
+      {
+       "agent": "claude",
+       "model": "opus",
+       "effort": "high"
+      }
+     ],
+     "write": [
+      {
+       "agent": "claude",
+       "model": "sonnet",
+       "effort": null
+      }
+     ],
+     "fix": [
+      {
+       "agent": "claude",
+       "model": null,
+       "effort": "high"
+      }
+     ],
+     "other": [
+      {
+       "agent": "claude",
+       "model": null,
+       "effort": null
+      }
+     ]
+    },
+    "why": {
+     "find": "your route for lookups",
+     "review": "your route for reviews",
+     "build": "your route for builds",
+     "write": "your route for writing",
+     "fix": "your route for fixes",
+     "other": "your route for other jobs"
+    },
+    "helpers": {
+     "force": false
+    },
+    "chat": {
+     "effort": false,
+     "model_on_first_turn": false
+    },
+    "hand": {
+     "on": true,
+     "write": false,
+     "max_s": 900
+    },
+    "carry_on": false,
+    "kinds": {
+     "order": [
+      "build",
+      "fix",
+      "review",
+      "plan",
+      "find",
+      "write",
+      "other"
+     ],
+     "light": "find",
+     "cut": 300,
+     "table": {
+      "build": [
+       "add",
+       "implement"
+      ],
+      "fix": [
+       "fix",
+       "debug"
+      ]
+     }
+    },
+    "types": {
+     "Explore": "find",
+     "Plan": "plan",
+     "explorer": "find"
+    }
+   }
+  ],
+  "kind": "find",
+  "here": "claude",
+  "now": 1764239000.0,
+  "want": {
+   "do": "nothing",
+   "reason": "no_plan",
+   "kind": "find",
+   "passed": [],
+   "why": null
+  }
+ },
+ {
+  "name": "a plan of another v (2): no_plan",
+  "plan": {
+   "v": 2,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false,
+     "line": {
+      "five_hour": 90,
+      "week": 95
+     },
+     "in_use": "1"
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "find",
+  "here": "claude",
+  "now": 1764239000.0,
+  "want": {
+   "do": "nothing",
+   "reason": "no_plan",
+   "kind": "find",
+   "passed": [],
+   "why": null
+  }
+ },
+ {
+  "name": "a plan with no v: no_plan",
+  "plan": {
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false,
+     "line": {
+      "five_hour": 90,
+      "week": 95
+     },
+     "in_use": "1"
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "find",
+  "here": "claude",
+  "now": 1764239000.0,
+  "want": {
+   "do": "nothing",
+   "reason": "no_plan",
+   "kind": "find",
+   "passed": [],
+   "why": null
+  }
+ },
+ {
+  "name": "v written as the text \"1\": no_plan",
+  "plan": {
+   "v": "1",
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false,
+     "line": {
+      "five_hour": 90,
+      "week": 95
+     },
+     "in_use": "1"
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "find",
+  "here": "claude",
+  "now": 1764239000.0,
+  "want": {
+   "do": "nothing",
+   "reason": "no_plan",
+   "kind": "find",
+   "passed": [],
+   "why": null
+  }
+ },
+ {
+  "name": "v written as true (not a number): no_plan",
+  "plan": {
+   "v": true,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false,
+     "line": {
+      "five_hour": 90,
+      "week": 95
+     },
+     "in_use": "1"
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "find",
+  "here": "claude",
+  "now": 1764239000.0,
+  "want": {
+   "do": "nothing",
+   "reason": "no_plan",
+   "kind": "find",
+   "passed": [],
+   "why": null
+  }
+ },
+ {
+  "name": "v written as 1.0 is the number 1: usable",
+  "plan": {
+   "v": 1.0,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false,
+     "line": {
+      "five_hour": 90,
+      "week": 95
+     },
+     "in_use": "1"
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "find",
+  "here": "claude",
+  "now": 1764239000.0,
+  "want": {
+   "do": "model",
+   "model": "haiku",
+   "effort": "medium",
+   "kind": "find",
+   "passed": [],
+   "why": "your route for lookups",
+   "reason": "route"
+  }
+ },
+ {
+  "name": "made_at written as text: no_plan",
+  "plan": {
+   "v": 1,
+   "made_at": "1764239000",
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false,
+     "line": {
+      "five_hour": 90,
+      "week": 95
+     },
+     "in_use": "1"
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "find",
+  "here": "claude",
+  "now": 1764239000.0,
+  "want": {
+   "do": "nothing",
+   "reason": "no_plan",
+   "kind": "find",
+   "passed": [],
+   "why": null
+  }
+ },
+ {
+  "name": "good_for_s missing: no_plan",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false,
+     "line": {
+      "five_hour": 90,
+      "week": 95
+     },
+     "in_use": "1"
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "find",
+  "here": "claude",
+  "now": 1764239000.0,
+  "want": {
+   "do": "nothing",
+   "reason": "no_plan",
+   "kind": "find",
+   "passed": [],
+   "why": null
+  }
+ },
+ {
+  "name": "on missing: no_plan",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false,
+     "line": {
+      "five_hour": 90,
+      "week": 95
+     },
+     "in_use": "1"
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "find",
+  "here": "claude",
+  "now": 1764239000.0,
+  "want": {
+   "do": "nothing",
+   "reason": "no_plan",
+   "kind": "find",
+   "passed": [],
+   "why": null
+  }
+ },
+ {
+  "name": "on written as \"yes\", not true: no_plan",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": "yes",
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false,
+     "line": {
+      "five_hour": 90,
+      "week": 95
+     },
+     "in_use": "1"
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "find",
+  "here": "claude",
+  "now": 1764239000.0,
+  "want": {
+   "do": "nothing",
+   "reason": "no_plan",
+   "kind": "find",
+   "passed": [],
+   "why": null
+  }
+ },
+ {
+  "name": "agents not an object: no_plan",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": [],
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "find",
+  "here": "claude",
+  "now": 1764239000.0,
+  "want": {
+   "do": "nothing",
+   "reason": "no_plan",
+   "kind": "find",
+   "passed": [],
+   "why": null
+  }
+ },
+ {
+  "name": "routes not an object: no_plan",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false,
+     "line": {
+      "five_hour": 90,
+      "week": 95
+     },
+     "in_use": "1"
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": [],
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "find",
+  "here": "claude",
+  "now": 1764239000.0,
+  "want": {
+   "do": "nothing",
+   "reason": "no_plan",
+   "kind": "find",
+   "passed": [],
+   "why": null
+  }
+ },
+ {
+  "name": "no hand switch at all: no_plan",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false,
+     "line": {
+      "five_hour": 90,
+      "week": 95
+     },
+     "in_use": "1"
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "find",
+  "here": "claude",
+  "now": 1764239000.0,
+  "want": {
+   "do": "nothing",
+   "reason": "no_plan",
+   "kind": "find",
+   "passed": [],
+   "why": null
+  }
+ },
+ {
+  "name": "hand.on written as \"yes\", not true: no_plan",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false,
+     "line": {
+      "five_hour": 90,
+      "week": 95
+     },
+     "in_use": "1"
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": "yes",
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "find",
+  "here": "claude",
+  "now": 1764239000.0,
+  "want": {
+   "do": "nothing",
+   "reason": "no_plan",
+   "kind": "find",
+   "passed": [],
+   "why": null
+  }
+ },
+ {
+  "name": "a plan still good at the last second (now = made_at + good_for_s) is used",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false,
+     "line": {
+      "five_hour": 90,
+      "week": 95
+     },
+     "in_use": "1"
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "find",
+  "here": "claude",
+  "now": 1764239180.0,
+  "want": {
+   "do": "model",
+   "model": "haiku",
+   "effort": "medium",
+   "kind": "find",
+   "passed": [],
+   "why": "your route for lookups",
+   "reason": "route"
+  }
+ },
+ {
+  "name": "a plan one second past made_at + good_for_s is old: old_plan",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false,
+     "line": {
+      "five_hour": 90,
+      "week": 95
+     },
+     "in_use": "1"
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "find",
+  "here": "claude",
+  "now": 1764239181.0,
+  "want": {
+   "do": "nothing",
+   "reason": "old_plan",
+   "kind": "find",
+   "passed": [],
+   "why": null
+  }
+ },
+ {
+  "name": "half a second past made_at + good_for_s is old too: old_plan",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false,
+     "line": {
+      "five_hour": 90,
+      "week": 95
+     },
+     "in_use": "1"
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "find",
+  "here": "claude",
+  "now": 1764239180.5,
+  "want": {
+   "do": "nothing",
+   "reason": "old_plan",
+   "kind": "find",
+   "passed": [],
+   "why": null
+  }
+ },
+ {
+  "name": "a clock behind made_at still uses the plan (only the end is checked)",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false,
+     "line": {
+      "five_hour": 90,
+      "week": 95
+     },
+     "in_use": "1"
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "find",
+  "here": "claude",
+  "now": 1764238970.0,
+  "want": {
+   "do": "model",
+   "model": "haiku",
+   "effort": "medium",
+   "kind": "find",
+   "passed": [],
+   "why": "your route for lookups",
+   "reason": "route"
+  }
+ },
+ {
+  "name": "a plan with good_for_s below zero is old at once: old_plan",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": -1,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false,
+     "line": {
+      "five_hour": 90,
+      "week": 95
+     },
+     "in_use": "1"
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "find",
+  "here": "claude",
+  "now": 1764239000.0,
+  "want": {
+   "do": "nothing",
+   "reason": "old_plan",
+   "kind": "find",
+   "passed": [],
+   "why": null
+  }
+ },
+ {
+  "name": "routing turned off (on false): off",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": false,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false,
+     "line": {
+      "five_hour": 90,
+      "week": 95
+     },
+     "in_use": "1"
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "find",
+  "here": "claude",
+  "now": 1764239000.0,
+  "want": {
+   "do": "nothing",
+   "reason": "off",
+   "kind": "find",
+   "passed": [],
+   "why": null
+  }
+ },
+ {
+  "name": "a plan that is old and off reads as old first: old_plan",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": false,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false,
+     "line": {
+      "five_hour": 90,
+      "week": 95
+     },
+     "in_use": "1"
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "find",
+  "here": "claude",
+  "now": 1764239600.0,
+  "want": {
+   "do": "nothing",
+   "reason": "old_plan",
+   "kind": "find",
+   "passed": [],
+   "why": null
+  }
+ },
+ {
+  "name": "a plan of another v that is also off reads as no_plan first",
+  "plan": {
+   "v": 2,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": false,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false,
+     "line": {
+      "five_hour": 90,
+      "week": 95
+     },
+     "in_use": "1"
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "find",
+  "here": "claude",
+  "now": 1764239000.0,
+  "want": {
+   "do": "nothing",
+   "reason": "no_plan",
+   "kind": "find",
+   "passed": [],
+   "why": null
+  }
+ },
+ {
+  "name": "a kind with no route stays where it was typed: no_route",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false,
+     "line": {
+      "five_hour": 90,
+      "week": 95
+     },
+     "in_use": "1"
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "plan",
+  "here": "claude",
+  "now": 1764239000.0,
+  "want": {
+   "do": "nothing",
+   "reason": "no_route",
+   "kind": "plan",
+   "passed": [],
+   "why": null
+  }
+ },
+ {
+  "name": "a kind whose route is an empty list: no_route",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false,
+     "line": {
+      "five_hour": 90,
+      "week": 95
+     },
+     "in_use": "1"
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": []
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "find",
+  "here": "claude",
+  "now": 1764239000.0,
+  "want": {
+   "do": "nothing",
+   "reason": "no_route",
+   "kind": "find",
+   "passed": [],
+   "why": "your route for lookups"
+  }
+ },
+ {
+  "name": "no kind at all (null): no_route",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false,
+     "line": {
+      "five_hour": 90,
+      "week": 95
+     },
+     "in_use": "1"
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": null,
+  "here": "claude",
+  "now": 1764239000.0,
+  "want": {
+   "do": "nothing",
+   "reason": "no_route",
+   "kind": null,
+   "passed": [],
+   "why": null
+  }
+ },
+ {
+  "name": "a kind that is not text (7): no_route",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false,
+     "line": {
+      "five_hour": 90,
+      "week": 95
+     },
+     "in_use": "1"
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": 7,
+  "here": "claude",
+  "now": 1764239000.0,
+  "want": {
+   "do": "nothing",
+   "reason": "no_route",
+   "kind": 7,
+   "passed": [],
+   "why": null
+  }
+ },
+ {
+  "name": "a route for this kind that is not a list: no_plan",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false,
+     "line": {
+      "five_hour": 90,
+      "week": 95
+     },
+     "in_use": "1"
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": {
+     "agent": "claude"
+    }
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "find",
+  "here": "claude",
+  "now": 1764239000.0,
+  "want": {
+   "do": "nothing",
+   "reason": "no_plan",
+   "kind": "find",
+   "passed": [],
+   "why": null
+  }
+ },
+ {
+  "name": "a choice that is not an object: no_plan",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false,
+     "line": {
+      "five_hour": 90,
+      "week": 95
+     },
+     "in_use": "1"
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     "claude"
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "find",
+  "here": "claude",
+  "now": 1764239000.0,
+  "want": {
+   "do": "nothing",
+   "reason": "no_plan",
+   "kind": "find",
+   "passed": [],
+   "why": null
+  }
+ },
+ {
+  "name": "a choice whose agent is not text: no_plan",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false,
+     "line": {
+      "five_hour": 90,
+      "week": 95
+     },
+     "in_use": "1"
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": 1,
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "find",
+  "here": "claude",
+  "now": 1764239000.0,
+  "want": {
+   "do": "nothing",
+   "reason": "no_plan",
+   "kind": "find",
+   "passed": [],
+   "why": null
+  }
+ },
+ {
+  "name": "a choice whose model is a number: no_plan",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false,
+     "line": {
+      "five_hour": 90,
+      "week": 95
+     },
+     "in_use": "1"
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": 5,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "find",
+  "here": "claude",
+  "now": 1764239000.0,
+  "want": {
+   "do": "nothing",
+   "reason": "no_plan",
+   "kind": "find",
+   "passed": [],
+   "why": null
+  }
+ },
+ {
+  "name": "a broken route for another kind does not stop this one",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false,
+     "line": {
+      "five_hour": 90,
+      "week": 95
+     },
+     "in_use": "1"
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     }
+    ],
+    "review": "broken"
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "find",
+  "here": "claude",
+  "now": 1764239000.0,
+  "want": {
+   "do": "model",
+   "model": "haiku",
+   "effort": "medium",
+   "kind": "find",
+   "passed": [],
+   "why": "your route for lookups",
+   "reason": "route"
+  }
+ },
+ {
+  "name": "the first choice is here and has room: its model and effort",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false,
+     "line": {
+      "five_hour": 90,
+      "week": 95
+     },
+     "in_use": "1"
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "find",
+  "here": "claude",
+  "now": 1764239000.0,
+  "want": {
+   "do": "model",
+   "model": "haiku",
+   "effort": "medium",
+   "kind": "find",
+   "passed": [],
+   "why": "your route for lookups",
+   "reason": "route"
+  }
+ },
+ {
+  "name": "a model without an effort: effort null",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false,
+     "line": {
+      "five_hour": 90,
+      "week": 95
+     },
+     "in_use": "1"
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "write",
+  "here": "claude",
+  "now": 1764239000.0,
+  "want": {
+   "do": "model",
+   "model": "sonnet",
+   "effort": null,
+   "kind": "write",
+   "passed": [],
+   "why": "your route for writing",
+   "reason": "route"
+  }
+ },
+ {
+  "name": "an effort without a model: model null",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false,
+     "line": {
+      "five_hour": 90,
+      "week": 95
+     },
+     "in_use": "1"
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "fix",
+  "here": "claude",
+  "now": 1764239000.0,
+  "want": {
+   "do": "model",
+   "model": null,
+   "effort": "high",
+   "kind": "fix",
+   "passed": [],
+   "why": "your route for fixes",
+   "reason": "route"
+  }
+ },
+ {
+  "name": "a choice here with neither model nor effort: nothing, stays",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false,
+     "line": {
+      "five_hour": 90,
+      "week": 95
+     },
+     "in_use": "1"
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "other",
+  "here": "claude",
+  "now": 1764239000.0,
+  "want": {
+   "do": "nothing",
+   "reason": "stays",
+   "kind": "other",
+   "passed": [],
+   "why": "your route for other jobs"
+  }
+ },
+ {
+  "name": "the first choice is another agent and the hand switch is on: hand",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false,
+     "line": {
+      "five_hour": 90,
+      "week": 95
+     },
+     "in_use": "1"
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "build",
+  "here": "claude",
+  "now": 1764239000.0,
+  "want": {
+   "do": "hand",
+   "to": "codex",
+   "model": "gpt-6.2-astra",
+   "effort": "high",
+   "kind": "build",
+   "passed": [],
+   "why": "your route for builds",
+   "reason": "route"
+  }
+ },
+ {
+  "name": "the first choice is out, the next is another agent: hand to it",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "out",
+     "back_at": 1764242600.0,
+     "at_lines": false
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "find",
+  "here": "claude",
+  "now": 1764239000.0,
+  "want": {
+   "do": "hand",
+   "to": "codex",
+   "model": "gpt-6-luna",
+   "effort": "medium",
+   "kind": "find",
+   "passed": [
+    [
+     "claude",
+     "out"
+    ]
+   ],
+   "why": "your route for lookups",
+   "reason": "route"
+  }
+ },
+ {
+  "name": "here = codex: a route that starts with claude hands to claude",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false,
+     "line": {
+      "five_hour": 90,
+      "week": 95
+     },
+     "in_use": "1"
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "find",
+  "here": "codex",
+  "now": 1764239000.0,
+  "want": {
+   "do": "hand",
+   "to": "claude",
+   "model": "haiku",
+   "effort": "medium",
+   "kind": "find",
+   "passed": [],
+   "why": "your route for lookups",
+   "reason": "route"
+  }
+ },
+ {
+  "name": "here = codex, hand switch off: claude is passed, codex takes its own choice",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false,
+     "line": {
+      "five_hour": 90,
+      "week": 95
+     },
+     "in_use": "1"
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": false,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "find",
+  "here": "codex",
+  "now": 1764239000.0,
+  "want": {
+   "do": "model",
+   "model": "gpt-6-luna",
+   "effort": "medium",
+   "kind": "find",
+   "passed": [
+    [
+     "claude",
+     "hand_off"
+    ]
+   ],
+   "why": "your route for lookups",
+   "reason": "route"
+  }
+ },
+ {
+  "name": "hand switch off, here = claude: codex is passed, claude takes its choice",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false,
+     "line": {
+      "five_hour": 90,
+      "week": 95
+     },
+     "in_use": "1"
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": false,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "build",
+  "here": "claude",
+  "now": 1764239000.0,
+  "want": {
+   "do": "model",
+   "model": "opus",
+   "effort": "high",
+   "kind": "build",
+   "passed": [
+    [
+     "codex",
+     "hand_off"
+    ]
+   ],
+   "why": "your route for builds",
+   "reason": "route"
+  }
+ },
+ {
+  "name": "hand switch off and the only choice is another agent: all_passed",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false,
+     "line": {
+      "five_hour": 90,
+      "week": 95
+     },
+     "in_use": "1"
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": false,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "build",
+  "here": "claude",
+  "now": 1764239000.0,
+  "want": {
+   "do": "nothing",
+   "reason": "all_passed",
+   "kind": "build",
+   "passed": [
+    [
+     "codex",
+     "hand_off"
+    ]
+   ],
+   "why": "your route for builds",
+   "back_at": null
+  }
+ },
+ {
+  "name": "a hand-over to an agent with neither model nor effort is still a hand (stays is only for here)",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false,
+     "line": {
+      "five_hour": 90,
+      "week": 95
+     },
+     "in_use": "1"
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "build": [
+     {
+      "agent": "codex",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "build",
+  "here": "claude",
+  "now": 1764239000.0,
+  "want": {
+   "do": "hand",
+   "to": "codex",
+   "model": null,
+   "effort": null,
+   "kind": "build",
+   "passed": [],
+   "why": "your route for builds",
+   "reason": "route"
+  }
+ },
+ {
+  "name": "a hand-over with an effort and no model",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false,
+     "line": {
+      "five_hour": 90,
+      "week": 95
+     },
+     "in_use": "1"
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "build": [
+     {
+      "agent": "codex",
+      "model": null,
+      "effort": "low"
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "build",
+  "here": "claude",
+  "now": 1764239000.0,
+  "want": {
+   "do": "hand",
+   "to": "codex",
+   "model": null,
+   "effort": "low",
+   "kind": "build",
+   "passed": [],
+   "why": "your route for builds",
+   "reason": "route"
+  }
+ },
+ {
+  "name": "a dry plan resolves the same (the adapter records would)",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": true,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false,
+     "line": {
+      "five_hour": 90,
+      "week": 95
+     },
+     "in_use": "1"
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "find",
+  "here": "claude",
+  "now": 1764239000.0,
+  "want": {
+   "do": "model",
+   "model": "haiku",
+   "effort": "medium",
+   "kind": "find",
+   "passed": [],
+   "why": "your route for lookups",
+   "reason": "route"
+  }
+ },
+ {
+  "name": "an agent named twice: its first choice is taken",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false,
+     "line": {
+      "five_hour": 90,
+      "week": 95
+     },
+     "in_use": "1"
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "low"
+     },
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "find",
+  "here": "claude",
+  "now": 1764239000.0,
+  "want": {
+   "do": "model",
+   "model": "haiku",
+   "effort": "low",
+   "kind": "find",
+   "passed": [],
+   "why": "your route for lookups",
+   "reason": "route"
+  }
+ },
+ {
+  "name": "a route naming an agent that was not added (not in agents): not_added",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false,
+     "line": {
+      "five_hour": 90,
+      "week": 95
+     },
+     "in_use": "1"
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "gemini",
+      "model": "pro",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "find",
+  "here": "claude",
+  "now": 1764239000.0,
+  "want": {
+   "do": "model",
+   "model": "haiku",
+   "effort": "medium",
+   "kind": "find",
+   "passed": [
+    [
+     "gemini",
+     "not_added"
+    ]
+   ],
+   "why": "your route for lookups",
+   "reason": "route"
+  }
+ },
+ {
+  "name": "an agent that cannot take work (why_not not_added) is passed with that code",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    },
+    "codex": {
+     "can": false,
+     "why_not": "not_added",
+     "room": "unknown",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "build",
+  "here": "claude",
+  "now": 1764239000.0,
+  "want": {
+   "do": "model",
+   "model": "opus",
+   "effort": "high",
+   "kind": "build",
+   "passed": [
+    [
+     "codex",
+     "not_added"
+    ]
+   ],
+   "why": "your route for builds",
+   "reason": "route"
+  }
+ },
+ {
+  "name": "an agent that cannot take work (why_not not_installed) is passed with that code",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    },
+    "codex": {
+     "can": false,
+     "why_not": "not_installed",
+     "room": "unknown",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "build",
+  "here": "claude",
+  "now": 1764239000.0,
+  "want": {
+   "do": "model",
+   "model": "opus",
+   "effort": "high",
+   "kind": "build",
+   "passed": [
+    [
+     "codex",
+     "not_installed"
+    ]
+   ],
+   "why": "your route for builds",
+   "reason": "route"
+  }
+ },
+ {
+  "name": "an agent that cannot take work (why_not signed_out) is passed with that code",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    },
+    "codex": {
+     "can": false,
+     "why_not": "signed_out",
+     "room": "unknown",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "build",
+  "here": "claude",
+  "now": 1764239000.0,
+  "want": {
+   "do": "model",
+   "model": "opus",
+   "effort": "high",
+   "kind": "build",
+   "passed": [
+    [
+     "codex",
+     "signed_out"
+    ]
+   ],
+   "why": "your route for builds",
+   "reason": "route"
+  }
+ },
+ {
+  "name": "an agent that cannot take work (why_not too_old) is passed with that code",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    },
+    "codex": {
+     "can": false,
+     "why_not": "too_old",
+     "room": "unknown",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "build",
+  "here": "claude",
+  "now": 1764239000.0,
+  "want": {
+   "do": "model",
+   "model": "opus",
+   "effort": "high",
+   "kind": "build",
+   "passed": [
+    [
+     "codex",
+     "too_old"
+    ]
+   ],
+   "why": "your route for builds",
+   "reason": "route"
+  }
+ },
+ {
+  "name": "an agent that cannot take work (why_not never) is passed with that code",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    },
+    "codex": {
+     "can": false,
+     "why_not": "never",
+     "room": "unknown",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "build",
+  "here": "claude",
+  "now": 1764239000.0,
+  "want": {
+   "do": "model",
+   "model": "opus",
+   "effort": "high",
+   "kind": "build",
+   "passed": [
+    [
+     "codex",
+     "never"
+    ]
+   ],
+   "why": "your route for builds",
+   "reason": "route"
+  }
+ },
+ {
+  "name": "can false with no why_not is passed as not_added",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    },
+    "codex": {
+     "can": false,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "build",
+  "here": "claude",
+  "now": 1764239000.0,
+  "want": {
+   "do": "model",
+   "model": "opus",
+   "effort": "high",
+   "kind": "build",
+   "passed": [
+    [
+     "codex",
+     "not_added"
+    ]
+   ],
+   "why": "your route for builds",
+   "reason": "route"
+  }
+ },
+ {
+  "name": "can false with a why_not the contract does not name is passed as not_added",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    },
+    "codex": {
+     "can": false,
+     "why_not": "busy",
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "build",
+  "here": "claude",
+  "now": 1764239000.0,
+  "want": {
+   "do": "model",
+   "model": "opus",
+   "effort": "high",
+   "kind": "build",
+   "passed": [
+    [
+     "codex",
+     "not_added"
+    ]
+   ],
+   "why": "your route for builds",
+   "reason": "route"
+  }
+ },
+ {
+  "name": "can missing counts as can false: not_added",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    },
+    "codex": {
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "build",
+  "here": "claude",
+  "now": 1764239000.0,
+  "want": {
+   "do": "model",
+   "model": "opus",
+   "effort": "high",
+   "kind": "build",
+   "passed": [
+    [
+     "codex",
+     "not_added"
+    ]
+   ],
+   "why": "your route for builds",
+   "reason": "route"
+  }
+ },
+ {
+  "name": "can written as 1, not true: not_added",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    },
+    "codex": {
+     "can": 1,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "build",
+  "here": "claude",
+  "now": 1764239000.0,
+  "want": {
+   "do": "model",
+   "model": "opus",
+   "effort": "high",
+   "kind": "build",
+   "passed": [
+    [
+     "codex",
+     "not_added"
+    ]
+   ],
+   "why": "your route for builds",
+   "reason": "route"
+  }
+ },
+ {
+  "name": "an agent entry that is not an object counts as not added",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    },
+    "codex": "yes"
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "build",
+  "here": "claude",
+  "now": 1764239000.0,
+  "want": {
+   "do": "model",
+   "model": "opus",
+   "effort": "high",
+   "kind": "build",
+   "passed": [
+    [
+     "codex",
+     "not_added"
+    ]
+   ],
+   "why": "your route for builds",
+   "reason": "route"
+  }
+ },
+ {
+  "name": "can false is checked before room out: the why_not code is said",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    },
+    "codex": {
+     "can": false,
+     "why_not": "signed_out",
+     "room": "out",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "build",
+  "here": "claude",
+  "now": 1764239000.0,
+  "want": {
+   "do": "model",
+   "model": "opus",
+   "effort": "high",
+   "kind": "build",
+   "passed": [
+    [
+     "codex",
+     "signed_out"
+    ]
+   ],
+   "why": "your route for builds",
+   "reason": "route"
+  }
+ },
+ {
+  "name": "room out is checked before the hand switch: out is said",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "out",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": false,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "build",
+  "here": "claude",
+  "now": 1764239000.0,
+  "want": {
+   "do": "model",
+   "model": "opus",
+   "effort": "high",
+   "kind": "build",
+   "passed": [
+    [
+     "codex",
+     "out"
+    ]
+   ],
+   "why": "your route for builds",
+   "reason": "route"
+  }
+ },
+ {
+  "name": "every pass code in one walk, in the order looked at",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "out",
+     "back_at": null,
+     "at_lines": false
+    },
+    "codex": {
+     "can": false,
+     "why_not": "signed_out",
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    },
+    "cursor": {
+     "can": true,
+     "why_not": null,
+     "room": "unknown",
+     "back_at": null,
+     "at_lines": false
+    },
+    "gemma": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "gemini",
+      "model": null,
+      "effort": null
+     },
+     {
+      "agent": "codex",
+      "model": null,
+      "effort": null
+     },
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     },
+     {
+      "agent": "cursor",
+      "model": null,
+      "effort": null
+     },
+     {
+      "agent": "gemma",
+      "model": "g1",
+      "effort": "low"
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "find",
+  "here": "gemma",
+  "now": 1764239000.0,
+  "want": {
+   "do": "model",
+   "model": "g1",
+   "effort": "low",
+   "kind": "find",
+   "passed": [
+    [
+     "gemini",
+     "not_added"
+    ],
+    [
+     "codex",
+     "signed_out"
+    ],
+    [
+     "claude",
+     "out"
+    ],
+    [
+     "cursor",
+     "unknown"
+    ]
+   ],
+   "why": "your route for lookups",
+   "reason": "route"
+  }
+ },
+ {
+  "name": "unknown before room: the unknown one is passed, the one with room is taken",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "unknown",
+     "back_at": null,
+     "at_lines": false
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "find",
+  "here": "claude",
+  "now": 1764239000.0,
+  "want": {
+   "do": "hand",
+   "to": "codex",
+   "model": "gpt-6-luna",
+   "effort": "medium",
+   "kind": "find",
+   "passed": [
+    [
+     "claude",
+     "unknown"
+    ]
+   ],
+   "why": "your route for lookups",
+   "reason": "route"
+  }
+ },
+ {
+  "name": "unknown after room: the one with room comes first and is taken",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "unknown",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "find",
+  "here": "claude",
+  "now": 1764239000.0,
+  "want": {
+   "do": "model",
+   "model": "haiku",
+   "effort": "medium",
+   "kind": "find",
+   "passed": [],
+   "why": "your route for lookups",
+   "reason": "route"
+  }
+ },
+ {
+  "name": "unknown and nothing after it: taken",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "unknown",
+     "back_at": null,
+     "at_lines": false
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "review",
+  "here": "claude",
+  "now": 1764239000.0,
+  "want": {
+   "do": "model",
+   "model": "sonnet",
+   "effort": "high",
+   "kind": "review",
+   "passed": [],
+   "why": "your route for reviews",
+   "reason": "route"
+  }
+ },
+ {
+  "name": "unknown, then out: the unknown one is taken",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "unknown",
+     "back_at": null,
+     "at_lines": false
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "out",
+     "back_at": 1764239060.0,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "find",
+  "here": "claude",
+  "now": 1764239000.0,
+  "want": {
+   "do": "model",
+   "model": "haiku",
+   "effort": "medium",
+   "kind": "find",
+   "passed": [],
+   "why": "your route for lookups",
+   "reason": "route"
+  }
+ },
+ {
+  "name": "unknown, then unknown: the first is taken",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "unknown",
+     "back_at": null,
+     "at_lines": false
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "unknown",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "find",
+  "here": "claude",
+  "now": 1764239000.0,
+  "want": {
+   "do": "model",
+   "model": "haiku",
+   "effort": "medium",
+   "kind": "find",
+   "passed": [],
+   "why": "your route for lookups",
+   "reason": "route"
+  }
+ },
+ {
+  "name": "unknown, then room the hand switch would pass: the unknown one is taken",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "unknown",
+     "back_at": null,
+     "at_lines": false
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": false,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "find",
+  "here": "claude",
+  "now": 1764239000.0,
+  "want": {
+   "do": "model",
+   "model": "haiku",
+   "effort": "medium",
+   "kind": "find",
+   "passed": [],
+   "why": "your route for lookups",
+   "reason": "route"
+  }
+ },
+ {
+  "name": "unknown, then room on an agent that cannot take work: the unknown one is taken",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "unknown",
+     "back_at": null,
+     "at_lines": false
+    },
+    "codex": {
+     "can": false,
+     "why_not": "too_old",
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "find",
+  "here": "claude",
+  "now": 1764239000.0,
+  "want": {
+   "do": "model",
+   "model": "haiku",
+   "effort": "medium",
+   "kind": "find",
+   "passed": [],
+   "why": "your route for lookups",
+   "reason": "route"
+  }
+ },
+ {
+  "name": "unknown, then room on an agent not added: the unknown one is taken",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "unknown",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "find",
+  "here": "claude",
+  "now": 1764239000.0,
+  "want": {
+   "do": "model",
+   "model": "haiku",
+   "effort": "medium",
+   "kind": "find",
+   "passed": [],
+   "why": "your route for lookups",
+   "reason": "route"
+  }
+ },
+ {
+  "name": "a room word the contract does not name (\"full\") reads as unknown",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "full",
+     "back_at": null,
+     "at_lines": false
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "find",
+  "here": "claude",
+  "now": 1764239000.0,
+  "want": {
+   "do": "hand",
+   "to": "codex",
+   "model": "gpt-6-luna",
+   "effort": "medium",
+   "kind": "find",
+   "passed": [
+    [
+     "claude",
+     "unknown"
+    ]
+   ],
+   "why": "your route for lookups",
+   "reason": "route"
+  }
+ },
+ {
+  "name": "both agents out, each with back_at: all_passed with the earliest",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "out",
+     "back_at": 1764242600.0,
+     "at_lines": false
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "out",
+     "back_at": 1764239600.0,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "find",
+  "here": "claude",
+  "now": 1764239000.0,
+  "want": {
+   "do": "nothing",
+   "reason": "all_passed",
+   "kind": "find",
+   "passed": [
+    [
+     "claude",
+     "out"
+    ],
+    [
+     "codex",
+     "out"
+    ]
+   ],
+   "why": "your route for lookups",
+   "back_at": 1764239600.0
+  }
+ },
+ {
+  "name": "both agents out, one back_at not known: the earliest known",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "out",
+     "back_at": null,
+     "at_lines": false
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "out",
+     "back_at": 1764239900.0,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "find",
+  "here": "claude",
+  "now": 1764239000.0,
+  "want": {
+   "do": "nothing",
+   "reason": "all_passed",
+   "kind": "find",
+   "passed": [
+    [
+     "claude",
+     "out"
+    ],
+    [
+     "codex",
+     "out"
+    ]
+   ],
+   "why": "your route for lookups",
+   "back_at": 1764239900.0
+  }
+ },
+ {
+  "name": "both agents out without back_at: back_at null",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "out",
+     "back_at": null,
+     "at_lines": false
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "out",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "find",
+  "here": "claude",
+  "now": 1764239000.0,
+  "want": {
+   "do": "nothing",
+   "reason": "all_passed",
+   "kind": "find",
+   "passed": [
+    [
+     "claude",
+     "out"
+    ],
+    [
+     "codex",
+     "out"
+    ]
+   ],
+   "why": "your route for lookups",
+   "back_at": null
+  }
+ },
+ {
+  "name": "back_at comes only from choices passed as out, not from one passed by the hand switch",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "out",
+     "back_at": 1764242600.0,
+     "at_lines": false
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": 1764239100.0,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": false,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "find",
+  "here": "claude",
+  "now": 1764239000.0,
+  "want": {
+   "do": "nothing",
+   "reason": "all_passed",
+   "kind": "find",
+   "passed": [
+    [
+     "claude",
+     "out"
+    ],
+    [
+     "codex",
+     "hand_off"
+    ]
+   ],
+   "why": "your route for lookups",
+   "back_at": 1764242600.0
+  }
+ },
+ {
+  "name": "a back_at written as text is not known",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "out",
+     "back_at": "soon",
+     "at_lines": false
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "out",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "find",
+  "here": "claude",
+  "now": 1764239000.0,
+  "want": {
+   "do": "nothing",
+   "reason": "all_passed",
+   "kind": "find",
+   "passed": [
+    [
+     "claude",
+     "out"
+    ],
+    [
+     "codex",
+     "out"
+    ]
+   ],
+   "why": "your route for lookups",
+   "back_at": null
+  }
+ },
+ {
+  "name": "every choice cannot take work: all_passed with each code",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": false,
+     "why_not": "signed_out",
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    },
+    "codex": {
+     "can": false,
+     "why_not": "not_installed",
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "find",
+  "here": "claude",
+  "now": 1764239000.0,
+  "want": {
+   "do": "nothing",
+   "reason": "all_passed",
+   "kind": "find",
+   "passed": [
+    [
+     "claude",
+     "signed_out"
+    ],
+    [
+     "codex",
+     "not_installed"
+    ]
+   ],
+   "why": "your route for lookups",
+   "back_at": null
+  }
+ },
+ {
+  "name": "here is not in agents and the hand switch is off: all_passed",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": false,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "find",
+  "here": "codex",
+  "now": 1764239000.0,
+  "want": {
+   "do": "nothing",
+   "reason": "all_passed",
+   "kind": "find",
+   "passed": [
+    [
+     "claude",
+     "hand_off"
+    ],
+    [
+     "codex",
+     "not_added"
+    ]
+   ],
+   "why": "your route for lookups",
+   "back_at": null
+  }
+ },
+ {
+  "name": "why is null when the plan has no words for the kind",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false,
+     "line": {
+      "five_hour": 90,
+      "week": 95
+     },
+     "in_use": "1"
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {},
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "find",
+  "here": "claude",
+  "now": 1764239000.0,
+  "want": {
+   "do": "model",
+   "model": "haiku",
+   "effort": "medium",
+   "kind": "find",
+   "passed": [],
+   "why": null,
+   "reason": "route"
+  }
+ },
+ {
+  "name": "why that is not text is null",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false,
+     "line": {
+      "five_hour": 90,
+      "week": 95
+     },
+     "in_use": "1"
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": 5
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "find",
+  "here": "claude",
+  "now": 1764239000.0,
+  "want": {
+   "do": "model",
+   "model": "haiku",
+   "effort": "medium",
+   "kind": "find",
+   "passed": [],
+   "why": null,
+   "reason": "route"
+  }
+ },
+ {
+  "name": "a plan with no why at all still resolves, why null",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false,
+     "line": {
+      "five_hour": 90,
+      "week": 95
+     },
+     "in_use": "1"
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "find",
+  "here": "claude",
+  "now": 1764239000.0,
+  "want": {
+   "do": "model",
+   "model": "haiku",
+   "effort": "medium",
+   "kind": "find",
+   "passed": [],
+   "why": null,
+   "reason": "route"
+  }
+ },
+ {
+  "name": "a helper type in types decides without reading any words (Explore is find)",
+  "kinds": {
+   "order": [
+    "build",
+    "fix",
+    "review",
+    "plan",
+    "find",
+    "write",
+    "other"
+   ],
+   "light": "find",
+   "cut": 300,
+   "table": {
+    "build": [
+     "add",
+     "implement",
+     "build",
+     "create",
+     "make",
+     "refactor",
+     "migrate",
+     "rename",
+     "port",
+     "update",
+     "write a",
+     "write the",
+     "change",
+     "convert",
+     "replace",
+     "remove",
+     "delete",
+     "move",
+     "extend",
+     "upgrade",
+     "set up",
+     "wire up",
+     "integrate",
+     "redesign"
+    ],
+    "fix": [
+     "fix",
+     "debug",
+     "broken",
+     "failing",
+     "fails",
+     "failed",
+     "crash",
+     "crashes",
+     "crashing",
+     "bug",
+     "bugs",
+     "error",
+     "errors",
+     "why does",
+     "why is",
+     "why are",
+     "why do",
+     "repair",
+     "mend",
+     "resolve",
+     "regression",
+     "not working",
+     "what is wrong"
+    ],
+    "review": [
+     "review",
+     "audit",
+     "critique",
+     "assess",
+     "evaluate",
+     "second opinion",
+     "look over",
+     "check over",
+     "proofread",
+     "sanity check"
+    ],
+    "plan": [
+     "plan",
+     "design",
+     "propose",
+     "outline",
+     "how should",
+     "how would",
+     "strategy",
+     "architecture",
+     "roadmap",
+     "spec",
+     "brainstorm",
+     "think through"
+    ],
+    "find": [
+     "find",
+     "where",
+     "which",
+     "list",
+     "explain",
+     "what does",
+     "look up",
+     "what is",
+     "what are",
+     "how does",
+     "how do",
+     "locate",
+     "search",
+     "show me",
+     "tell me",
+     "count",
+     "who"
+    ],
+    "write": [
+     "draft",
+     "summarize",
+     "summarise",
+     "document",
+     "write up",
+     "translate",
+     "readme",
+     "changelog",
+     "release notes",
+     "summary",
+     "memo",
+     "email",
+     "blog post",
+     "announcement",
+     "docs",
+     "write a readme",
+     "write an readme",
+     "write the readme",
+     "write a changelog",
+     "write an changelog",
+     "write the changelog",
+     "write a release notes",
+     "write an release notes",
+     "write the release notes",
+     "write a summary",
+     "write an summary",
+     "write the summary",
+     "write a memo",
+     "write an memo",
+     "write the memo",
+     "write a email",
+     "write an email",
+     "write the email",
+     "write a blog post",
+     "write an blog post",
+     "write the blog post",
+     "write a announcement",
+     "write an announcement",
+     "write the announcement",
+     "write a docs",
+     "write an docs",
+     "write the docs"
+    ]
+   }
+  },
+  "types": {
+   "Explore": "find",
+   "Plan": "plan",
+   "explorer": "find"
+  },
+  "helper_type": "Explore",
+  "description": "Fix the crash",
+  "task": "Fix the crash in the parser.",
+  "want_kind": "find"
+ },
+ {
+  "name": "a helper type in types decides (Plan is plan)",
+  "kinds": {
+   "order": [
+    "build",
+    "fix",
+    "review",
+    "plan",
+    "find",
+    "write",
+    "other"
+   ],
+   "light": "find",
+   "cut": 300,
+   "table": {
+    "build": [
+     "add",
+     "implement",
+     "build",
+     "create",
+     "make",
+     "refactor",
+     "migrate",
+     "rename",
+     "port",
+     "update",
+     "write a",
+     "write the",
+     "change",
+     "convert",
+     "replace",
+     "remove",
+     "delete",
+     "move",
+     "extend",
+     "upgrade",
+     "set up",
+     "wire up",
+     "integrate",
+     "redesign"
+    ],
+    "fix": [
+     "fix",
+     "debug",
+     "broken",
+     "failing",
+     "fails",
+     "failed",
+     "crash",
+     "crashes",
+     "crashing",
+     "bug",
+     "bugs",
+     "error",
+     "errors",
+     "why does",
+     "why is",
+     "why are",
+     "why do",
+     "repair",
+     "mend",
+     "resolve",
+     "regression",
+     "not working",
+     "what is wrong"
+    ],
+    "review": [
+     "review",
+     "audit",
+     "critique",
+     "assess",
+     "evaluate",
+     "second opinion",
+     "look over",
+     "check over",
+     "proofread",
+     "sanity check"
+    ],
+    "plan": [
+     "plan",
+     "design",
+     "propose",
+     "outline",
+     "how should",
+     "how would",
+     "strategy",
+     "architecture",
+     "roadmap",
+     "spec",
+     "brainstorm",
+     "think through"
+    ],
+    "find": [
+     "find",
+     "where",
+     "which",
+     "list",
+     "explain",
+     "what does",
+     "look up",
+     "what is",
+     "what are",
+     "how does",
+     "how do",
+     "locate",
+     "search",
+     "show me",
+     "tell me",
+     "count",
+     "who"
+    ],
+    "write": [
+     "draft",
+     "summarize",
+     "summarise",
+     "document",
+     "write up",
+     "translate",
+     "readme",
+     "changelog",
+     "release notes",
+     "summary",
+     "memo",
+     "email",
+     "blog post",
+     "announcement",
+     "docs",
+     "write a readme",
+     "write an readme",
+     "write the readme",
+     "write a changelog",
+     "write an changelog",
+     "write the changelog",
+     "write a release notes",
+     "write an release notes",
+     "write the release notes",
+     "write a summary",
+     "write an summary",
+     "write the summary",
+     "write a memo",
+     "write an memo",
+     "write the memo",
+     "write a email",
+     "write an email",
+     "write the email",
+     "write a blog post",
+     "write an blog post",
+     "write the blog post",
+     "write a announcement",
+     "write an announcement",
+     "write the announcement",
+     "write a docs",
+     "write an docs",
+     "write the docs"
+    ]
+   }
+  },
+  "types": {
+   "Explore": "find",
+   "Plan": "plan",
+   "explorer": "find"
+  },
+  "helper_type": "Plan",
+  "description": "Fix it",
+  "task": "Fix it.",
+  "want_kind": "plan"
+ },
+ {
+  "name": "Codex's explorer type is find",
+  "kinds": {
+   "order": [
+    "build",
+    "fix",
+    "review",
+    "plan",
+    "find",
+    "write",
+    "other"
+   ],
+   "light": "find",
+   "cut": 300,
+   "table": {
+    "build": [
+     "add",
+     "implement",
+     "build",
+     "create",
+     "make",
+     "refactor",
+     "migrate",
+     "rename",
+     "port",
+     "update",
+     "write a",
+     "write the",
+     "change",
+     "convert",
+     "replace",
+     "remove",
+     "delete",
+     "move",
+     "extend",
+     "upgrade",
+     "set up",
+     "wire up",
+     "integrate",
+     "redesign"
+    ],
+    "fix": [
+     "fix",
+     "debug",
+     "broken",
+     "failing",
+     "fails",
+     "failed",
+     "crash",
+     "crashes",
+     "crashing",
+     "bug",
+     "bugs",
+     "error",
+     "errors",
+     "why does",
+     "why is",
+     "why are",
+     "why do",
+     "repair",
+     "mend",
+     "resolve",
+     "regression",
+     "not working",
+     "what is wrong"
+    ],
+    "review": [
+     "review",
+     "audit",
+     "critique",
+     "assess",
+     "evaluate",
+     "second opinion",
+     "look over",
+     "check over",
+     "proofread",
+     "sanity check"
+    ],
+    "plan": [
+     "plan",
+     "design",
+     "propose",
+     "outline",
+     "how should",
+     "how would",
+     "strategy",
+     "architecture",
+     "roadmap",
+     "spec",
+     "brainstorm",
+     "think through"
+    ],
+    "find": [
+     "find",
+     "where",
+     "which",
+     "list",
+     "explain",
+     "what does",
+     "look up",
+     "what is",
+     "what are",
+     "how does",
+     "how do",
+     "locate",
+     "search",
+     "show me",
+     "tell me",
+     "count",
+     "who"
+    ],
+    "write": [
+     "draft",
+     "summarize",
+     "summarise",
+     "document",
+     "write up",
+     "translate",
+     "readme",
+     "changelog",
+     "release notes",
+     "summary",
+     "memo",
+     "email",
+     "blog post",
+     "announcement",
+     "docs",
+     "write a readme",
+     "write an readme",
+     "write the readme",
+     "write a changelog",
+     "write an changelog",
+     "write the changelog",
+     "write a release notes",
+     "write an release notes",
+     "write the release notes",
+     "write a summary",
+     "write an summary",
+     "write the summary",
+     "write a memo",
+     "write an memo",
+     "write the memo",
+     "write a email",
+     "write an email",
+     "write the email",
+     "write a blog post",
+     "write an blog post",
+     "write the blog post",
+     "write a announcement",
+     "write an announcement",
+     "write the announcement",
+     "write a docs",
+     "write an docs",
+     "write the docs"
+    ]
+   }
+  },
+  "types": {
+   "Explore": "find",
+   "Plan": "plan",
+   "explorer": "find"
+  },
+  "helper_type": "explorer",
+  "description": null,
+  "task": "Implement the cache.",
+  "want_kind": "find"
+ },
+ {
+  "name": "a helper type not in types: the description decides",
+  "kinds": {
+   "order": [
+    "build",
+    "fix",
+    "review",
+    "plan",
+    "find",
+    "write",
+    "other"
+   ],
+   "light": "find",
+   "cut": 300,
+   "table": {
+    "build": [
+     "add",
+     "implement",
+     "build",
+     "create",
+     "make",
+     "refactor",
+     "migrate",
+     "rename",
+     "port",
+     "update",
+     "write a",
+     "write the",
+     "change",
+     "convert",
+     "replace",
+     "remove",
+     "delete",
+     "move",
+     "extend",
+     "upgrade",
+     "set up",
+     "wire up",
+     "integrate",
+     "redesign"
+    ],
+    "fix": [
+     "fix",
+     "debug",
+     "broken",
+     "failing",
+     "fails",
+     "failed",
+     "crash",
+     "crashes",
+     "crashing",
+     "bug",
+     "bugs",
+     "error",
+     "errors",
+     "why does",
+     "why is",
+     "why are",
+     "why do",
+     "repair",
+     "mend",
+     "resolve",
+     "regression",
+     "not working",
+     "what is wrong"
+    ],
+    "review": [
+     "review",
+     "audit",
+     "critique",
+     "assess",
+     "evaluate",
+     "second opinion",
+     "look over",
+     "check over",
+     "proofread",
+     "sanity check"
+    ],
+    "plan": [
+     "plan",
+     "design",
+     "propose",
+     "outline",
+     "how should",
+     "how would",
+     "strategy",
+     "architecture",
+     "roadmap",
+     "spec",
+     "brainstorm",
+     "think through"
+    ],
+    "find": [
+     "find",
+     "where",
+     "which",
+     "list",
+     "explain",
+     "what does",
+     "look up",
+     "what is",
+     "what are",
+     "how does",
+     "how do",
+     "locate",
+     "search",
+     "show me",
+     "tell me",
+     "count",
+     "who"
+    ],
+    "write": [
+     "draft",
+     "summarize",
+     "summarise",
+     "document",
+     "write up",
+     "translate",
+     "readme",
+     "changelog",
+     "release notes",
+     "summary",
+     "memo",
+     "email",
+     "blog post",
+     "announcement",
+     "docs",
+     "write a readme",
+     "write an readme",
+     "write the readme",
+     "write a changelog",
+     "write an changelog",
+     "write the changelog",
+     "write a release notes",
+     "write an release notes",
+     "write the release notes",
+     "write a summary",
+     "write an summary",
+     "write the summary",
+     "write a memo",
+     "write an memo",
+     "write the memo",
+     "write a email",
+     "write an email",
+     "write the email",
+     "write a blog post",
+     "write an blog post",
+     "write the blog post",
+     "write a announcement",
+     "write an announcement",
+     "write the announcement",
+     "write a docs",
+     "write an docs",
+     "write the docs"
+    ]
+   }
+  },
+  "types": {
+   "Explore": "find",
+   "Plan": "plan",
+   "explorer": "find"
+  },
+  "helper_type": "general-purpose",
+  "description": "Review the patch",
+  "task": "Fix everything.",
+  "want_kind": "review"
+ },
+ {
+  "name": "the description decides even when the task reads as another kind",
+  "kinds": {
+   "order": [
+    "build",
+    "fix",
+    "review",
+    "plan",
+    "find",
+    "write",
+    "other"
+   ],
+   "light": "find",
+   "cut": 300,
+   "table": {
+    "build": [
+     "add",
+     "implement",
+     "build",
+     "create",
+     "make",
+     "refactor",
+     "migrate",
+     "rename",
+     "port",
+     "update",
+     "write a",
+     "write the",
+     "change",
+     "convert",
+     "replace",
+     "remove",
+     "delete",
+     "move",
+     "extend",
+     "upgrade",
+     "set up",
+     "wire up",
+     "integrate",
+     "redesign"
+    ],
+    "fix": [
+     "fix",
+     "debug",
+     "broken",
+     "failing",
+     "fails",
+     "failed",
+     "crash",
+     "crashes",
+     "crashing",
+     "bug",
+     "bugs",
+     "error",
+     "errors",
+     "why does",
+     "why is",
+     "why are",
+     "why do",
+     "repair",
+     "mend",
+     "resolve",
+     "regression",
+     "not working",
+     "what is wrong"
+    ],
+    "review": [
+     "review",
+     "audit",
+     "critique",
+     "assess",
+     "evaluate",
+     "second opinion",
+     "look over",
+     "check over",
+     "proofread",
+     "sanity check"
+    ],
+    "plan": [
+     "plan",
+     "design",
+     "propose",
+     "outline",
+     "how should",
+     "how would",
+     "strategy",
+     "architecture",
+     "roadmap",
+     "spec",
+     "brainstorm",
+     "think through"
+    ],
+    "find": [
+     "find",
+     "where",
+     "which",
+     "list",
+     "explain",
+     "what does",
+     "look up",
+     "what is",
+     "what are",
+     "how does",
+     "how do",
+     "locate",
+     "search",
+     "show me",
+     "tell me",
+     "count",
+     "who"
+    ],
+    "write": [
+     "draft",
+     "summarize",
+     "summarise",
+     "document",
+     "write up",
+     "translate",
+     "readme",
+     "changelog",
+     "release notes",
+     "summary",
+     "memo",
+     "email",
+     "blog post",
+     "announcement",
+     "docs",
+     "write a readme",
+     "write an readme",
+     "write the readme",
+     "write a changelog",
+     "write an changelog",
+     "write the changelog",
+     "write a release notes",
+     "write an release notes",
+     "write the release notes",
+     "write a summary",
+     "write an summary",
+     "write the summary",
+     "write a memo",
+     "write an memo",
+     "write the memo",
+     "write a email",
+     "write an email",
+     "write the email",
+     "write a blog post",
+     "write an blog post",
+     "write the blog post",
+     "write a announcement",
+     "write an announcement",
+     "write the announcement",
+     "write a docs",
+     "write an docs",
+     "write the docs"
+    ]
+   }
+  },
+  "types": {
+   "Explore": "find",
+   "Plan": "plan",
+   "explorer": "find"
+  },
+  "helper_type": null,
+  "description": "Fix login bug",
+  "task": "Review everything.",
+  "want_kind": "fix"
+ },
+ {
+  "name": "a description that reads as other: the task decides",
+  "kinds": {
+   "order": [
+    "build",
+    "fix",
+    "review",
+    "plan",
+    "find",
+    "write",
+    "other"
+   ],
+   "light": "find",
+   "cut": 300,
+   "table": {
+    "build": [
+     "add",
+     "implement",
+     "build",
+     "create",
+     "make",
+     "refactor",
+     "migrate",
+     "rename",
+     "port",
+     "update",
+     "write a",
+     "write the",
+     "change",
+     "convert",
+     "replace",
+     "remove",
+     "delete",
+     "move",
+     "extend",
+     "upgrade",
+     "set up",
+     "wire up",
+     "integrate",
+     "redesign"
+    ],
+    "fix": [
+     "fix",
+     "debug",
+     "broken",
+     "failing",
+     "fails",
+     "failed",
+     "crash",
+     "crashes",
+     "crashing",
+     "bug",
+     "bugs",
+     "error",
+     "errors",
+     "why does",
+     "why is",
+     "why are",
+     "why do",
+     "repair",
+     "mend",
+     "resolve",
+     "regression",
+     "not working",
+     "what is wrong"
+    ],
+    "review": [
+     "review",
+     "audit",
+     "critique",
+     "assess",
+     "evaluate",
+     "second opinion",
+     "look over",
+     "check over",
+     "proofread",
+     "sanity check"
+    ],
+    "plan": [
+     "plan",
+     "design",
+     "propose",
+     "outline",
+     "how should",
+     "how would",
+     "strategy",
+     "architecture",
+     "roadmap",
+     "spec",
+     "brainstorm",
+     "think through"
+    ],
+    "find": [
+     "find",
+     "where",
+     "which",
+     "list",
+     "explain",
+     "what does",
+     "look up",
+     "what is",
+     "what are",
+     "how does",
+     "how do",
+     "locate",
+     "search",
+     "show me",
+     "tell me",
+     "count",
+     "who"
+    ],
+    "write": [
+     "draft",
+     "summarize",
+     "summarise",
+     "document",
+     "write up",
+     "translate",
+     "readme",
+     "changelog",
+     "release notes",
+     "summary",
+     "memo",
+     "email",
+     "blog post",
+     "announcement",
+     "docs",
+     "write a readme",
+     "write an readme",
+     "write the readme",
+     "write a changelog",
+     "write an changelog",
+     "write the changelog",
+     "write a release notes",
+     "write an release notes",
+     "write the release notes",
+     "write a summary",
+     "write an summary",
+     "write the summary",
+     "write a memo",
+     "write an memo",
+     "write the memo",
+     "write a email",
+     "write an email",
+     "write the email",
+     "write a blog post",
+     "write an blog post",
+     "write the blog post",
+     "write a announcement",
+     "write an announcement",
+     "write the announcement",
+     "write a docs",
+     "write an docs",
+     "write the docs"
+    ]
+   }
+  },
+  "types": {
+   "Explore": "find",
+   "Plan": "plan",
+   "explorer": "find"
+  },
+  "helper_type": null,
+  "description": "Helper",
+  "task": "Fix the failing test in auth. Then rest.",
+  "want_kind": "fix"
+ },
+ {
+  "name": "description and task both other: other",
+  "kinds": {
+   "order": [
+    "build",
+    "fix",
+    "review",
+    "plan",
+    "find",
+    "write",
+    "other"
+   ],
+   "light": "find",
+   "cut": 300,
+   "table": {
+    "build": [
+     "add",
+     "implement",
+     "build",
+     "create",
+     "make",
+     "refactor",
+     "migrate",
+     "rename",
+     "port",
+     "update",
+     "write a",
+     "write the",
+     "change",
+     "convert",
+     "replace",
+     "remove",
+     "delete",
+     "move",
+     "extend",
+     "upgrade",
+     "set up",
+     "wire up",
+     "integrate",
+     "redesign"
+    ],
+    "fix": [
+     "fix",
+     "debug",
+     "broken",
+     "failing",
+     "fails",
+     "failed",
+     "crash",
+     "crashes",
+     "crashing",
+     "bug",
+     "bugs",
+     "error",
+     "errors",
+     "why does",
+     "why is",
+     "why are",
+     "why do",
+     "repair",
+     "mend",
+     "resolve",
+     "regression",
+     "not working",
+     "what is wrong"
+    ],
+    "review": [
+     "review",
+     "audit",
+     "critique",
+     "assess",
+     "evaluate",
+     "second opinion",
+     "look over",
+     "check over",
+     "proofread",
+     "sanity check"
+    ],
+    "plan": [
+     "plan",
+     "design",
+     "propose",
+     "outline",
+     "how should",
+     "how would",
+     "strategy",
+     "architecture",
+     "roadmap",
+     "spec",
+     "brainstorm",
+     "think through"
+    ],
+    "find": [
+     "find",
+     "where",
+     "which",
+     "list",
+     "explain",
+     "what does",
+     "look up",
+     "what is",
+     "what are",
+     "how does",
+     "how do",
+     "locate",
+     "search",
+     "show me",
+     "tell me",
+     "count",
+     "who"
+    ],
+    "write": [
+     "draft",
+     "summarize",
+     "summarise",
+     "document",
+     "write up",
+     "translate",
+     "readme",
+     "changelog",
+     "release notes",
+     "summary",
+     "memo",
+     "email",
+     "blog post",
+     "announcement",
+     "docs",
+     "write a readme",
+     "write an readme",
+     "write the readme",
+     "write a changelog",
+     "write an changelog",
+     "write the changelog",
+     "write a release notes",
+     "write an release notes",
+     "write the release notes",
+     "write a summary",
+     "write an summary",
+     "write the summary",
+     "write a memo",
+     "write an memo",
+     "write the memo",
+     "write a email",
+     "write an email",
+     "write the email",
+     "write a blog post",
+     "write an blog post",
+     "write the blog post",
+     "write a announcement",
+     "write an announcement",
+     "write the announcement",
+     "write a docs",
+     "write an docs",
+     "write the docs"
+    ]
+   }
+  },
+  "types": {
+   "Explore": "find",
+   "Plan": "plan",
+   "explorer": "find"
+  },
+  "helper_type": null,
+  "description": "Helper",
+  "task": "Thanks a lot.",
+  "want_kind": "other"
+ },
+ {
+  "name": "no description (null): the task decides",
+  "kinds": {
+   "order": [
+    "build",
+    "fix",
+    "review",
+    "plan",
+    "find",
+    "write",
+    "other"
+   ],
+   "light": "find",
+   "cut": 300,
+   "table": {
+    "build": [
+     "add",
+     "implement",
+     "build",
+     "create",
+     "make",
+     "refactor",
+     "migrate",
+     "rename",
+     "port",
+     "update",
+     "write a",
+     "write the",
+     "change",
+     "convert",
+     "replace",
+     "remove",
+     "delete",
+     "move",
+     "extend",
+     "upgrade",
+     "set up",
+     "wire up",
+     "integrate",
+     "redesign"
+    ],
+    "fix": [
+     "fix",
+     "debug",
+     "broken",
+     "failing",
+     "fails",
+     "failed",
+     "crash",
+     "crashes",
+     "crashing",
+     "bug",
+     "bugs",
+     "error",
+     "errors",
+     "why does",
+     "why is",
+     "why are",
+     "why do",
+     "repair",
+     "mend",
+     "resolve",
+     "regression",
+     "not working",
+     "what is wrong"
+    ],
+    "review": [
+     "review",
+     "audit",
+     "critique",
+     "assess",
+     "evaluate",
+     "second opinion",
+     "look over",
+     "check over",
+     "proofread",
+     "sanity check"
+    ],
+    "plan": [
+     "plan",
+     "design",
+     "propose",
+     "outline",
+     "how should",
+     "how would",
+     "strategy",
+     "architecture",
+     "roadmap",
+     "spec",
+     "brainstorm",
+     "think through"
+    ],
+    "find": [
+     "find",
+     "where",
+     "which",
+     "list",
+     "explain",
+     "what does",
+     "look up",
+     "what is",
+     "what are",
+     "how does",
+     "how do",
+     "locate",
+     "search",
+     "show me",
+     "tell me",
+     "count",
+     "who"
+    ],
+    "write": [
+     "draft",
+     "summarize",
+     "summarise",
+     "document",
+     "write up",
+     "translate",
+     "readme",
+     "changelog",
+     "release notes",
+     "summary",
+     "memo",
+     "email",
+     "blog post",
+     "announcement",
+     "docs",
+     "write a readme",
+     "write an readme",
+     "write the readme",
+     "write a changelog",
+     "write an changelog",
+     "write the changelog",
+     "write a release notes",
+     "write an release notes",
+     "write the release notes",
+     "write a summary",
+     "write an summary",
+     "write the summary",
+     "write a memo",
+     "write an memo",
+     "write the memo",
+     "write a email",
+     "write an email",
+     "write the email",
+     "write a blog post",
+     "write an blog post",
+     "write the blog post",
+     "write a announcement",
+     "write an announcement",
+     "write the announcement",
+     "write a docs",
+     "write an docs",
+     "write the docs"
+    ]
+   }
+  },
+  "types": {
+   "Explore": "find",
+   "Plan": "plan",
+   "explorer": "find"
+  },
+  "helper_type": null,
+  "description": null,
+  "task": "review the diff",
+  "want_kind": "review"
+ },
+ {
+  "name": "an empty description: the task decides",
+  "kinds": {
+   "order": [
+    "build",
+    "fix",
+    "review",
+    "plan",
+    "find",
+    "write",
+    "other"
+   ],
+   "light": "find",
+   "cut": 300,
+   "table": {
+    "build": [
+     "add",
+     "implement",
+     "build",
+     "create",
+     "make",
+     "refactor",
+     "migrate",
+     "rename",
+     "port",
+     "update",
+     "write a",
+     "write the",
+     "change",
+     "convert",
+     "replace",
+     "remove",
+     "delete",
+     "move",
+     "extend",
+     "upgrade",
+     "set up",
+     "wire up",
+     "integrate",
+     "redesign"
+    ],
+    "fix": [
+     "fix",
+     "debug",
+     "broken",
+     "failing",
+     "fails",
+     "failed",
+     "crash",
+     "crashes",
+     "crashing",
+     "bug",
+     "bugs",
+     "error",
+     "errors",
+     "why does",
+     "why is",
+     "why are",
+     "why do",
+     "repair",
+     "mend",
+     "resolve",
+     "regression",
+     "not working",
+     "what is wrong"
+    ],
+    "review": [
+     "review",
+     "audit",
+     "critique",
+     "assess",
+     "evaluate",
+     "second opinion",
+     "look over",
+     "check over",
+     "proofread",
+     "sanity check"
+    ],
+    "plan": [
+     "plan",
+     "design",
+     "propose",
+     "outline",
+     "how should",
+     "how would",
+     "strategy",
+     "architecture",
+     "roadmap",
+     "spec",
+     "brainstorm",
+     "think through"
+    ],
+    "find": [
+     "find",
+     "where",
+     "which",
+     "list",
+     "explain",
+     "what does",
+     "look up",
+     "what is",
+     "what are",
+     "how does",
+     "how do",
+     "locate",
+     "search",
+     "show me",
+     "tell me",
+     "count",
+     "who"
+    ],
+    "write": [
+     "draft",
+     "summarize",
+     "summarise",
+     "document",
+     "write up",
+     "translate",
+     "readme",
+     "changelog",
+     "release notes",
+     "summary",
+     "memo",
+     "email",
+     "blog post",
+     "announcement",
+     "docs",
+     "write a readme",
+     "write an readme",
+     "write the readme",
+     "write a changelog",
+     "write an changelog",
+     "write the changelog",
+     "write a release notes",
+     "write an release notes",
+     "write the release notes",
+     "write a summary",
+     "write an summary",
+     "write the summary",
+     "write a memo",
+     "write an memo",
+     "write the memo",
+     "write a email",
+     "write an email",
+     "write the email",
+     "write a blog post",
+     "write an blog post",
+     "write the blog post",
+     "write a announcement",
+     "write an announcement",
+     "write the announcement",
+     "write a docs",
+     "write an docs",
+     "write the docs"
+    ]
+   }
+  },
+  "types": {
+   "Explore": "find",
+   "Plan": "plan",
+   "explorer": "find"
+  },
+  "helper_type": null,
+  "description": "",
+  "task": "add a flag",
+  "want_kind": "build"
+ },
+ {
+  "name": "a description that is not text: the task decides",
+  "kinds": {
+   "order": [
+    "build",
+    "fix",
+    "review",
+    "plan",
+    "find",
+    "write",
+    "other"
+   ],
+   "light": "find",
+   "cut": 300,
+   "table": {
+    "build": [
+     "add",
+     "implement",
+     "build",
+     "create",
+     "make",
+     "refactor",
+     "migrate",
+     "rename",
+     "port",
+     "update",
+     "write a",
+     "write the",
+     "change",
+     "convert",
+     "replace",
+     "remove",
+     "delete",
+     "move",
+     "extend",
+     "upgrade",
+     "set up",
+     "wire up",
+     "integrate",
+     "redesign"
+    ],
+    "fix": [
+     "fix",
+     "debug",
+     "broken",
+     "failing",
+     "fails",
+     "failed",
+     "crash",
+     "crashes",
+     "crashing",
+     "bug",
+     "bugs",
+     "error",
+     "errors",
+     "why does",
+     "why is",
+     "why are",
+     "why do",
+     "repair",
+     "mend",
+     "resolve",
+     "regression",
+     "not working",
+     "what is wrong"
+    ],
+    "review": [
+     "review",
+     "audit",
+     "critique",
+     "assess",
+     "evaluate",
+     "second opinion",
+     "look over",
+     "check over",
+     "proofread",
+     "sanity check"
+    ],
+    "plan": [
+     "plan",
+     "design",
+     "propose",
+     "outline",
+     "how should",
+     "how would",
+     "strategy",
+     "architecture",
+     "roadmap",
+     "spec",
+     "brainstorm",
+     "think through"
+    ],
+    "find": [
+     "find",
+     "where",
+     "which",
+     "list",
+     "explain",
+     "what does",
+     "look up",
+     "what is",
+     "what are",
+     "how does",
+     "how do",
+     "locate",
+     "search",
+     "show me",
+     "tell me",
+     "count",
+     "who"
+    ],
+    "write": [
+     "draft",
+     "summarize",
+     "summarise",
+     "document",
+     "write up",
+     "translate",
+     "readme",
+     "changelog",
+     "release notes",
+     "summary",
+     "memo",
+     "email",
+     "blog post",
+     "announcement",
+     "docs",
+     "write a readme",
+     "write an readme",
+     "write the readme",
+     "write a changelog",
+     "write an changelog",
+     "write the changelog",
+     "write a release notes",
+     "write an release notes",
+     "write the release notes",
+     "write a summary",
+     "write an summary",
+     "write the summary",
+     "write a memo",
+     "write an memo",
+     "write the memo",
+     "write a email",
+     "write an email",
+     "write the email",
+     "write a blog post",
+     "write an blog post",
+     "write the blog post",
+     "write a announcement",
+     "write an announcement",
+     "write the announcement",
+     "write a docs",
+     "write an docs",
+     "write the docs"
+    ]
+   }
+  },
+  "types": {
+   "Explore": "find",
+   "Plan": "plan",
+   "explorer": "find"
+  },
+  "helper_type": null,
+  "description": 12,
+  "task": "plan the release",
+  "want_kind": "plan"
+ },
+ {
+  "name": "no description and no task: other",
+  "kinds": {
+   "order": [
+    "build",
+    "fix",
+    "review",
+    "plan",
+    "find",
+    "write",
+    "other"
+   ],
+   "light": "find",
+   "cut": 300,
+   "table": {
+    "build": [
+     "add",
+     "implement",
+     "build",
+     "create",
+     "make",
+     "refactor",
+     "migrate",
+     "rename",
+     "port",
+     "update",
+     "write a",
+     "write the",
+     "change",
+     "convert",
+     "replace",
+     "remove",
+     "delete",
+     "move",
+     "extend",
+     "upgrade",
+     "set up",
+     "wire up",
+     "integrate",
+     "redesign"
+    ],
+    "fix": [
+     "fix",
+     "debug",
+     "broken",
+     "failing",
+     "fails",
+     "failed",
+     "crash",
+     "crashes",
+     "crashing",
+     "bug",
+     "bugs",
+     "error",
+     "errors",
+     "why does",
+     "why is",
+     "why are",
+     "why do",
+     "repair",
+     "mend",
+     "resolve",
+     "regression",
+     "not working",
+     "what is wrong"
+    ],
+    "review": [
+     "review",
+     "audit",
+     "critique",
+     "assess",
+     "evaluate",
+     "second opinion",
+     "look over",
+     "check over",
+     "proofread",
+     "sanity check"
+    ],
+    "plan": [
+     "plan",
+     "design",
+     "propose",
+     "outline",
+     "how should",
+     "how would",
+     "strategy",
+     "architecture",
+     "roadmap",
+     "spec",
+     "brainstorm",
+     "think through"
+    ],
+    "find": [
+     "find",
+     "where",
+     "which",
+     "list",
+     "explain",
+     "what does",
+     "look up",
+     "what is",
+     "what are",
+     "how does",
+     "how do",
+     "locate",
+     "search",
+     "show me",
+     "tell me",
+     "count",
+     "who"
+    ],
+    "write": [
+     "draft",
+     "summarize",
+     "summarise",
+     "document",
+     "write up",
+     "translate",
+     "readme",
+     "changelog",
+     "release notes",
+     "summary",
+     "memo",
+     "email",
+     "blog post",
+     "announcement",
+     "docs",
+     "write a readme",
+     "write an readme",
+     "write the readme",
+     "write a changelog",
+     "write an changelog",
+     "write the changelog",
+     "write a release notes",
+     "write an release notes",
+     "write the release notes",
+     "write a summary",
+     "write an summary",
+     "write the summary",
+     "write a memo",
+     "write an memo",
+     "write the memo",
+     "write a email",
+     "write an email",
+     "write the email",
+     "write a blog post",
+     "write an blog post",
+     "write the blog post",
+     "write a announcement",
+     "write an announcement",
+     "write the announcement",
+     "write a docs",
+     "write an docs",
+     "write the docs"
+    ]
+   }
+  },
+  "types": {
+   "Explore": "find",
+   "Plan": "plan",
+   "explorer": "find"
+  },
+  "helper_type": null,
+  "description": null,
+  "task": null,
+  "want_kind": "other"
+ },
+ {
+  "name": "no helper type and empty types: the words decide",
+  "kinds": {
+   "order": [
+    "build",
+    "fix",
+    "review",
+    "plan",
+    "find",
+    "write",
+    "other"
+   ],
+   "light": "find",
+   "cut": 300,
+   "table": {
+    "build": [
+     "add",
+     "implement",
+     "build",
+     "create",
+     "make",
+     "refactor",
+     "migrate",
+     "rename",
+     "port",
+     "update",
+     "write a",
+     "write the",
+     "change",
+     "convert",
+     "replace",
+     "remove",
+     "delete",
+     "move",
+     "extend",
+     "upgrade",
+     "set up",
+     "wire up",
+     "integrate",
+     "redesign"
+    ],
+    "fix": [
+     "fix",
+     "debug",
+     "broken",
+     "failing",
+     "fails",
+     "failed",
+     "crash",
+     "crashes",
+     "crashing",
+     "bug",
+     "bugs",
+     "error",
+     "errors",
+     "why does",
+     "why is",
+     "why are",
+     "why do",
+     "repair",
+     "mend",
+     "resolve",
+     "regression",
+     "not working",
+     "what is wrong"
+    ],
+    "review": [
+     "review",
+     "audit",
+     "critique",
+     "assess",
+     "evaluate",
+     "second opinion",
+     "look over",
+     "check over",
+     "proofread",
+     "sanity check"
+    ],
+    "plan": [
+     "plan",
+     "design",
+     "propose",
+     "outline",
+     "how should",
+     "how would",
+     "strategy",
+     "architecture",
+     "roadmap",
+     "spec",
+     "brainstorm",
+     "think through"
+    ],
+    "find": [
+     "find",
+     "where",
+     "which",
+     "list",
+     "explain",
+     "what does",
+     "look up",
+     "what is",
+     "what are",
+     "how does",
+     "how do",
+     "locate",
+     "search",
+     "show me",
+     "tell me",
+     "count",
+     "who"
+    ],
+    "write": [
+     "draft",
+     "summarize",
+     "summarise",
+     "document",
+     "write up",
+     "translate",
+     "readme",
+     "changelog",
+     "release notes",
+     "summary",
+     "memo",
+     "email",
+     "blog post",
+     "announcement",
+     "docs",
+     "write a readme",
+     "write an readme",
+     "write the readme",
+     "write a changelog",
+     "write an changelog",
+     "write the changelog",
+     "write a release notes",
+     "write an release notes",
+     "write the release notes",
+     "write a summary",
+     "write an summary",
+     "write the summary",
+     "write a memo",
+     "write an memo",
+     "write the memo",
+     "write a email",
+     "write an email",
+     "write the email",
+     "write a blog post",
+     "write an blog post",
+     "write the blog post",
+     "write a announcement",
+     "write an announcement",
+     "write the announcement",
+     "write a docs",
+     "write an docs",
+     "write the docs"
+    ]
+   }
+  },
+  "types": {},
+  "helper_type": null,
+  "description": null,
+  "task": "debug the login",
+  "want_kind": "fix"
+ },
+ {
+  "name": "a types entry naming a kind not in order is passed over: the words decide",
+  "kinds": {
+   "order": [
+    "build",
+    "fix",
+    "review",
+    "plan",
+    "find",
+    "write",
+    "other"
+   ],
+   "light": "find",
+   "cut": 300,
+   "table": {
+    "build": [
+     "add",
+     "implement",
+     "build",
+     "create",
+     "make",
+     "refactor",
+     "migrate",
+     "rename",
+     "port",
+     "update",
+     "write a",
+     "write the",
+     "change",
+     "convert",
+     "replace",
+     "remove",
+     "delete",
+     "move",
+     "extend",
+     "upgrade",
+     "set up",
+     "wire up",
+     "integrate",
+     "redesign"
+    ],
+    "fix": [
+     "fix",
+     "debug",
+     "broken",
+     "failing",
+     "fails",
+     "failed",
+     "crash",
+     "crashes",
+     "crashing",
+     "bug",
+     "bugs",
+     "error",
+     "errors",
+     "why does",
+     "why is",
+     "why are",
+     "why do",
+     "repair",
+     "mend",
+     "resolve",
+     "regression",
+     "not working",
+     "what is wrong"
+    ],
+    "review": [
+     "review",
+     "audit",
+     "critique",
+     "assess",
+     "evaluate",
+     "second opinion",
+     "look over",
+     "check over",
+     "proofread",
+     "sanity check"
+    ],
+    "plan": [
+     "plan",
+     "design",
+     "propose",
+     "outline",
+     "how should",
+     "how would",
+     "strategy",
+     "architecture",
+     "roadmap",
+     "spec",
+     "brainstorm",
+     "think through"
+    ],
+    "find": [
+     "find",
+     "where",
+     "which",
+     "list",
+     "explain",
+     "what does",
+     "look up",
+     "what is",
+     "what are",
+     "how does",
+     "how do",
+     "locate",
+     "search",
+     "show me",
+     "tell me",
+     "count",
+     "who"
+    ],
+    "write": [
+     "draft",
+     "summarize",
+     "summarise",
+     "document",
+     "write up",
+     "translate",
+     "readme",
+     "changelog",
+     "release notes",
+     "summary",
+     "memo",
+     "email",
+     "blog post",
+     "announcement",
+     "docs",
+     "write a readme",
+     "write an readme",
+     "write the readme",
+     "write a changelog",
+     "write an changelog",
+     "write the changelog",
+     "write a release notes",
+     "write an release notes",
+     "write the release notes",
+     "write a summary",
+     "write an summary",
+     "write the summary",
+     "write a memo",
+     "write an memo",
+     "write the memo",
+     "write a email",
+     "write an email",
+     "write the email",
+     "write a blog post",
+     "write an blog post",
+     "write the blog post",
+     "write a announcement",
+     "write an announcement",
+     "write the announcement",
+     "write a docs",
+     "write an docs",
+     "write the docs"
+    ]
+   }
+  },
+  "types": {
+   "Odd": "testing"
+  },
+  "helper_type": "Odd",
+  "description": null,
+  "task": "review it",
+  "want_kind": "review"
+ },
+ {
+  "name": "the light kind loses to a heavier word anywhere in the sentence",
+  "kinds": {
+   "order": [
+    "build",
+    "fix",
+    "review",
+    "plan",
+    "find",
+    "write",
+    "other"
+   ],
+   "light": "find",
+   "cut": 300,
+   "table": {
+    "build": [
+     "add",
+     "implement",
+     "build",
+     "create",
+     "make",
+     "refactor",
+     "migrate",
+     "rename",
+     "port",
+     "update",
+     "write a",
+     "write the",
+     "change",
+     "convert",
+     "replace",
+     "remove",
+     "delete",
+     "move",
+     "extend",
+     "upgrade",
+     "set up",
+     "wire up",
+     "integrate",
+     "redesign"
+    ],
+    "fix": [
+     "fix",
+     "debug",
+     "broken",
+     "failing",
+     "fails",
+     "failed",
+     "crash",
+     "crashes",
+     "crashing",
+     "bug",
+     "bugs",
+     "error",
+     "errors",
+     "why does",
+     "why is",
+     "why are",
+     "why do",
+     "repair",
+     "mend",
+     "resolve",
+     "regression",
+     "not working",
+     "what is wrong"
+    ],
+    "review": [
+     "review",
+     "audit",
+     "critique",
+     "assess",
+     "evaluate",
+     "second opinion",
+     "look over",
+     "check over",
+     "proofread",
+     "sanity check"
+    ],
+    "plan": [
+     "plan",
+     "design",
+     "propose",
+     "outline",
+     "how should",
+     "how would",
+     "strategy",
+     "architecture",
+     "roadmap",
+     "spec",
+     "brainstorm",
+     "think through"
+    ],
+    "find": [
+     "find",
+     "where",
+     "which",
+     "list",
+     "explain",
+     "what does",
+     "look up",
+     "what is",
+     "what are",
+     "how does",
+     "how do",
+     "locate",
+     "search",
+     "show me",
+     "tell me",
+     "count",
+     "who"
+    ],
+    "write": [
+     "draft",
+     "summarize",
+     "summarise",
+     "document",
+     "write up",
+     "translate",
+     "readme",
+     "changelog",
+     "release notes",
+     "summary",
+     "memo",
+     "email",
+     "blog post",
+     "announcement",
+     "docs",
+     "write a readme",
+     "write an readme",
+     "write the readme",
+     "write a changelog",
+     "write an changelog",
+     "write the changelog",
+     "write a release notes",
+     "write an release notes",
+     "write the release notes",
+     "write a summary",
+     "write an summary",
+     "write the summary",
+     "write a memo",
+     "write an memo",
+     "write the memo",
+     "write a email",
+     "write an email",
+     "write the email",
+     "write a blog post",
+     "write an blog post",
+     "write the blog post",
+     "write a announcement",
+     "write an announcement",
+     "write the announcement",
+     "write a docs",
+     "write an docs",
+     "write the docs"
+    ]
+   }
+  },
+  "types": {
+   "Explore": "find",
+   "Plan": "plan",
+   "explorer": "find"
+  },
+  "helper_type": null,
+  "description": null,
+  "task": "find and fix the bug",
+  "want_kind": "fix"
+ },
+ {
+  "name": "the light kind alone wins",
+  "kinds": {
+   "order": [
+    "build",
+    "fix",
+    "review",
+    "plan",
+    "find",
+    "write",
+    "other"
+   ],
+   "light": "find",
+   "cut": 300,
+   "table": {
+    "build": [
+     "add",
+     "implement",
+     "build",
+     "create",
+     "make",
+     "refactor",
+     "migrate",
+     "rename",
+     "port",
+     "update",
+     "write a",
+     "write the",
+     "change",
+     "convert",
+     "replace",
+     "remove",
+     "delete",
+     "move",
+     "extend",
+     "upgrade",
+     "set up",
+     "wire up",
+     "integrate",
+     "redesign"
+    ],
+    "fix": [
+     "fix",
+     "debug",
+     "broken",
+     "failing",
+     "fails",
+     "failed",
+     "crash",
+     "crashes",
+     "crashing",
+     "bug",
+     "bugs",
+     "error",
+     "errors",
+     "why does",
+     "why is",
+     "why are",
+     "why do",
+     "repair",
+     "mend",
+     "resolve",
+     "regression",
+     "not working",
+     "what is wrong"
+    ],
+    "review": [
+     "review",
+     "audit",
+     "critique",
+     "assess",
+     "evaluate",
+     "second opinion",
+     "look over",
+     "check over",
+     "proofread",
+     "sanity check"
+    ],
+    "plan": [
+     "plan",
+     "design",
+     "propose",
+     "outline",
+     "how should",
+     "how would",
+     "strategy",
+     "architecture",
+     "roadmap",
+     "spec",
+     "brainstorm",
+     "think through"
+    ],
+    "find": [
+     "find",
+     "where",
+     "which",
+     "list",
+     "explain",
+     "what does",
+     "look up",
+     "what is",
+     "what are",
+     "how does",
+     "how do",
+     "locate",
+     "search",
+     "show me",
+     "tell me",
+     "count",
+     "who"
+    ],
+    "write": [
+     "draft",
+     "summarize",
+     "summarise",
+     "document",
+     "write up",
+     "translate",
+     "readme",
+     "changelog",
+     "release notes",
+     "summary",
+     "memo",
+     "email",
+     "blog post",
+     "announcement",
+     "docs",
+     "write a readme",
+     "write an readme",
+     "write the readme",
+     "write a changelog",
+     "write an changelog",
+     "write the changelog",
+     "write a release notes",
+     "write an release notes",
+     "write the release notes",
+     "write a summary",
+     "write an summary",
+     "write the summary",
+     "write a memo",
+     "write an memo",
+     "write the memo",
+     "write a email",
+     "write an email",
+     "write the email",
+     "write a blog post",
+     "write an blog post",
+     "write the blog post",
+     "write a announcement",
+     "write an announcement",
+     "write the announcement",
+     "write a docs",
+     "write an docs",
+     "write the docs"
+    ]
+   }
+  },
+  "types": {
+   "Explore": "find",
+   "Plan": "plan",
+   "explorer": "find"
+  },
+  "helper_type": null,
+  "description": null,
+  "task": "list the files in src",
+  "want_kind": "find"
+ },
+ {
+  "name": "a list mark at the start is not part of the sentence",
+  "kinds": {
+   "order": [
+    "build",
+    "fix",
+    "review",
+    "plan",
+    "find",
+    "write",
+    "other"
+   ],
+   "light": "find",
+   "cut": 300,
+   "table": {
+    "build": [
+     "add",
+     "implement",
+     "build",
+     "create",
+     "make",
+     "refactor",
+     "migrate",
+     "rename",
+     "port",
+     "update",
+     "write a",
+     "write the",
+     "change",
+     "convert",
+     "replace",
+     "remove",
+     "delete",
+     "move",
+     "extend",
+     "upgrade",
+     "set up",
+     "wire up",
+     "integrate",
+     "redesign"
+    ],
+    "fix": [
+     "fix",
+     "debug",
+     "broken",
+     "failing",
+     "fails",
+     "failed",
+     "crash",
+     "crashes",
+     "crashing",
+     "bug",
+     "bugs",
+     "error",
+     "errors",
+     "why does",
+     "why is",
+     "why are",
+     "why do",
+     "repair",
+     "mend",
+     "resolve",
+     "regression",
+     "not working",
+     "what is wrong"
+    ],
+    "review": [
+     "review",
+     "audit",
+     "critique",
+     "assess",
+     "evaluate",
+     "second opinion",
+     "look over",
+     "check over",
+     "proofread",
+     "sanity check"
+    ],
+    "plan": [
+     "plan",
+     "design",
+     "propose",
+     "outline",
+     "how should",
+     "how would",
+     "strategy",
+     "architecture",
+     "roadmap",
+     "spec",
+     "brainstorm",
+     "think through"
+    ],
+    "find": [
+     "find",
+     "where",
+     "which",
+     "list",
+     "explain",
+     "what does",
+     "look up",
+     "what is",
+     "what are",
+     "how does",
+     "how do",
+     "locate",
+     "search",
+     "show me",
+     "tell me",
+     "count",
+     "who"
+    ],
+    "write": [
+     "draft",
+     "summarize",
+     "summarise",
+     "document",
+     "write up",
+     "translate",
+     "readme",
+     "changelog",
+     "release notes",
+     "summary",
+     "memo",
+     "email",
+     "blog post",
+     "announcement",
+     "docs",
+     "write a readme",
+     "write an readme",
+     "write the readme",
+     "write a changelog",
+     "write an changelog",
+     "write the changelog",
+     "write a release notes",
+     "write an release notes",
+     "write the release notes",
+     "write a summary",
+     "write an summary",
+     "write the summary",
+     "write a memo",
+     "write an memo",
+     "write the memo",
+     "write a email",
+     "write an email",
+     "write the email",
+     "write a blog post",
+     "write an blog post",
+     "write the blog post",
+     "write a announcement",
+     "write an announcement",
+     "write the announcement",
+     "write a docs",
+     "write an docs",
+     "write the docs"
+    ]
+   }
+  },
+  "types": {
+   "Explore": "find",
+   "Plan": "plan",
+   "explorer": "find"
+  },
+  "helper_type": null,
+  "description": null,
+  "task": "1. review the diff",
+  "want_kind": "review"
+ },
+ {
+  "name": "a dash list mark at the start",
+  "kinds": {
+   "order": [
+    "build",
+    "fix",
+    "review",
+    "plan",
+    "find",
+    "write",
+    "other"
+   ],
+   "light": "find",
+   "cut": 300,
+   "table": {
+    "build": [
+     "add",
+     "implement",
+     "build",
+     "create",
+     "make",
+     "refactor",
+     "migrate",
+     "rename",
+     "port",
+     "update",
+     "write a",
+     "write the",
+     "change",
+     "convert",
+     "replace",
+     "remove",
+     "delete",
+     "move",
+     "extend",
+     "upgrade",
+     "set up",
+     "wire up",
+     "integrate",
+     "redesign"
+    ],
+    "fix": [
+     "fix",
+     "debug",
+     "broken",
+     "failing",
+     "fails",
+     "failed",
+     "crash",
+     "crashes",
+     "crashing",
+     "bug",
+     "bugs",
+     "error",
+     "errors",
+     "why does",
+     "why is",
+     "why are",
+     "why do",
+     "repair",
+     "mend",
+     "resolve",
+     "regression",
+     "not working",
+     "what is wrong"
+    ],
+    "review": [
+     "review",
+     "audit",
+     "critique",
+     "assess",
+     "evaluate",
+     "second opinion",
+     "look over",
+     "check over",
+     "proofread",
+     "sanity check"
+    ],
+    "plan": [
+     "plan",
+     "design",
+     "propose",
+     "outline",
+     "how should",
+     "how would",
+     "strategy",
+     "architecture",
+     "roadmap",
+     "spec",
+     "brainstorm",
+     "think through"
+    ],
+    "find": [
+     "find",
+     "where",
+     "which",
+     "list",
+     "explain",
+     "what does",
+     "look up",
+     "what is",
+     "what are",
+     "how does",
+     "how do",
+     "locate",
+     "search",
+     "show me",
+     "tell me",
+     "count",
+     "who"
+    ],
+    "write": [
+     "draft",
+     "summarize",
+     "summarise",
+     "document",
+     "write up",
+     "translate",
+     "readme",
+     "changelog",
+     "release notes",
+     "summary",
+     "memo",
+     "email",
+     "blog post",
+     "announcement",
+     "docs",
+     "write a readme",
+     "write an readme",
+     "write the readme",
+     "write a changelog",
+     "write an changelog",
+     "write the changelog",
+     "write a release notes",
+     "write an release notes",
+     "write the release notes",
+     "write a summary",
+     "write an summary",
+     "write the summary",
+     "write a memo",
+     "write an memo",
+     "write the memo",
+     "write a email",
+     "write an email",
+     "write the email",
+     "write a blog post",
+     "write an blog post",
+     "write the blog post",
+     "write a announcement",
+     "write an announcement",
+     "write the announcement",
+     "write a docs",
+     "write an docs",
+     "write the docs"
+    ]
+   }
+  },
+  "types": {
+   "Explore": "find",
+   "Plan": "plan",
+   "explorer": "find"
+  },
+  "helper_type": null,
+  "description": null,
+  "task": "- fix the crash",
+  "want_kind": "fix"
+ },
+ {
+  "name": "upper case reads as lower case",
+  "kinds": {
+   "order": [
+    "build",
+    "fix",
+    "review",
+    "plan",
+    "find",
+    "write",
+    "other"
+   ],
+   "light": "find",
+   "cut": 300,
+   "table": {
+    "build": [
+     "add",
+     "implement",
+     "build",
+     "create",
+     "make",
+     "refactor",
+     "migrate",
+     "rename",
+     "port",
+     "update",
+     "write a",
+     "write the",
+     "change",
+     "convert",
+     "replace",
+     "remove",
+     "delete",
+     "move",
+     "extend",
+     "upgrade",
+     "set up",
+     "wire up",
+     "integrate",
+     "redesign"
+    ],
+    "fix": [
+     "fix",
+     "debug",
+     "broken",
+     "failing",
+     "fails",
+     "failed",
+     "crash",
+     "crashes",
+     "crashing",
+     "bug",
+     "bugs",
+     "error",
+     "errors",
+     "why does",
+     "why is",
+     "why are",
+     "why do",
+     "repair",
+     "mend",
+     "resolve",
+     "regression",
+     "not working",
+     "what is wrong"
+    ],
+    "review": [
+     "review",
+     "audit",
+     "critique",
+     "assess",
+     "evaluate",
+     "second opinion",
+     "look over",
+     "check over",
+     "proofread",
+     "sanity check"
+    ],
+    "plan": [
+     "plan",
+     "design",
+     "propose",
+     "outline",
+     "how should",
+     "how would",
+     "strategy",
+     "architecture",
+     "roadmap",
+     "spec",
+     "brainstorm",
+     "think through"
+    ],
+    "find": [
+     "find",
+     "where",
+     "which",
+     "list",
+     "explain",
+     "what does",
+     "look up",
+     "what is",
+     "what are",
+     "how does",
+     "how do",
+     "locate",
+     "search",
+     "show me",
+     "tell me",
+     "count",
+     "who"
+    ],
+    "write": [
+     "draft",
+     "summarize",
+     "summarise",
+     "document",
+     "write up",
+     "translate",
+     "readme",
+     "changelog",
+     "release notes",
+     "summary",
+     "memo",
+     "email",
+     "blog post",
+     "announcement",
+     "docs",
+     "write a readme",
+     "write an readme",
+     "write the readme",
+     "write a changelog",
+     "write an changelog",
+     "write the changelog",
+     "write a release notes",
+     "write an release notes",
+     "write the release notes",
+     "write a summary",
+     "write an summary",
+     "write the summary",
+     "write a memo",
+     "write an memo",
+     "write the memo",
+     "write a email",
+     "write an email",
+     "write the email",
+     "write a blog post",
+     "write an blog post",
+     "write the blog post",
+     "write a announcement",
+     "write an announcement",
+     "write the announcement",
+     "write a docs",
+     "write an docs",
+     "write the docs"
+    ]
+   }
+  },
+  "types": {
+   "Explore": "find",
+   "Plan": "plan",
+   "explorer": "find"
+  },
+  "helper_type": null,
+  "description": null,
+  "task": "REVIEW THE PR",
+  "want_kind": "review"
+ },
+ {
+  "name": "leading blanks are passed over",
+  "kinds": {
+   "order": [
+    "build",
+    "fix",
+    "review",
+    "plan",
+    "find",
+    "write",
+    "other"
+   ],
+   "light": "find",
+   "cut": 300,
+   "table": {
+    "build": [
+     "add",
+     "implement",
+     "build",
+     "create",
+     "make",
+     "refactor",
+     "migrate",
+     "rename",
+     "port",
+     "update",
+     "write a",
+     "write the",
+     "change",
+     "convert",
+     "replace",
+     "remove",
+     "delete",
+     "move",
+     "extend",
+     "upgrade",
+     "set up",
+     "wire up",
+     "integrate",
+     "redesign"
+    ],
+    "fix": [
+     "fix",
+     "debug",
+     "broken",
+     "failing",
+     "fails",
+     "failed",
+     "crash",
+     "crashes",
+     "crashing",
+     "bug",
+     "bugs",
+     "error",
+     "errors",
+     "why does",
+     "why is",
+     "why are",
+     "why do",
+     "repair",
+     "mend",
+     "resolve",
+     "regression",
+     "not working",
+     "what is wrong"
+    ],
+    "review": [
+     "review",
+     "audit",
+     "critique",
+     "assess",
+     "evaluate",
+     "second opinion",
+     "look over",
+     "check over",
+     "proofread",
+     "sanity check"
+    ],
+    "plan": [
+     "plan",
+     "design",
+     "propose",
+     "outline",
+     "how should",
+     "how would",
+     "strategy",
+     "architecture",
+     "roadmap",
+     "spec",
+     "brainstorm",
+     "think through"
+    ],
+    "find": [
+     "find",
+     "where",
+     "which",
+     "list",
+     "explain",
+     "what does",
+     "look up",
+     "what is",
+     "what are",
+     "how does",
+     "how do",
+     "locate",
+     "search",
+     "show me",
+     "tell me",
+     "count",
+     "who"
+    ],
+    "write": [
+     "draft",
+     "summarize",
+     "summarise",
+     "document",
+     "write up",
+     "translate",
+     "readme",
+     "changelog",
+     "release notes",
+     "summary",
+     "memo",
+     "email",
+     "blog post",
+     "announcement",
+     "docs",
+     "write a readme",
+     "write an readme",
+     "write the readme",
+     "write a changelog",
+     "write an changelog",
+     "write the changelog",
+     "write a release notes",
+     "write an release notes",
+     "write the release notes",
+     "write a summary",
+     "write an summary",
+     "write the summary",
+     "write a memo",
+     "write an memo",
+     "write the memo",
+     "write a email",
+     "write an email",
+     "write the email",
+     "write a blog post",
+     "write an blog post",
+     "write the blog post",
+     "write a announcement",
+     "write an announcement",
+     "write the announcement",
+     "write a docs",
+     "write an docs",
+     "write the docs"
+    ]
+   }
+  },
+  "types": {
+   "Explore": "find",
+   "Plan": "plan",
+   "explorer": "find"
+  },
+  "helper_type": null,
+  "description": null,
+  "task": "   review this",
+  "want_kind": "review"
+ },
+ {
+  "name": "a phrase that starts another kind's phrase: the longer one wins at its place",
+  "kinds": {
+   "order": [
+    "build",
+    "fix",
+    "review",
+    "plan",
+    "find",
+    "write",
+    "other"
+   ],
+   "light": "find",
+   "cut": 300,
+   "table": {
+    "build": [
+     "add",
+     "implement",
+     "build",
+     "create",
+     "make",
+     "refactor",
+     "migrate",
+     "rename",
+     "port",
+     "update",
+     "write a",
+     "write the",
+     "change",
+     "convert",
+     "replace",
+     "remove",
+     "delete",
+     "move",
+     "extend",
+     "upgrade",
+     "set up",
+     "wire up",
+     "integrate",
+     "redesign"
+    ],
+    "fix": [
+     "fix",
+     "debug",
+     "broken",
+     "failing",
+     "fails",
+     "failed",
+     "crash",
+     "crashes",
+     "crashing",
+     "bug",
+     "bugs",
+     "error",
+     "errors",
+     "why does",
+     "why is",
+     "why are",
+     "why do",
+     "repair",
+     "mend",
+     "resolve",
+     "regression",
+     "not working",
+     "what is wrong"
+    ],
+    "review": [
+     "review",
+     "audit",
+     "critique",
+     "assess",
+     "evaluate",
+     "second opinion",
+     "look over",
+     "check over",
+     "proofread",
+     "sanity check"
+    ],
+    "plan": [
+     "plan",
+     "design",
+     "propose",
+     "outline",
+     "how should",
+     "how would",
+     "strategy",
+     "architecture",
+     "roadmap",
+     "spec",
+     "brainstorm",
+     "think through"
+    ],
+    "find": [
+     "find",
+     "where",
+     "which",
+     "list",
+     "explain",
+     "what does",
+     "look up",
+     "what is",
+     "what are",
+     "how does",
+     "how do",
+     "locate",
+     "search",
+     "show me",
+     "tell me",
+     "count",
+     "who"
+    ],
+    "write": [
+     "draft",
+     "summarize",
+     "summarise",
+     "document",
+     "write up",
+     "translate",
+     "readme",
+     "changelog",
+     "release notes",
+     "summary",
+     "memo",
+     "email",
+     "blog post",
+     "announcement",
+     "docs",
+     "write a readme",
+     "write an readme",
+     "write the readme",
+     "write a changelog",
+     "write an changelog",
+     "write the changelog",
+     "write a release notes",
+     "write an release notes",
+     "write the release notes",
+     "write a summary",
+     "write an summary",
+     "write the summary",
+     "write a memo",
+     "write an memo",
+     "write the memo",
+     "write a email",
+     "write an email",
+     "write the email",
+     "write a blog post",
+     "write an blog post",
+     "write the blog post",
+     "write a announcement",
+     "write an announcement",
+     "write the announcement",
+     "write a docs",
+     "write an docs",
+     "write the docs"
+    ]
+   }
+  },
+  "types": {
+   "Explore": "find",
+   "Plan": "plan",
+   "explorer": "find"
+  },
+  "helper_type": null,
+  "description": null,
+  "task": "write the release notes for 2.0",
+  "want_kind": "write"
+ },
+ {
+  "name": "\"write the\" alone is a build job",
+  "kinds": {
+   "order": [
+    "build",
+    "fix",
+    "review",
+    "plan",
+    "find",
+    "write",
+    "other"
+   ],
+   "light": "find",
+   "cut": 300,
+   "table": {
+    "build": [
+     "add",
+     "implement",
+     "build",
+     "create",
+     "make",
+     "refactor",
+     "migrate",
+     "rename",
+     "port",
+     "update",
+     "write a",
+     "write the",
+     "change",
+     "convert",
+     "replace",
+     "remove",
+     "delete",
+     "move",
+     "extend",
+     "upgrade",
+     "set up",
+     "wire up",
+     "integrate",
+     "redesign"
+    ],
+    "fix": [
+     "fix",
+     "debug",
+     "broken",
+     "failing",
+     "fails",
+     "failed",
+     "crash",
+     "crashes",
+     "crashing",
+     "bug",
+     "bugs",
+     "error",
+     "errors",
+     "why does",
+     "why is",
+     "why are",
+     "why do",
+     "repair",
+     "mend",
+     "resolve",
+     "regression",
+     "not working",
+     "what is wrong"
+    ],
+    "review": [
+     "review",
+     "audit",
+     "critique",
+     "assess",
+     "evaluate",
+     "second opinion",
+     "look over",
+     "check over",
+     "proofread",
+     "sanity check"
+    ],
+    "plan": [
+     "plan",
+     "design",
+     "propose",
+     "outline",
+     "how should",
+     "how would",
+     "strategy",
+     "architecture",
+     "roadmap",
+     "spec",
+     "brainstorm",
+     "think through"
+    ],
+    "find": [
+     "find",
+     "where",
+     "which",
+     "list",
+     "explain",
+     "what does",
+     "look up",
+     "what is",
+     "what are",
+     "how does",
+     "how do",
+     "locate",
+     "search",
+     "show me",
+     "tell me",
+     "count",
+     "who"
+    ],
+    "write": [
+     "draft",
+     "summarize",
+     "summarise",
+     "document",
+     "write up",
+     "translate",
+     "readme",
+     "changelog",
+     "release notes",
+     "summary",
+     "memo",
+     "email",
+     "blog post",
+     "announcement",
+     "docs",
+     "write a readme",
+     "write an readme",
+     "write the readme",
+     "write a changelog",
+     "write an changelog",
+     "write the changelog",
+     "write a release notes",
+     "write an release notes",
+     "write the release notes",
+     "write a summary",
+     "write an summary",
+     "write the summary",
+     "write a memo",
+     "write an memo",
+     "write the memo",
+     "write a email",
+     "write an email",
+     "write the email",
+     "write a blog post",
+     "write an blog post",
+     "write the blog post",
+     "write a announcement",
+     "write an announcement",
+     "write the announcement",
+     "write a docs",
+     "write an docs",
+     "write the docs"
+    ]
+   }
+  },
+  "types": {
+   "Explore": "find",
+   "Plan": "plan",
+   "explorer": "find"
+  },
+  "helper_type": null,
+  "description": null,
+  "task": "write the parser",
+  "want_kind": "build"
+ },
+ {
+  "name": "\"what is wrong\" (fix) over \"what is\" (find) at the same place",
+  "kinds": {
+   "order": [
+    "build",
+    "fix",
+    "review",
+    "plan",
+    "find",
+    "write",
+    "other"
+   ],
+   "light": "find",
+   "cut": 300,
+   "table": {
+    "build": [
+     "add",
+     "implement",
+     "build",
+     "create",
+     "make",
+     "refactor",
+     "migrate",
+     "rename",
+     "port",
+     "update",
+     "write a",
+     "write the",
+     "change",
+     "convert",
+     "replace",
+     "remove",
+     "delete",
+     "move",
+     "extend",
+     "upgrade",
+     "set up",
+     "wire up",
+     "integrate",
+     "redesign"
+    ],
+    "fix": [
+     "fix",
+     "debug",
+     "broken",
+     "failing",
+     "fails",
+     "failed",
+     "crash",
+     "crashes",
+     "crashing",
+     "bug",
+     "bugs",
+     "error",
+     "errors",
+     "why does",
+     "why is",
+     "why are",
+     "why do",
+     "repair",
+     "mend",
+     "resolve",
+     "regression",
+     "not working",
+     "what is wrong"
+    ],
+    "review": [
+     "review",
+     "audit",
+     "critique",
+     "assess",
+     "evaluate",
+     "second opinion",
+     "look over",
+     "check over",
+     "proofread",
+     "sanity check"
+    ],
+    "plan": [
+     "plan",
+     "design",
+     "propose",
+     "outline",
+     "how should",
+     "how would",
+     "strategy",
+     "architecture",
+     "roadmap",
+     "spec",
+     "brainstorm",
+     "think through"
+    ],
+    "find": [
+     "find",
+     "where",
+     "which",
+     "list",
+     "explain",
+     "what does",
+     "look up",
+     "what is",
+     "what are",
+     "how does",
+     "how do",
+     "locate",
+     "search",
+     "show me",
+     "tell me",
+     "count",
+     "who"
+    ],
+    "write": [
+     "draft",
+     "summarize",
+     "summarise",
+     "document",
+     "write up",
+     "translate",
+     "readme",
+     "changelog",
+     "release notes",
+     "summary",
+     "memo",
+     "email",
+     "blog post",
+     "announcement",
+     "docs",
+     "write a readme",
+     "write an readme",
+     "write the readme",
+     "write a changelog",
+     "write an changelog",
+     "write the changelog",
+     "write a release notes",
+     "write an release notes",
+     "write the release notes",
+     "write a summary",
+     "write an summary",
+     "write the summary",
+     "write a memo",
+     "write an memo",
+     "write the memo",
+     "write a email",
+     "write an email",
+     "write the email",
+     "write a blog post",
+     "write an blog post",
+     "write the blog post",
+     "write a announcement",
+     "write an announcement",
+     "write the announcement",
+     "write a docs",
+     "write an docs",
+     "write the docs"
+    ]
+   }
+  },
+  "types": {
+   "Explore": "find",
+   "Plan": "plan",
+   "explorer": "find"
+  },
+  "helper_type": null,
+  "description": null,
+  "task": "what is wrong with this page",
+  "want_kind": "fix"
+ },
+ {
+  "name": "the earliest match wins among heavier kinds",
+  "kinds": {
+   "order": [
+    "build",
+    "fix",
+    "review",
+    "plan",
+    "find",
+    "write",
+    "other"
+   ],
+   "light": "find",
+   "cut": 300,
+   "table": {
+    "build": [
+     "add",
+     "implement",
+     "build",
+     "create",
+     "make",
+     "refactor",
+     "migrate",
+     "rename",
+     "port",
+     "update",
+     "write a",
+     "write the",
+     "change",
+     "convert",
+     "replace",
+     "remove",
+     "delete",
+     "move",
+     "extend",
+     "upgrade",
+     "set up",
+     "wire up",
+     "integrate",
+     "redesign"
+    ],
+    "fix": [
+     "fix",
+     "debug",
+     "broken",
+     "failing",
+     "fails",
+     "failed",
+     "crash",
+     "crashes",
+     "crashing",
+     "bug",
+     "bugs",
+     "error",
+     "errors",
+     "why does",
+     "why is",
+     "why are",
+     "why do",
+     "repair",
+     "mend",
+     "resolve",
+     "regression",
+     "not working",
+     "what is wrong"
+    ],
+    "review": [
+     "review",
+     "audit",
+     "critique",
+     "assess",
+     "evaluate",
+     "second opinion",
+     "look over",
+     "check over",
+     "proofread",
+     "sanity check"
+    ],
+    "plan": [
+     "plan",
+     "design",
+     "propose",
+     "outline",
+     "how should",
+     "how would",
+     "strategy",
+     "architecture",
+     "roadmap",
+     "spec",
+     "brainstorm",
+     "think through"
+    ],
+    "find": [
+     "find",
+     "where",
+     "which",
+     "list",
+     "explain",
+     "what does",
+     "look up",
+     "what is",
+     "what are",
+     "how does",
+     "how do",
+     "locate",
+     "search",
+     "show me",
+     "tell me",
+     "count",
+     "who"
+    ],
+    "write": [
+     "draft",
+     "summarize",
+     "summarise",
+     "document",
+     "write up",
+     "translate",
+     "readme",
+     "changelog",
+     "release notes",
+     "summary",
+     "memo",
+     "email",
+     "blog post",
+     "announcement",
+     "docs",
+     "write a readme",
+     "write an readme",
+     "write the readme",
+     "write a changelog",
+     "write an changelog",
+     "write the changelog",
+     "write a release notes",
+     "write an release notes",
+     "write the release notes",
+     "write a summary",
+     "write an summary",
+     "write the summary",
+     "write a memo",
+     "write an memo",
+     "write the memo",
+     "write a email",
+     "write an email",
+     "write the email",
+     "write a blog post",
+     "write an blog post",
+     "write the blog post",
+     "write a announcement",
+     "write an announcement",
+     "write the announcement",
+     "write a docs",
+     "write an docs",
+     "write the docs"
+    ]
+   }
+  },
+  "types": {
+   "Explore": "find",
+   "Plan": "plan",
+   "explorer": "find"
+  },
+  "helper_type": null,
+  "description": null,
+  "task": "plan the migration then fix the bug",
+  "want_kind": "plan"
+ },
+ {
+  "name": "the earliest match wins, the other way round",
+  "kinds": {
+   "order": [
+    "build",
+    "fix",
+    "review",
+    "plan",
+    "find",
+    "write",
+    "other"
+   ],
+   "light": "find",
+   "cut": 300,
+   "table": {
+    "build": [
+     "add",
+     "implement",
+     "build",
+     "create",
+     "make",
+     "refactor",
+     "migrate",
+     "rename",
+     "port",
+     "update",
+     "write a",
+     "write the",
+     "change",
+     "convert",
+     "replace",
+     "remove",
+     "delete",
+     "move",
+     "extend",
+     "upgrade",
+     "set up",
+     "wire up",
+     "integrate",
+     "redesign"
+    ],
+    "fix": [
+     "fix",
+     "debug",
+     "broken",
+     "failing",
+     "fails",
+     "failed",
+     "crash",
+     "crashes",
+     "crashing",
+     "bug",
+     "bugs",
+     "error",
+     "errors",
+     "why does",
+     "why is",
+     "why are",
+     "why do",
+     "repair",
+     "mend",
+     "resolve",
+     "regression",
+     "not working",
+     "what is wrong"
+    ],
+    "review": [
+     "review",
+     "audit",
+     "critique",
+     "assess",
+     "evaluate",
+     "second opinion",
+     "look over",
+     "check over",
+     "proofread",
+     "sanity check"
+    ],
+    "plan": [
+     "plan",
+     "design",
+     "propose",
+     "outline",
+     "how should",
+     "how would",
+     "strategy",
+     "architecture",
+     "roadmap",
+     "spec",
+     "brainstorm",
+     "think through"
+    ],
+    "find": [
+     "find",
+     "where",
+     "which",
+     "list",
+     "explain",
+     "what does",
+     "look up",
+     "what is",
+     "what are",
+     "how does",
+     "how do",
+     "locate",
+     "search",
+     "show me",
+     "tell me",
+     "count",
+     "who"
+    ],
+    "write": [
+     "draft",
+     "summarize",
+     "summarise",
+     "document",
+     "write up",
+     "translate",
+     "readme",
+     "changelog",
+     "release notes",
+     "summary",
+     "memo",
+     "email",
+     "blog post",
+     "announcement",
+     "docs",
+     "write a readme",
+     "write an readme",
+     "write the readme",
+     "write a changelog",
+     "write an changelog",
+     "write the changelog",
+     "write a release notes",
+     "write an release notes",
+     "write the release notes",
+     "write a summary",
+     "write an summary",
+     "write the summary",
+     "write a memo",
+     "write an memo",
+     "write the memo",
+     "write a email",
+     "write an email",
+     "write the email",
+     "write a blog post",
+     "write an blog post",
+     "write the blog post",
+     "write a announcement",
+     "write an announcement",
+     "write the announcement",
+     "write a docs",
+     "write an docs",
+     "write the docs"
+    ]
+   }
+  },
+  "types": {
+   "Explore": "find",
+   "Plan": "plan",
+   "explorer": "find"
+  },
+  "helper_type": null,
+  "description": null,
+  "task": "fix the plan",
+  "want_kind": "fix"
+ },
+ {
+  "name": "a phrase of two words is read as one (sanity check is review)",
+  "kinds": {
+   "order": [
+    "build",
+    "fix",
+    "review",
+    "plan",
+    "find",
+    "write",
+    "other"
+   ],
+   "light": "find",
+   "cut": 300,
+   "table": {
+    "build": [
+     "add",
+     "implement",
+     "build",
+     "create",
+     "make",
+     "refactor",
+     "migrate",
+     "rename",
+     "port",
+     "update",
+     "write a",
+     "write the",
+     "change",
+     "convert",
+     "replace",
+     "remove",
+     "delete",
+     "move",
+     "extend",
+     "upgrade",
+     "set up",
+     "wire up",
+     "integrate",
+     "redesign"
+    ],
+    "fix": [
+     "fix",
+     "debug",
+     "broken",
+     "failing",
+     "fails",
+     "failed",
+     "crash",
+     "crashes",
+     "crashing",
+     "bug",
+     "bugs",
+     "error",
+     "errors",
+     "why does",
+     "why is",
+     "why are",
+     "why do",
+     "repair",
+     "mend",
+     "resolve",
+     "regression",
+     "not working",
+     "what is wrong"
+    ],
+    "review": [
+     "review",
+     "audit",
+     "critique",
+     "assess",
+     "evaluate",
+     "second opinion",
+     "look over",
+     "check over",
+     "proofread",
+     "sanity check"
+    ],
+    "plan": [
+     "plan",
+     "design",
+     "propose",
+     "outline",
+     "how should",
+     "how would",
+     "strategy",
+     "architecture",
+     "roadmap",
+     "spec",
+     "brainstorm",
+     "think through"
+    ],
+    "find": [
+     "find",
+     "where",
+     "which",
+     "list",
+     "explain",
+     "what does",
+     "look up",
+     "what is",
+     "what are",
+     "how does",
+     "how do",
+     "locate",
+     "search",
+     "show me",
+     "tell me",
+     "count",
+     "who"
+    ],
+    "write": [
+     "draft",
+     "summarize",
+     "summarise",
+     "document",
+     "write up",
+     "translate",
+     "readme",
+     "changelog",
+     "release notes",
+     "summary",
+     "memo",
+     "email",
+     "blog post",
+     "announcement",
+     "docs",
+     "write a readme",
+     "write an readme",
+     "write the readme",
+     "write a changelog",
+     "write an changelog",
+     "write the changelog",
+     "write a release notes",
+     "write an release notes",
+     "write the release notes",
+     "write a summary",
+     "write an summary",
+     "write the summary",
+     "write a memo",
+     "write an memo",
+     "write the memo",
+     "write a email",
+     "write an email",
+     "write the email",
+     "write a blog post",
+     "write an blog post",
+     "write the blog post",
+     "write a announcement",
+     "write an announcement",
+     "write the announcement",
+     "write a docs",
+     "write an docs",
+     "write the docs"
+    ]
+   }
+  },
+  "types": {
+   "Explore": "find",
+   "Plan": "plan",
+   "explorer": "find"
+  },
+  "helper_type": null,
+  "description": null,
+  "task": "sanity check the plan",
+  "want_kind": "review"
+ },
+ {
+  "name": "only the first sentence is read",
+  "kinds": {
+   "order": [
+    "build",
+    "fix",
+    "review",
+    "plan",
+    "find",
+    "write",
+    "other"
+   ],
+   "light": "find",
+   "cut": 300,
+   "table": {
+    "build": [
+     "add",
+     "implement",
+     "build",
+     "create",
+     "make",
+     "refactor",
+     "migrate",
+     "rename",
+     "port",
+     "update",
+     "write a",
+     "write the",
+     "change",
+     "convert",
+     "replace",
+     "remove",
+     "delete",
+     "move",
+     "extend",
+     "upgrade",
+     "set up",
+     "wire up",
+     "integrate",
+     "redesign"
+    ],
+    "fix": [
+     "fix",
+     "debug",
+     "broken",
+     "failing",
+     "fails",
+     "failed",
+     "crash",
+     "crashes",
+     "crashing",
+     "bug",
+     "bugs",
+     "error",
+     "errors",
+     "why does",
+     "why is",
+     "why are",
+     "why do",
+     "repair",
+     "mend",
+     "resolve",
+     "regression",
+     "not working",
+     "what is wrong"
+    ],
+    "review": [
+     "review",
+     "audit",
+     "critique",
+     "assess",
+     "evaluate",
+     "second opinion",
+     "look over",
+     "check over",
+     "proofread",
+     "sanity check"
+    ],
+    "plan": [
+     "plan",
+     "design",
+     "propose",
+     "outline",
+     "how should",
+     "how would",
+     "strategy",
+     "architecture",
+     "roadmap",
+     "spec",
+     "brainstorm",
+     "think through"
+    ],
+    "find": [
+     "find",
+     "where",
+     "which",
+     "list",
+     "explain",
+     "what does",
+     "look up",
+     "what is",
+     "what are",
+     "how does",
+     "how do",
+     "locate",
+     "search",
+     "show me",
+     "tell me",
+     "count",
+     "who"
+    ],
+    "write": [
+     "draft",
+     "summarize",
+     "summarise",
+     "document",
+     "write up",
+     "translate",
+     "readme",
+     "changelog",
+     "release notes",
+     "summary",
+     "memo",
+     "email",
+     "blog post",
+     "announcement",
+     "docs",
+     "write a readme",
+     "write an readme",
+     "write the readme",
+     "write a changelog",
+     "write an changelog",
+     "write the changelog",
+     "write a release notes",
+     "write an release notes",
+     "write the release notes",
+     "write a summary",
+     "write an summary",
+     "write the summary",
+     "write a memo",
+     "write an memo",
+     "write the memo",
+     "write a email",
+     "write an email",
+     "write the email",
+     "write a blog post",
+     "write an blog post",
+     "write the blog post",
+     "write a announcement",
+     "write an announcement",
+     "write the announcement",
+     "write a docs",
+     "write an docs",
+     "write the docs"
+    ]
+   }
+  },
+  "types": {
+   "Explore": "find",
+   "Plan": "plan",
+   "explorer": "find"
+  },
+  "helper_type": null,
+  "description": null,
+  "task": "Thanks. Fix the login.",
+  "want_kind": "other"
+ },
+ {
+  "name": "a question mark ends the first sentence",
+  "kinds": {
+   "order": [
+    "build",
+    "fix",
+    "review",
+    "plan",
+    "find",
+    "write",
+    "other"
+   ],
+   "light": "find",
+   "cut": 300,
+   "table": {
+    "build": [
+     "add",
+     "implement",
+     "build",
+     "create",
+     "make",
+     "refactor",
+     "migrate",
+     "rename",
+     "port",
+     "update",
+     "write a",
+     "write the",
+     "change",
+     "convert",
+     "replace",
+     "remove",
+     "delete",
+     "move",
+     "extend",
+     "upgrade",
+     "set up",
+     "wire up",
+     "integrate",
+     "redesign"
+    ],
+    "fix": [
+     "fix",
+     "debug",
+     "broken",
+     "failing",
+     "fails",
+     "failed",
+     "crash",
+     "crashes",
+     "crashing",
+     "bug",
+     "bugs",
+     "error",
+     "errors",
+     "why does",
+     "why is",
+     "why are",
+     "why do",
+     "repair",
+     "mend",
+     "resolve",
+     "regression",
+     "not working",
+     "what is wrong"
+    ],
+    "review": [
+     "review",
+     "audit",
+     "critique",
+     "assess",
+     "evaluate",
+     "second opinion",
+     "look over",
+     "check over",
+     "proofread",
+     "sanity check"
+    ],
+    "plan": [
+     "plan",
+     "design",
+     "propose",
+     "outline",
+     "how should",
+     "how would",
+     "strategy",
+     "architecture",
+     "roadmap",
+     "spec",
+     "brainstorm",
+     "think through"
+    ],
+    "find": [
+     "find",
+     "where",
+     "which",
+     "list",
+     "explain",
+     "what does",
+     "look up",
+     "what is",
+     "what are",
+     "how does",
+     "how do",
+     "locate",
+     "search",
+     "show me",
+     "tell me",
+     "count",
+     "who"
+    ],
+    "write": [
+     "draft",
+     "summarize",
+     "summarise",
+     "document",
+     "write up",
+     "translate",
+     "readme",
+     "changelog",
+     "release notes",
+     "summary",
+     "memo",
+     "email",
+     "blog post",
+     "announcement",
+     "docs",
+     "write a readme",
+     "write an readme",
+     "write the readme",
+     "write a changelog",
+     "write an changelog",
+     "write the changelog",
+     "write a release notes",
+     "write an release notes",
+     "write the release notes",
+     "write a summary",
+     "write an summary",
+     "write the summary",
+     "write a memo",
+     "write an memo",
+     "write the memo",
+     "write a email",
+     "write an email",
+     "write the email",
+     "write a blog post",
+     "write an blog post",
+     "write the blog post",
+     "write a announcement",
+     "write an announcement",
+     "write the announcement",
+     "write a docs",
+     "write an docs",
+     "write the docs"
+    ]
+   }
+  },
+  "types": {
+   "Explore": "find",
+   "Plan": "plan",
+   "explorer": "find"
+  },
+  "helper_type": null,
+  "description": null,
+  "task": "Is it done? review it",
+  "want_kind": "other"
+ },
+ {
+  "name": "a line end ends the first sentence",
+  "kinds": {
+   "order": [
+    "build",
+    "fix",
+    "review",
+    "plan",
+    "find",
+    "write",
+    "other"
+   ],
+   "light": "find",
+   "cut": 300,
+   "table": {
+    "build": [
+     "add",
+     "implement",
+     "build",
+     "create",
+     "make",
+     "refactor",
+     "migrate",
+     "rename",
+     "port",
+     "update",
+     "write a",
+     "write the",
+     "change",
+     "convert",
+     "replace",
+     "remove",
+     "delete",
+     "move",
+     "extend",
+     "upgrade",
+     "set up",
+     "wire up",
+     "integrate",
+     "redesign"
+    ],
+    "fix": [
+     "fix",
+     "debug",
+     "broken",
+     "failing",
+     "fails",
+     "failed",
+     "crash",
+     "crashes",
+     "crashing",
+     "bug",
+     "bugs",
+     "error",
+     "errors",
+     "why does",
+     "why is",
+     "why are",
+     "why do",
+     "repair",
+     "mend",
+     "resolve",
+     "regression",
+     "not working",
+     "what is wrong"
+    ],
+    "review": [
+     "review",
+     "audit",
+     "critique",
+     "assess",
+     "evaluate",
+     "second opinion",
+     "look over",
+     "check over",
+     "proofread",
+     "sanity check"
+    ],
+    "plan": [
+     "plan",
+     "design",
+     "propose",
+     "outline",
+     "how should",
+     "how would",
+     "strategy",
+     "architecture",
+     "roadmap",
+     "spec",
+     "brainstorm",
+     "think through"
+    ],
+    "find": [
+     "find",
+     "where",
+     "which",
+     "list",
+     "explain",
+     "what does",
+     "look up",
+     "what is",
+     "what are",
+     "how does",
+     "how do",
+     "locate",
+     "search",
+     "show me",
+     "tell me",
+     "count",
+     "who"
+    ],
+    "write": [
+     "draft",
+     "summarize",
+     "summarise",
+     "document",
+     "write up",
+     "translate",
+     "readme",
+     "changelog",
+     "release notes",
+     "summary",
+     "memo",
+     "email",
+     "blog post",
+     "announcement",
+     "docs",
+     "write a readme",
+     "write an readme",
+     "write the readme",
+     "write a changelog",
+     "write an changelog",
+     "write the changelog",
+     "write a release notes",
+     "write an release notes",
+     "write the release notes",
+     "write a summary",
+     "write an summary",
+     "write the summary",
+     "write a memo",
+     "write an memo",
+     "write the memo",
+     "write a email",
+     "write an email",
+     "write the email",
+     "write a blog post",
+     "write an blog post",
+     "write the blog post",
+     "write a announcement",
+     "write an announcement",
+     "write the announcement",
+     "write a docs",
+     "write an docs",
+     "write the docs"
+    ]
+   }
+  },
+  "types": {
+   "Explore": "find",
+   "Plan": "plan",
+   "explorer": "find"
+  },
+  "helper_type": null,
+  "description": null,
+  "task": "hello\nfix the login",
+  "want_kind": "other"
+ },
+ {
+  "name": "a dot inside a word does not end the sentence",
+  "kinds": {
+   "order": [
+    "build",
+    "fix",
+    "review",
+    "plan",
+    "find",
+    "write",
+    "other"
+   ],
+   "light": "find",
+   "cut": 300,
+   "table": {
+    "build": [
+     "add",
+     "implement",
+     "build",
+     "create",
+     "make",
+     "refactor",
+     "migrate",
+     "rename",
+     "port",
+     "update",
+     "write a",
+     "write the",
+     "change",
+     "convert",
+     "replace",
+     "remove",
+     "delete",
+     "move",
+     "extend",
+     "upgrade",
+     "set up",
+     "wire up",
+     "integrate",
+     "redesign"
+    ],
+    "fix": [
+     "fix",
+     "debug",
+     "broken",
+     "failing",
+     "fails",
+     "failed",
+     "crash",
+     "crashes",
+     "crashing",
+     "bug",
+     "bugs",
+     "error",
+     "errors",
+     "why does",
+     "why is",
+     "why are",
+     "why do",
+     "repair",
+     "mend",
+     "resolve",
+     "regression",
+     "not working",
+     "what is wrong"
+    ],
+    "review": [
+     "review",
+     "audit",
+     "critique",
+     "assess",
+     "evaluate",
+     "second opinion",
+     "look over",
+     "check over",
+     "proofread",
+     "sanity check"
+    ],
+    "plan": [
+     "plan",
+     "design",
+     "propose",
+     "outline",
+     "how should",
+     "how would",
+     "strategy",
+     "architecture",
+     "roadmap",
+     "spec",
+     "brainstorm",
+     "think through"
+    ],
+    "find": [
+     "find",
+     "where",
+     "which",
+     "list",
+     "explain",
+     "what does",
+     "look up",
+     "what is",
+     "what are",
+     "how does",
+     "how do",
+     "locate",
+     "search",
+     "show me",
+     "tell me",
+     "count",
+     "who"
+    ],
+    "write": [
+     "draft",
+     "summarize",
+     "summarise",
+     "document",
+     "write up",
+     "translate",
+     "readme",
+     "changelog",
+     "release notes",
+     "summary",
+     "memo",
+     "email",
+     "blog post",
+     "announcement",
+     "docs",
+     "write a readme",
+     "write an readme",
+     "write the readme",
+     "write a changelog",
+     "write an changelog",
+     "write the changelog",
+     "write a release notes",
+     "write an release notes",
+     "write the release notes",
+     "write a summary",
+     "write an summary",
+     "write the summary",
+     "write a memo",
+     "write an memo",
+     "write the memo",
+     "write a email",
+     "write an email",
+     "write the email",
+     "write a blog post",
+     "write an blog post",
+     "write the blog post",
+     "write a announcement",
+     "write an announcement",
+     "write the announcement",
+     "write a docs",
+     "write an docs",
+     "write the docs"
+    ]
+   }
+  },
+  "types": {
+   "Explore": "find",
+   "Plan": "plan",
+   "explorer": "find"
+  },
+  "helper_type": null,
+  "description": null,
+  "task": "open foo.py and fix it",
+  "want_kind": "fix"
+ },
+ {
+  "name": "whole words only: \"addresses\" is not \"add\"",
+  "kinds": {
+   "order": [
+    "build",
+    "fix",
+    "review",
+    "plan",
+    "find",
+    "write",
+    "other"
+   ],
+   "light": "find",
+   "cut": 300,
+   "table": {
+    "build": [
+     "add",
+     "implement",
+     "build",
+     "create",
+     "make",
+     "refactor",
+     "migrate",
+     "rename",
+     "port",
+     "update",
+     "write a",
+     "write the",
+     "change",
+     "convert",
+     "replace",
+     "remove",
+     "delete",
+     "move",
+     "extend",
+     "upgrade",
+     "set up",
+     "wire up",
+     "integrate",
+     "redesign"
+    ],
+    "fix": [
+     "fix",
+     "debug",
+     "broken",
+     "failing",
+     "fails",
+     "failed",
+     "crash",
+     "crashes",
+     "crashing",
+     "bug",
+     "bugs",
+     "error",
+     "errors",
+     "why does",
+     "why is",
+     "why are",
+     "why do",
+     "repair",
+     "mend",
+     "resolve",
+     "regression",
+     "not working",
+     "what is wrong"
+    ],
+    "review": [
+     "review",
+     "audit",
+     "critique",
+     "assess",
+     "evaluate",
+     "second opinion",
+     "look over",
+     "check over",
+     "proofread",
+     "sanity check"
+    ],
+    "plan": [
+     "plan",
+     "design",
+     "propose",
+     "outline",
+     "how should",
+     "how would",
+     "strategy",
+     "architecture",
+     "roadmap",
+     "spec",
+     "brainstorm",
+     "think through"
+    ],
+    "find": [
+     "find",
+     "where",
+     "which",
+     "list",
+     "explain",
+     "what does",
+     "look up",
+     "what is",
+     "what are",
+     "how does",
+     "how do",
+     "locate",
+     "search",
+     "show me",
+     "tell me",
+     "count",
+     "who"
+    ],
+    "write": [
+     "draft",
+     "summarize",
+     "summarise",
+     "document",
+     "write up",
+     "translate",
+     "readme",
+     "changelog",
+     "release notes",
+     "summary",
+     "memo",
+     "email",
+     "blog post",
+     "announcement",
+     "docs",
+     "write a readme",
+     "write an readme",
+     "write the readme",
+     "write a changelog",
+     "write an changelog",
+     "write the changelog",
+     "write a release notes",
+     "write an release notes",
+     "write the release notes",
+     "write a summary",
+     "write an summary",
+     "write the summary",
+     "write a memo",
+     "write an memo",
+     "write the memo",
+     "write a email",
+     "write an email",
+     "write the email",
+     "write a blog post",
+     "write an blog post",
+     "write the blog post",
+     "write a announcement",
+     "write an announcement",
+     "write the announcement",
+     "write a docs",
+     "write an docs",
+     "write the docs"
+    ]
+   }
+  },
+  "types": {
+   "Explore": "find",
+   "Plan": "plan",
+   "explorer": "find"
+  },
+  "helper_type": null,
+  "description": null,
+  "task": "addresses the issue",
+  "want_kind": "other"
+ },
+ {
+  "name": "a letter with an accent is part of the word: \"fix\u00e9\" is not \"fix\"",
+  "kinds": {
+   "order": [
+    "build",
+    "fix",
+    "review",
+    "plan",
+    "find",
+    "write",
+    "other"
+   ],
+   "light": "find",
+   "cut": 300,
+   "table": {
+    "build": [
+     "add",
+     "implement",
+     "build",
+     "create",
+     "make",
+     "refactor",
+     "migrate",
+     "rename",
+     "port",
+     "update",
+     "write a",
+     "write the",
+     "change",
+     "convert",
+     "replace",
+     "remove",
+     "delete",
+     "move",
+     "extend",
+     "upgrade",
+     "set up",
+     "wire up",
+     "integrate",
+     "redesign"
+    ],
+    "fix": [
+     "fix",
+     "debug",
+     "broken",
+     "failing",
+     "fails",
+     "failed",
+     "crash",
+     "crashes",
+     "crashing",
+     "bug",
+     "bugs",
+     "error",
+     "errors",
+     "why does",
+     "why is",
+     "why are",
+     "why do",
+     "repair",
+     "mend",
+     "resolve",
+     "regression",
+     "not working",
+     "what is wrong"
+    ],
+    "review": [
+     "review",
+     "audit",
+     "critique",
+     "assess",
+     "evaluate",
+     "second opinion",
+     "look over",
+     "check over",
+     "proofread",
+     "sanity check"
+    ],
+    "plan": [
+     "plan",
+     "design",
+     "propose",
+     "outline",
+     "how should",
+     "how would",
+     "strategy",
+     "architecture",
+     "roadmap",
+     "spec",
+     "brainstorm",
+     "think through"
+    ],
+    "find": [
+     "find",
+     "where",
+     "which",
+     "list",
+     "explain",
+     "what does",
+     "look up",
+     "what is",
+     "what are",
+     "how does",
+     "how do",
+     "locate",
+     "search",
+     "show me",
+     "tell me",
+     "count",
+     "who"
+    ],
+    "write": [
+     "draft",
+     "summarize",
+     "summarise",
+     "document",
+     "write up",
+     "translate",
+     "readme",
+     "changelog",
+     "release notes",
+     "summary",
+     "memo",
+     "email",
+     "blog post",
+     "announcement",
+     "docs",
+     "write a readme",
+     "write an readme",
+     "write the readme",
+     "write a changelog",
+     "write an changelog",
+     "write the changelog",
+     "write a release notes",
+     "write an release notes",
+     "write the release notes",
+     "write a summary",
+     "write an summary",
+     "write the summary",
+     "write a memo",
+     "write an memo",
+     "write the memo",
+     "write a email",
+     "write an email",
+     "write the email",
+     "write a blog post",
+     "write an blog post",
+     "write the blog post",
+     "write a announcement",
+     "write an announcement",
+     "write the announcement",
+     "write a docs",
+     "write an docs",
+     "write the docs"
+    ]
+   }
+  },
+  "types": {
+   "Explore": "find",
+   "Plan": "plan",
+   "explorer": "find"
+  },
+  "helper_type": null,
+  "description": null,
+  "task": "fix\u00e9 le module",
+  "want_kind": "other"
+ },
+ {
+  "name": "blanks between the words of a phrase may be several",
+  "kinds": {
+   "order": [
+    "build",
+    "fix",
+    "review",
+    "plan",
+    "find",
+    "write",
+    "other"
+   ],
+   "light": "find",
+   "cut": 300,
+   "table": {
+    "build": [
+     "add",
+     "implement",
+     "build",
+     "create",
+     "make",
+     "refactor",
+     "migrate",
+     "rename",
+     "port",
+     "update",
+     "write a",
+     "write the",
+     "change",
+     "convert",
+     "replace",
+     "remove",
+     "delete",
+     "move",
+     "extend",
+     "upgrade",
+     "set up",
+     "wire up",
+     "integrate",
+     "redesign"
+    ],
+    "fix": [
+     "fix",
+     "debug",
+     "broken",
+     "failing",
+     "fails",
+     "failed",
+     "crash",
+     "crashes",
+     "crashing",
+     "bug",
+     "bugs",
+     "error",
+     "errors",
+     "why does",
+     "why is",
+     "why are",
+     "why do",
+     "repair",
+     "mend",
+     "resolve",
+     "regression",
+     "not working",
+     "what is wrong"
+    ],
+    "review": [
+     "review",
+     "audit",
+     "critique",
+     "assess",
+     "evaluate",
+     "second opinion",
+     "look over",
+     "check over",
+     "proofread",
+     "sanity check"
+    ],
+    "plan": [
+     "plan",
+     "design",
+     "propose",
+     "outline",
+     "how should",
+     "how would",
+     "strategy",
+     "architecture",
+     "roadmap",
+     "spec",
+     "brainstorm",
+     "think through"
+    ],
+    "find": [
+     "find",
+     "where",
+     "which",
+     "list",
+     "explain",
+     "what does",
+     "look up",
+     "what is",
+     "what are",
+     "how does",
+     "how do",
+     "locate",
+     "search",
+     "show me",
+     "tell me",
+     "count",
+     "who"
+    ],
+    "write": [
+     "draft",
+     "summarize",
+     "summarise",
+     "document",
+     "write up",
+     "translate",
+     "readme",
+     "changelog",
+     "release notes",
+     "summary",
+     "memo",
+     "email",
+     "blog post",
+     "announcement",
+     "docs",
+     "write a readme",
+     "write an readme",
+     "write the readme",
+     "write a changelog",
+     "write an changelog",
+     "write the changelog",
+     "write a release notes",
+     "write an release notes",
+     "write the release notes",
+     "write a summary",
+     "write an summary",
+     "write the summary",
+     "write a memo",
+     "write an memo",
+     "write the memo",
+     "write a email",
+     "write an email",
+     "write the email",
+     "write a blog post",
+     "write an blog post",
+     "write the blog post",
+     "write a announcement",
+     "write an announcement",
+     "write the announcement",
+     "write a docs",
+     "write an docs",
+     "write the docs"
+    ]
+   }
+  },
+  "types": {
+   "Explore": "find",
+   "Plan": "plan",
+   "explorer": "find"
+  },
+  "helper_type": null,
+  "description": null,
+  "task": "set   up the repo",
+  "want_kind": "build"
+ },
+ {
+  "name": "a word past the cut (300 characters) is not read",
+  "kinds": {
+   "order": [
+    "build",
+    "fix",
+    "review",
+    "plan",
+    "find",
+    "write",
+    "other"
+   ],
+   "light": "find",
+   "cut": 300,
+   "table": {
+    "build": [
+     "add",
+     "implement",
+     "build",
+     "create",
+     "make",
+     "refactor",
+     "migrate",
+     "rename",
+     "port",
+     "update",
+     "write a",
+     "write the",
+     "change",
+     "convert",
+     "replace",
+     "remove",
+     "delete",
+     "move",
+     "extend",
+     "upgrade",
+     "set up",
+     "wire up",
+     "integrate",
+     "redesign"
+    ],
+    "fix": [
+     "fix",
+     "debug",
+     "broken",
+     "failing",
+     "fails",
+     "failed",
+     "crash",
+     "crashes",
+     "crashing",
+     "bug",
+     "bugs",
+     "error",
+     "errors",
+     "why does",
+     "why is",
+     "why are",
+     "why do",
+     "repair",
+     "mend",
+     "resolve",
+     "regression",
+     "not working",
+     "what is wrong"
+    ],
+    "review": [
+     "review",
+     "audit",
+     "critique",
+     "assess",
+     "evaluate",
+     "second opinion",
+     "look over",
+     "check over",
+     "proofread",
+     "sanity check"
+    ],
+    "plan": [
+     "plan",
+     "design",
+     "propose",
+     "outline",
+     "how should",
+     "how would",
+     "strategy",
+     "architecture",
+     "roadmap",
+     "spec",
+     "brainstorm",
+     "think through"
+    ],
+    "find": [
+     "find",
+     "where",
+     "which",
+     "list",
+     "explain",
+     "what does",
+     "look up",
+     "what is",
+     "what are",
+     "how does",
+     "how do",
+     "locate",
+     "search",
+     "show me",
+     "tell me",
+     "count",
+     "who"
+    ],
+    "write": [
+     "draft",
+     "summarize",
+     "summarise",
+     "document",
+     "write up",
+     "translate",
+     "readme",
+     "changelog",
+     "release notes",
+     "summary",
+     "memo",
+     "email",
+     "blog post",
+     "announcement",
+     "docs",
+     "write a readme",
+     "write an readme",
+     "write the readme",
+     "write a changelog",
+     "write an changelog",
+     "write the changelog",
+     "write a release notes",
+     "write an release notes",
+     "write the release notes",
+     "write a summary",
+     "write an summary",
+     "write the summary",
+     "write a memo",
+     "write an memo",
+     "write the memo",
+     "write a email",
+     "write an email",
+     "write the email",
+     "write a blog post",
+     "write an blog post",
+     "write the blog post",
+     "write a announcement",
+     "write an announcement",
+     "write the announcement",
+     "write a docs",
+     "write an docs",
+     "write the docs"
+    ]
+   }
+  },
+  "types": {
+   "Explore": "find",
+   "Plan": "plan",
+   "explorer": "find"
+  },
+  "helper_type": null,
+  "description": null,
+  "task": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx fix it",
+  "want_kind": "other"
+ },
+ {
+  "name": "a word inside the cut is read",
+  "kinds": {
+   "order": [
+    "build",
+    "fix",
+    "review",
+    "plan",
+    "find",
+    "write",
+    "other"
+   ],
+   "light": "find",
+   "cut": 300,
+   "table": {
+    "build": [
+     "add",
+     "implement",
+     "build",
+     "create",
+     "make",
+     "refactor",
+     "migrate",
+     "rename",
+     "port",
+     "update",
+     "write a",
+     "write the",
+     "change",
+     "convert",
+     "replace",
+     "remove",
+     "delete",
+     "move",
+     "extend",
+     "upgrade",
+     "set up",
+     "wire up",
+     "integrate",
+     "redesign"
+    ],
+    "fix": [
+     "fix",
+     "debug",
+     "broken",
+     "failing",
+     "fails",
+     "failed",
+     "crash",
+     "crashes",
+     "crashing",
+     "bug",
+     "bugs",
+     "error",
+     "errors",
+     "why does",
+     "why is",
+     "why are",
+     "why do",
+     "repair",
+     "mend",
+     "resolve",
+     "regression",
+     "not working",
+     "what is wrong"
+    ],
+    "review": [
+     "review",
+     "audit",
+     "critique",
+     "assess",
+     "evaluate",
+     "second opinion",
+     "look over",
+     "check over",
+     "proofread",
+     "sanity check"
+    ],
+    "plan": [
+     "plan",
+     "design",
+     "propose",
+     "outline",
+     "how should",
+     "how would",
+     "strategy",
+     "architecture",
+     "roadmap",
+     "spec",
+     "brainstorm",
+     "think through"
+    ],
+    "find": [
+     "find",
+     "where",
+     "which",
+     "list",
+     "explain",
+     "what does",
+     "look up",
+     "what is",
+     "what are",
+     "how does",
+     "how do",
+     "locate",
+     "search",
+     "show me",
+     "tell me",
+     "count",
+     "who"
+    ],
+    "write": [
+     "draft",
+     "summarize",
+     "summarise",
+     "document",
+     "write up",
+     "translate",
+     "readme",
+     "changelog",
+     "release notes",
+     "summary",
+     "memo",
+     "email",
+     "blog post",
+     "announcement",
+     "docs",
+     "write a readme",
+     "write an readme",
+     "write the readme",
+     "write a changelog",
+     "write an changelog",
+     "write the changelog",
+     "write a release notes",
+     "write an release notes",
+     "write the release notes",
+     "write a summary",
+     "write an summary",
+     "write the summary",
+     "write a memo",
+     "write an memo",
+     "write the memo",
+     "write a email",
+     "write an email",
+     "write the email",
+     "write a blog post",
+     "write an blog post",
+     "write the blog post",
+     "write a announcement",
+     "write an announcement",
+     "write the announcement",
+     "write a docs",
+     "write an docs",
+     "write the docs"
+    ]
+   }
+  },
+  "types": {
+   "Explore": "find",
+   "Plan": "plan",
+   "explorer": "find"
+  },
+  "helper_type": null,
+  "description": null,
+  "task": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx fix it",
+  "want_kind": "fix"
+ },
+ {
+  "name": "a smaller cut from the plan is used, counted in characters (not UTF-16 units)",
+  "kinds": {
+   "order": [
+    "build",
+    "fix",
+    "review",
+    "plan",
+    "find",
+    "write",
+    "other"
+   ],
+   "light": "find",
+   "cut": 7,
+   "table": {
+    "build": [
+     "add",
+     "implement",
+     "build",
+     "create",
+     "make",
+     "refactor",
+     "migrate",
+     "rename",
+     "port",
+     "update",
+     "write a",
+     "write the",
+     "change",
+     "convert",
+     "replace",
+     "remove",
+     "delete",
+     "move",
+     "extend",
+     "upgrade",
+     "set up",
+     "wire up",
+     "integrate",
+     "redesign"
+    ],
+    "fix": [
+     "fix",
+     "debug",
+     "broken",
+     "failing",
+     "fails",
+     "failed",
+     "crash",
+     "crashes",
+     "crashing",
+     "bug",
+     "bugs",
+     "error",
+     "errors",
+     "why does",
+     "why is",
+     "why are",
+     "why do",
+     "repair",
+     "mend",
+     "resolve",
+     "regression",
+     "not working",
+     "what is wrong"
+    ],
+    "review": [
+     "review",
+     "audit",
+     "critique",
+     "assess",
+     "evaluate",
+     "second opinion",
+     "look over",
+     "check over",
+     "proofread",
+     "sanity check"
+    ],
+    "plan": [
+     "plan",
+     "design",
+     "propose",
+     "outline",
+     "how should",
+     "how would",
+     "strategy",
+     "architecture",
+     "roadmap",
+     "spec",
+     "brainstorm",
+     "think through"
+    ],
+    "find": [
+     "find",
+     "where",
+     "which",
+     "list",
+     "explain",
+     "what does",
+     "look up",
+     "what is",
+     "what are",
+     "how does",
+     "how do",
+     "locate",
+     "search",
+     "show me",
+     "tell me",
+     "count",
+     "who"
+    ],
+    "write": [
+     "draft",
+     "summarize",
+     "summarise",
+     "document",
+     "write up",
+     "translate",
+     "readme",
+     "changelog",
+     "release notes",
+     "summary",
+     "memo",
+     "email",
+     "blog post",
+     "announcement",
+     "docs",
+     "write a readme",
+     "write an readme",
+     "write the readme",
+     "write a changelog",
+     "write an changelog",
+     "write the changelog",
+     "write a release notes",
+     "write an release notes",
+     "write the release notes",
+     "write a summary",
+     "write an summary",
+     "write the summary",
+     "write a memo",
+     "write an memo",
+     "write the memo",
+     "write a email",
+     "write an email",
+     "write the email",
+     "write a blog post",
+     "write an blog post",
+     "write the blog post",
+     "write a announcement",
+     "write an announcement",
+     "write the announcement",
+     "write a docs",
+     "write an docs",
+     "write the docs"
+    ]
+   }
+  },
+  "types": {
+   "Explore": "find",
+   "Plan": "plan",
+   "explorer": "find"
+  },
+  "helper_type": null,
+  "description": null,
+  "task": "\ud83d\ude42\ud83d\ude42\ud83d\ude42 fix the bug",
+  "want_kind": "fix"
+ },
+ {
+  "name": "a smaller cut from the plan cuts a word off",
+  "kinds": {
+   "order": [
+    "build",
+    "fix",
+    "review",
+    "plan",
+    "find",
+    "write",
+    "other"
+   ],
+   "light": "find",
+   "cut": 9,
+   "table": {
+    "build": [
+     "add",
+     "implement",
+     "build",
+     "create",
+     "make",
+     "refactor",
+     "migrate",
+     "rename",
+     "port",
+     "update",
+     "write a",
+     "write the",
+     "change",
+     "convert",
+     "replace",
+     "remove",
+     "delete",
+     "move",
+     "extend",
+     "upgrade",
+     "set up",
+     "wire up",
+     "integrate",
+     "redesign"
+    ],
+    "fix": [
+     "fix",
+     "debug",
+     "broken",
+     "failing",
+     "fails",
+     "failed",
+     "crash",
+     "crashes",
+     "crashing",
+     "bug",
+     "bugs",
+     "error",
+     "errors",
+     "why does",
+     "why is",
+     "why are",
+     "why do",
+     "repair",
+     "mend",
+     "resolve",
+     "regression",
+     "not working",
+     "what is wrong"
+    ],
+    "review": [
+     "review",
+     "audit",
+     "critique",
+     "assess",
+     "evaluate",
+     "second opinion",
+     "look over",
+     "check over",
+     "proofread",
+     "sanity check"
+    ],
+    "plan": [
+     "plan",
+     "design",
+     "propose",
+     "outline",
+     "how should",
+     "how would",
+     "strategy",
+     "architecture",
+     "roadmap",
+     "spec",
+     "brainstorm",
+     "think through"
+    ],
+    "find": [
+     "find",
+     "where",
+     "which",
+     "list",
+     "explain",
+     "what does",
+     "look up",
+     "what is",
+     "what are",
+     "how does",
+     "how do",
+     "locate",
+     "search",
+     "show me",
+     "tell me",
+     "count",
+     "who"
+    ],
+    "write": [
+     "draft",
+     "summarize",
+     "summarise",
+     "document",
+     "write up",
+     "translate",
+     "readme",
+     "changelog",
+     "release notes",
+     "summary",
+     "memo",
+     "email",
+     "blog post",
+     "announcement",
+     "docs",
+     "write a readme",
+     "write an readme",
+     "write the readme",
+     "write a changelog",
+     "write an changelog",
+     "write the changelog",
+     "write a release notes",
+     "write an release notes",
+     "write the release notes",
+     "write a summary",
+     "write an summary",
+     "write the summary",
+     "write a memo",
+     "write an memo",
+     "write the memo",
+     "write a email",
+     "write an email",
+     "write the email",
+     "write a blog post",
+     "write an blog post",
+     "write the blog post",
+     "write a announcement",
+     "write an announcement",
+     "write the announcement",
+     "write a docs",
+     "write an docs",
+     "write the docs"
+    ]
+   }
+  },
+  "types": {
+   "Explore": "find",
+   "Plan": "plan",
+   "explorer": "find"
+  },
+  "helper_type": null,
+  "description": null,
+  "task": "please fix it",
+  "want_kind": "other"
+ },
+ {
+  "name": "a made-up table with its own kind names: the heavier kind wins",
+  "kinds": {
+   "order": [
+    "code",
+    "look",
+    "other"
+   ],
+   "light": "look",
+   "cut": 300,
+   "table": {
+    "code": [
+     "make",
+     "change"
+    ],
+    "look": [
+     "show"
+    ]
+   }
+  },
+  "types": {},
+  "helper_type": null,
+  "description": null,
+  "task": "show me and make it",
+  "want_kind": "code"
+ },
+ {
+  "name": "a made-up table: the light kind alone",
+  "kinds": {
+   "order": [
+    "code",
+    "look",
+    "other"
+   ],
+   "light": "look",
+   "cut": 300,
+   "table": {
+    "code": [
+     "make",
+     "change"
+    ],
+    "look": [
+     "show"
+    ]
+   }
+  },
+  "types": {},
+  "helper_type": null,
+  "description": null,
+  "task": "show the logs",
+  "want_kind": "look"
+ },
+ {
+  "name": "a made-up table: nothing matches, other",
+  "kinds": {
+   "order": [
+    "code",
+    "look",
+    "other"
+   ],
+   "light": "look",
+   "cut": 300,
+   "table": {
+    "code": [
+     "make",
+     "change"
+    ],
+    "look": [
+     "show"
+    ]
+   }
+  },
+  "types": {},
+  "helper_type": null,
+  "description": null,
+  "task": "fix it",
+  "want_kind": "other"
+ },
+ {
+  "name": "no kinds block (null): no kind",
+  "kinds": null,
+  "types": {},
+  "helper_type": null,
+  "description": null,
+  "task": "fix it",
+  "want_kind": null
+ },
+ {
+  "name": "kinds whose light kind is not in its order: no kind",
+  "kinds": {
+   "order": [
+    "build",
+    "fix",
+    "review",
+    "plan",
+    "find",
+    "write",
+    "other"
+   ],
+   "light": "lookup",
+   "cut": 300,
+   "table": {
+    "build": [
+     "add",
+     "implement",
+     "build",
+     "create",
+     "make",
+     "refactor",
+     "migrate",
+     "rename",
+     "port",
+     "update",
+     "write a",
+     "write the",
+     "change",
+     "convert",
+     "replace",
+     "remove",
+     "delete",
+     "move",
+     "extend",
+     "upgrade",
+     "set up",
+     "wire up",
+     "integrate",
+     "redesign"
+    ],
+    "fix": [
+     "fix",
+     "debug",
+     "broken",
+     "failing",
+     "fails",
+     "failed",
+     "crash",
+     "crashes",
+     "crashing",
+     "bug",
+     "bugs",
+     "error",
+     "errors",
+     "why does",
+     "why is",
+     "why are",
+     "why do",
+     "repair",
+     "mend",
+     "resolve",
+     "regression",
+     "not working",
+     "what is wrong"
+    ],
+    "review": [
+     "review",
+     "audit",
+     "critique",
+     "assess",
+     "evaluate",
+     "second opinion",
+     "look over",
+     "check over",
+     "proofread",
+     "sanity check"
+    ],
+    "plan": [
+     "plan",
+     "design",
+     "propose",
+     "outline",
+     "how should",
+     "how would",
+     "strategy",
+     "architecture",
+     "roadmap",
+     "spec",
+     "brainstorm",
+     "think through"
+    ],
+    "find": [
+     "find",
+     "where",
+     "which",
+     "list",
+     "explain",
+     "what does",
+     "look up",
+     "what is",
+     "what are",
+     "how does",
+     "how do",
+     "locate",
+     "search",
+     "show me",
+     "tell me",
+     "count",
+     "who"
+    ],
+    "write": [
+     "draft",
+     "summarize",
+     "summarise",
+     "document",
+     "write up",
+     "translate",
+     "readme",
+     "changelog",
+     "release notes",
+     "summary",
+     "memo",
+     "email",
+     "blog post",
+     "announcement",
+     "docs",
+     "write a readme",
+     "write an readme",
+     "write the readme",
+     "write a changelog",
+     "write an changelog",
+     "write the changelog",
+     "write a release notes",
+     "write an release notes",
+     "write the release notes",
+     "write a summary",
+     "write an summary",
+     "write the summary",
+     "write a memo",
+     "write an memo",
+     "write the memo",
+     "write a email",
+     "write an email",
+     "write the email",
+     "write a blog post",
+     "write an blog post",
+     "write the blog post",
+     "write a announcement",
+     "write an announcement",
+     "write the announcement",
+     "write a docs",
+     "write an docs",
+     "write the docs"
+    ]
+   }
+  },
+  "types": {
+   "Explore": "find",
+   "Plan": "plan",
+   "explorer": "find"
+  },
+  "helper_type": null,
+  "description": null,
+  "task": "fix it",
+  "want_kind": null
+ },
+ {
+  "name": "kinds whose cut is over 300: no kind",
+  "kinds": {
+   "order": [
+    "build",
+    "fix",
+    "review",
+    "plan",
+    "find",
+    "write",
+    "other"
+   ],
+   "light": "find",
+   "cut": 301,
+   "table": {
+    "build": [
+     "add",
+     "implement",
+     "build",
+     "create",
+     "make",
+     "refactor",
+     "migrate",
+     "rename",
+     "port",
+     "update",
+     "write a",
+     "write the",
+     "change",
+     "convert",
+     "replace",
+     "remove",
+     "delete",
+     "move",
+     "extend",
+     "upgrade",
+     "set up",
+     "wire up",
+     "integrate",
+     "redesign"
+    ],
+    "fix": [
+     "fix",
+     "debug",
+     "broken",
+     "failing",
+     "fails",
+     "failed",
+     "crash",
+     "crashes",
+     "crashing",
+     "bug",
+     "bugs",
+     "error",
+     "errors",
+     "why does",
+     "why is",
+     "why are",
+     "why do",
+     "repair",
+     "mend",
+     "resolve",
+     "regression",
+     "not working",
+     "what is wrong"
+    ],
+    "review": [
+     "review",
+     "audit",
+     "critique",
+     "assess",
+     "evaluate",
+     "second opinion",
+     "look over",
+     "check over",
+     "proofread",
+     "sanity check"
+    ],
+    "plan": [
+     "plan",
+     "design",
+     "propose",
+     "outline",
+     "how should",
+     "how would",
+     "strategy",
+     "architecture",
+     "roadmap",
+     "spec",
+     "brainstorm",
+     "think through"
+    ],
+    "find": [
+     "find",
+     "where",
+     "which",
+     "list",
+     "explain",
+     "what does",
+     "look up",
+     "what is",
+     "what are",
+     "how does",
+     "how do",
+     "locate",
+     "search",
+     "show me",
+     "tell me",
+     "count",
+     "who"
+    ],
+    "write": [
+     "draft",
+     "summarize",
+     "summarise",
+     "document",
+     "write up",
+     "translate",
+     "readme",
+     "changelog",
+     "release notes",
+     "summary",
+     "memo",
+     "email",
+     "blog post",
+     "announcement",
+     "docs",
+     "write a readme",
+     "write an readme",
+     "write the readme",
+     "write a changelog",
+     "write an changelog",
+     "write the changelog",
+     "write a release notes",
+     "write an release notes",
+     "write the release notes",
+     "write a summary",
+     "write an summary",
+     "write the summary",
+     "write a memo",
+     "write an memo",
+     "write the memo",
+     "write a email",
+     "write an email",
+     "write the email",
+     "write a blog post",
+     "write an blog post",
+     "write the blog post",
+     "write a announcement",
+     "write an announcement",
+     "write the announcement",
+     "write a docs",
+     "write an docs",
+     "write the docs"
+    ]
+   }
+  },
+  "types": {
+   "Explore": "find",
+   "Plan": "plan",
+   "explorer": "find"
+  },
+  "helper_type": null,
+  "description": null,
+  "task": "fix it",
+  "want_kind": null
+ },
+ {
+  "name": "kinds whose cut is 0: no kind",
+  "kinds": {
+   "order": [
+    "build",
+    "fix",
+    "review",
+    "plan",
+    "find",
+    "write",
+    "other"
+   ],
+   "light": "find",
+   "cut": 0,
+   "table": {
+    "build": [
+     "add",
+     "implement",
+     "build",
+     "create",
+     "make",
+     "refactor",
+     "migrate",
+     "rename",
+     "port",
+     "update",
+     "write a",
+     "write the",
+     "change",
+     "convert",
+     "replace",
+     "remove",
+     "delete",
+     "move",
+     "extend",
+     "upgrade",
+     "set up",
+     "wire up",
+     "integrate",
+     "redesign"
+    ],
+    "fix": [
+     "fix",
+     "debug",
+     "broken",
+     "failing",
+     "fails",
+     "failed",
+     "crash",
+     "crashes",
+     "crashing",
+     "bug",
+     "bugs",
+     "error",
+     "errors",
+     "why does",
+     "why is",
+     "why are",
+     "why do",
+     "repair",
+     "mend",
+     "resolve",
+     "regression",
+     "not working",
+     "what is wrong"
+    ],
+    "review": [
+     "review",
+     "audit",
+     "critique",
+     "assess",
+     "evaluate",
+     "second opinion",
+     "look over",
+     "check over",
+     "proofread",
+     "sanity check"
+    ],
+    "plan": [
+     "plan",
+     "design",
+     "propose",
+     "outline",
+     "how should",
+     "how would",
+     "strategy",
+     "architecture",
+     "roadmap",
+     "spec",
+     "brainstorm",
+     "think through"
+    ],
+    "find": [
+     "find",
+     "where",
+     "which",
+     "list",
+     "explain",
+     "what does",
+     "look up",
+     "what is",
+     "what are",
+     "how does",
+     "how do",
+     "locate",
+     "search",
+     "show me",
+     "tell me",
+     "count",
+     "who"
+    ],
+    "write": [
+     "draft",
+     "summarize",
+     "summarise",
+     "document",
+     "write up",
+     "translate",
+     "readme",
+     "changelog",
+     "release notes",
+     "summary",
+     "memo",
+     "email",
+     "blog post",
+     "announcement",
+     "docs",
+     "write a readme",
+     "write an readme",
+     "write the readme",
+     "write a changelog",
+     "write an changelog",
+     "write the changelog",
+     "write a release notes",
+     "write an release notes",
+     "write the release notes",
+     "write a summary",
+     "write an summary",
+     "write the summary",
+     "write a memo",
+     "write an memo",
+     "write the memo",
+     "write a email",
+     "write an email",
+     "write the email",
+     "write a blog post",
+     "write an blog post",
+     "write the blog post",
+     "write a announcement",
+     "write an announcement",
+     "write the announcement",
+     "write a docs",
+     "write an docs",
+     "write the docs"
+    ]
+   }
+  },
+  "types": {
+   "Explore": "find",
+   "Plan": "plan",
+   "explorer": "find"
+  },
+  "helper_type": null,
+  "description": null,
+  "task": "fix it",
+  "want_kind": null
+ },
+ {
+  "name": "kinds whose order does not end with other: no kind",
+  "kinds": {
+   "order": [
+    "other",
+    "build",
+    "fix",
+    "review",
+    "plan",
+    "find",
+    "write"
+   ],
+   "light": "find",
+   "cut": 300,
+   "table": {
+    "build": [
+     "add",
+     "implement",
+     "build",
+     "create",
+     "make",
+     "refactor",
+     "migrate",
+     "rename",
+     "port",
+     "update",
+     "write a",
+     "write the",
+     "change",
+     "convert",
+     "replace",
+     "remove",
+     "delete",
+     "move",
+     "extend",
+     "upgrade",
+     "set up",
+     "wire up",
+     "integrate",
+     "redesign"
+    ],
+    "fix": [
+     "fix",
+     "debug",
+     "broken",
+     "failing",
+     "fails",
+     "failed",
+     "crash",
+     "crashes",
+     "crashing",
+     "bug",
+     "bugs",
+     "error",
+     "errors",
+     "why does",
+     "why is",
+     "why are",
+     "why do",
+     "repair",
+     "mend",
+     "resolve",
+     "regression",
+     "not working",
+     "what is wrong"
+    ],
+    "review": [
+     "review",
+     "audit",
+     "critique",
+     "assess",
+     "evaluate",
+     "second opinion",
+     "look over",
+     "check over",
+     "proofread",
+     "sanity check"
+    ],
+    "plan": [
+     "plan",
+     "design",
+     "propose",
+     "outline",
+     "how should",
+     "how would",
+     "strategy",
+     "architecture",
+     "roadmap",
+     "spec",
+     "brainstorm",
+     "think through"
+    ],
+    "find": [
+     "find",
+     "where",
+     "which",
+     "list",
+     "explain",
+     "what does",
+     "look up",
+     "what is",
+     "what are",
+     "how does",
+     "how do",
+     "locate",
+     "search",
+     "show me",
+     "tell me",
+     "count",
+     "who"
+    ],
+    "write": [
+     "draft",
+     "summarize",
+     "summarise",
+     "document",
+     "write up",
+     "translate",
+     "readme",
+     "changelog",
+     "release notes",
+     "summary",
+     "memo",
+     "email",
+     "blog post",
+     "announcement",
+     "docs",
+     "write a readme",
+     "write an readme",
+     "write the readme",
+     "write a changelog",
+     "write an changelog",
+     "write the changelog",
+     "write a release notes",
+     "write an release notes",
+     "write the release notes",
+     "write a summary",
+     "write an summary",
+     "write the summary",
+     "write a memo",
+     "write an memo",
+     "write the memo",
+     "write a email",
+     "write an email",
+     "write the email",
+     "write a blog post",
+     "write an blog post",
+     "write the blog post",
+     "write a announcement",
+     "write an announcement",
+     "write the announcement",
+     "write a docs",
+     "write an docs",
+     "write the docs"
+    ]
+   }
+  },
+  "types": {
+   "Explore": "find",
+   "Plan": "plan",
+   "explorer": "find"
+  },
+  "helper_type": null,
+  "description": null,
+  "task": "fix it",
+  "want_kind": null
+ },
+ {
+  "name": "kinds with a table kind not in its order: no kind",
+  "kinds": {
+   "order": [
+    "build",
+    "fix",
+    "review",
+    "plan",
+    "find",
+    "write",
+    "other"
+   ],
+   "light": "find",
+   "cut": 300,
+   "table": {
+    "build": [
+     "add",
+     "implement",
+     "build",
+     "create",
+     "make",
+     "refactor",
+     "migrate",
+     "rename",
+     "port",
+     "update",
+     "write a",
+     "write the",
+     "change",
+     "convert",
+     "replace",
+     "remove",
+     "delete",
+     "move",
+     "extend",
+     "upgrade",
+     "set up",
+     "wire up",
+     "integrate",
+     "redesign"
+    ],
+    "fix": [
+     "fix",
+     "debug",
+     "broken",
+     "failing",
+     "fails",
+     "failed",
+     "crash",
+     "crashes",
+     "crashing",
+     "bug",
+     "bugs",
+     "error",
+     "errors",
+     "why does",
+     "why is",
+     "why are",
+     "why do",
+     "repair",
+     "mend",
+     "resolve",
+     "regression",
+     "not working",
+     "what is wrong"
+    ],
+    "review": [
+     "review",
+     "audit",
+     "critique",
+     "assess",
+     "evaluate",
+     "second opinion",
+     "look over",
+     "check over",
+     "proofread",
+     "sanity check"
+    ],
+    "plan": [
+     "plan",
+     "design",
+     "propose",
+     "outline",
+     "how should",
+     "how would",
+     "strategy",
+     "architecture",
+     "roadmap",
+     "spec",
+     "brainstorm",
+     "think through"
+    ],
+    "find": [
+     "find",
+     "where",
+     "which",
+     "list",
+     "explain",
+     "what does",
+     "look up",
+     "what is",
+     "what are",
+     "how does",
+     "how do",
+     "locate",
+     "search",
+     "show me",
+     "tell me",
+     "count",
+     "who"
+    ],
+    "write": [
+     "draft",
+     "summarize",
+     "summarise",
+     "document",
+     "write up",
+     "translate",
+     "readme",
+     "changelog",
+     "release notes",
+     "summary",
+     "memo",
+     "email",
+     "blog post",
+     "announcement",
+     "docs",
+     "write a readme",
+     "write an readme",
+     "write the readme",
+     "write a changelog",
+     "write an changelog",
+     "write the changelog",
+     "write a release notes",
+     "write an release notes",
+     "write the release notes",
+     "write a summary",
+     "write an summary",
+     "write the summary",
+     "write a memo",
+     "write an memo",
+     "write the memo",
+     "write a email",
+     "write an email",
+     "write the email",
+     "write a blog post",
+     "write an blog post",
+     "write the blog post",
+     "write a announcement",
+     "write an announcement",
+     "write the announcement",
+     "write a docs",
+     "write an docs",
+     "write the docs"
+    ],
+    "test": [
+     "test"
+    ]
+   }
+  },
+  "types": {
+   "Explore": "find",
+   "Plan": "plan",
+   "explorer": "find"
+  },
+  "helper_type": null,
+  "description": null,
+  "task": "fix it",
+  "want_kind": null
+ },
+ {
+  "name": "kinds with an empty phrase: no kind",
+  "kinds": {
+   "order": [
+    "build",
+    "fix",
+    "review",
+    "plan",
+    "find",
+    "write",
+    "other"
+   ],
+   "light": "find",
+   "cut": 300,
+   "table": {
+    "fix": [
+     "fix",
+     " "
+    ]
+   }
+  },
+  "types": {
+   "Explore": "find",
+   "Plan": "plan",
+   "explorer": "find"
+  },
+  "helper_type": null,
+  "description": null,
+  "task": "fix it",
+  "want_kind": null
+ },
+ {
+  "name": "even a helper type in types gives no kind when the kinds block cannot be read",
+  "kinds": {
+   "order": [
+    "build",
+    "fix",
+    "review",
+    "plan",
+    "find",
+    "write",
+    "other"
+   ],
+   "light": "lookup",
+   "cut": 300,
+   "table": {
+    "build": [
+     "add",
+     "implement",
+     "build",
+     "create",
+     "make",
+     "refactor",
+     "migrate",
+     "rename",
+     "port",
+     "update",
+     "write a",
+     "write the",
+     "change",
+     "convert",
+     "replace",
+     "remove",
+     "delete",
+     "move",
+     "extend",
+     "upgrade",
+     "set up",
+     "wire up",
+     "integrate",
+     "redesign"
+    ],
+    "fix": [
+     "fix",
+     "debug",
+     "broken",
+     "failing",
+     "fails",
+     "failed",
+     "crash",
+     "crashes",
+     "crashing",
+     "bug",
+     "bugs",
+     "error",
+     "errors",
+     "why does",
+     "why is",
+     "why are",
+     "why do",
+     "repair",
+     "mend",
+     "resolve",
+     "regression",
+     "not working",
+     "what is wrong"
+    ],
+    "review": [
+     "review",
+     "audit",
+     "critique",
+     "assess",
+     "evaluate",
+     "second opinion",
+     "look over",
+     "check over",
+     "proofread",
+     "sanity check"
+    ],
+    "plan": [
+     "plan",
+     "design",
+     "propose",
+     "outline",
+     "how should",
+     "how would",
+     "strategy",
+     "architecture",
+     "roadmap",
+     "spec",
+     "brainstorm",
+     "think through"
+    ],
+    "find": [
+     "find",
+     "where",
+     "which",
+     "list",
+     "explain",
+     "what does",
+     "look up",
+     "what is",
+     "what are",
+     "how does",
+     "how do",
+     "locate",
+     "search",
+     "show me",
+     "tell me",
+     "count",
+     "who"
+    ],
+    "write": [
+     "draft",
+     "summarize",
+     "summarise",
+     "document",
+     "write up",
+     "translate",
+     "readme",
+     "changelog",
+     "release notes",
+     "summary",
+     "memo",
+     "email",
+     "blog post",
+     "announcement",
+     "docs",
+     "write a readme",
+     "write an readme",
+     "write the readme",
+     "write a changelog",
+     "write an changelog",
+     "write the changelog",
+     "write a release notes",
+     "write an release notes",
+     "write the release notes",
+     "write a summary",
+     "write an summary",
+     "write the summary",
+     "write a memo",
+     "write an memo",
+     "write the memo",
+     "write a email",
+     "write an email",
+     "write the email",
+     "write a blog post",
+     "write an blog post",
+     "write the blog post",
+     "write a announcement",
+     "write an announcement",
+     "write the announcement",
+     "write a docs",
+     "write an docs",
+     "write the docs"
+    ]
+   }
+  },
+  "types": {
+   "Explore": "find",
+   "Plan": "plan",
+   "explorer": "find"
+  },
+  "helper_type": "Explore",
+  "description": null,
+  "task": "fix it",
+  "want_kind": null
+ },
+ {
+  "name": "default for a workflow agent, an effort only: that effort, no model",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false,
+     "line": {
+      "five_hour": 90,
+      "week": 95
+     },
+     "in_use": "1"
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "defaults": {
+    "workflow": {
+     "model": null,
+     "effort": "xhigh"
+    },
+    "helper": {
+     "model": {
+      "claude": "sonnet"
+     },
+     "effort": null
+    },
+    "chat": {
+     "model": {
+      "claude": "opus"
+     },
+     "effort": "high"
+    }
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "plan",
+  "here": "claude",
+  "now": 1764239000.0,
+  "where": "workflow",
+  "want": {
+   "do": "model",
+   "model": null,
+   "effort": "xhigh",
+   "reason": "default",
+   "kind": "plan",
+   "passed": [],
+   "why": null
+  }
+ },
+ {
+  "name": "default for a helper, a model only: that model, no effort",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false,
+     "line": {
+      "five_hour": 90,
+      "week": 95
+     },
+     "in_use": "1"
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "defaults": {
+    "workflow": {
+     "model": null,
+     "effort": "xhigh"
+    },
+    "helper": {
+     "model": {
+      "claude": "sonnet"
+     },
+     "effort": null
+    },
+    "chat": {
+     "model": {
+      "claude": "opus"
+     },
+     "effort": "high"
+    }
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "plan",
+  "here": "claude",
+  "now": 1764239000.0,
+  "where": "helper",
+  "want": {
+   "do": "model",
+   "model": "sonnet",
+   "effort": null,
+   "reason": "default",
+   "kind": "plan",
+   "passed": [],
+   "why": null
+  }
+ },
+ {
+  "name": "default for the chat, a model and an effort: both",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false,
+     "line": {
+      "five_hour": 90,
+      "week": 95
+     },
+     "in_use": "1"
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "defaults": {
+    "workflow": {
+     "model": null,
+     "effort": "xhigh"
+    },
+    "helper": {
+     "model": {
+      "claude": "sonnet"
+     },
+     "effort": null
+    },
+    "chat": {
+     "model": {
+      "claude": "opus"
+     },
+     "effort": "high"
+    }
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "plan",
+  "here": "claude",
+  "now": 1764239000.0,
+  "where": "chat",
+  "want": {
+   "do": "model",
+   "model": "opus",
+   "effort": "high",
+   "reason": "default",
+   "kind": "plan",
+   "passed": [],
+   "why": null
+  }
+ },
+ {
+  "name": "where is null: no default is looked at, no_route",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false,
+     "line": {
+      "five_hour": 90,
+      "week": 95
+     },
+     "in_use": "1"
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "defaults": {
+    "workflow": {
+     "model": null,
+     "effort": "xhigh"
+    },
+    "helper": {
+     "model": {
+      "claude": "sonnet"
+     },
+     "effort": null
+    },
+    "chat": {
+     "model": {
+      "claude": "opus"
+     },
+     "effort": "high"
+    }
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "plan",
+  "here": "claude",
+  "now": 1764239000.0,
+  "where": null,
+  "want": {
+   "do": "nothing",
+   "reason": "no_route",
+   "kind": "plan",
+   "passed": [],
+   "why": null
+  }
+ },
+ {
+  "name": "a default that names neither a model nor an effort: no_route",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false,
+     "line": {
+      "five_hour": 90,
+      "week": 95
+     },
+     "in_use": "1"
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "defaults": {
+    "workflow": {
+     "model": null,
+     "effort": null
+    }
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "plan",
+  "here": "claude",
+  "now": 1764239000.0,
+  "where": "workflow",
+  "want": {
+   "do": "nothing",
+   "reason": "no_route",
+   "kind": "plan",
+   "passed": [],
+   "why": null
+  }
+ },
+ {
+  "name": "a where not in the defaults: no default, no_route",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false,
+     "line": {
+      "five_hour": 90,
+      "week": 95
+     },
+     "in_use": "1"
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "defaults": {
+    "chat": {
+     "model": {
+      "claude": "opus"
+     },
+     "effort": null
+    }
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "plan",
+  "here": "claude",
+  "now": 1764239000.0,
+  "where": "workflow",
+  "want": {
+   "do": "nothing",
+   "reason": "no_route",
+   "kind": "plan",
+   "passed": [],
+   "why": null
+  }
+ },
+ {
+  "name": "a plan with no defaults key: no default, no_route",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false,
+     "line": {
+      "five_hour": 90,
+      "week": 95
+     },
+     "in_use": "1"
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "plan",
+  "here": "claude",
+  "now": 1764239000.0,
+  "where": "workflow",
+  "want": {
+   "do": "nothing",
+   "reason": "no_route",
+   "kind": "plan",
+   "passed": [],
+   "why": null
+  }
+ },
+ {
+  "name": "a kind with a route takes the route and ignores the default",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false,
+     "line": {
+      "five_hour": 90,
+      "week": 95
+     },
+     "in_use": "1"
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "defaults": {
+    "workflow": {
+     "model": null,
+     "effort": "xhigh"
+    },
+    "helper": {
+     "model": {
+      "claude": "sonnet"
+     },
+     "effort": null
+    },
+    "chat": {
+     "model": {
+      "claude": "opus"
+     },
+     "effort": "high"
+    }
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "find",
+  "here": "claude",
+  "now": 1764239000.0,
+  "where": "workflow",
+  "want": {
+   "do": "model",
+   "model": "haiku",
+   "effort": "medium",
+   "reason": "route",
+   "kind": "find",
+   "passed": [],
+   "why": "your route for lookups"
+  }
+ },
+ {
+  "name": "a route that hands work over ignores the default",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false,
+     "line": {
+      "five_hour": 90,
+      "week": 95
+     },
+     "in_use": "1"
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "defaults": {
+    "workflow": {
+     "model": null,
+     "effort": "xhigh"
+    },
+    "helper": {
+     "model": {
+      "claude": "sonnet"
+     },
+     "effort": null
+    },
+    "chat": {
+     "model": {
+      "claude": "opus"
+     },
+     "effort": "high"
+    }
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "build",
+  "here": "claude",
+  "now": 1764239000.0,
+  "where": "workflow",
+  "want": {
+   "do": "hand",
+   "to": "codex",
+   "model": "gpt-6.2-astra",
+   "effort": "high",
+   "reason": "route",
+   "kind": "build",
+   "passed": [],
+   "why": "your route for builds"
+  }
+ },
+ {
+  "name": "a route whose choices were all passed does not fall to the default",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "out",
+     "back_at": 1764239600.0,
+     "at_lines": false
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "out",
+     "back_at": 1764239300.0,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "defaults": {
+    "workflow": {
+     "model": null,
+     "effort": "xhigh"
+    },
+    "helper": {
+     "model": {
+      "claude": "sonnet"
+     },
+     "effort": null
+    },
+    "chat": {
+     "model": {
+      "claude": "opus"
+     },
+     "effort": "high"
+    }
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "find",
+  "here": "claude",
+  "now": 1764239000.0,
+  "where": "workflow",
+  "want": {
+   "do": "nothing",
+   "reason": "all_passed",
+   "kind": "find",
+   "passed": [
+    [
+     "claude",
+     "out"
+    ],
+    [
+     "codex",
+     "out"
+    ]
+   ],
+   "why": "your route for lookups",
+   "back_at": 1764239300.0
+  }
+ },
+ {
+  "name": "a route that names neither model nor effort stays, never the default",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false,
+     "line": {
+      "five_hour": 90,
+      "week": 95
+     },
+     "in_use": "1"
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "defaults": {
+    "workflow": {
+     "model": null,
+     "effort": "xhigh"
+    },
+    "helper": {
+     "model": {
+      "claude": "sonnet"
+     },
+     "effort": null
+    },
+    "chat": {
+     "model": {
+      "claude": "opus"
+     },
+     "effort": "high"
+    }
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "other",
+  "here": "claude",
+  "now": 1764239000.0,
+  "where": "chat",
+  "want": {
+   "do": "nothing",
+   "reason": "stays",
+   "kind": "other",
+   "passed": [],
+   "why": "your route for other jobs"
+  }
+ },
+ {
+  "name": "a null kind with a default for where: the default",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false,
+     "line": {
+      "five_hour": 90,
+      "week": 95
+     },
+     "in_use": "1"
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "defaults": {
+    "workflow": {
+     "model": null,
+     "effort": "xhigh"
+    },
+    "helper": {
+     "model": {
+      "claude": "sonnet"
+     },
+     "effort": null
+    },
+    "chat": {
+     "model": {
+      "claude": "opus"
+     },
+     "effort": "high"
+    }
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": null,
+  "here": "claude",
+  "now": 1764239000.0,
+  "where": "workflow",
+  "want": {
+   "do": "model",
+   "model": null,
+   "effort": "xhigh",
+   "reason": "default",
+   "kind": null,
+   "passed": [],
+   "why": null
+  }
+ },
+ {
+  "name": "a null kind with no default for where: no_route",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false,
+     "line": {
+      "five_hour": 90,
+      "week": 95
+     },
+     "in_use": "1"
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "defaults": {
+    "chat": {
+     "model": {
+      "claude": "opus"
+     },
+     "effort": null
+    }
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": null,
+  "here": "claude",
+  "now": 1764239000.0,
+  "where": "helper",
+  "want": {
+   "do": "nothing",
+   "reason": "no_route",
+   "kind": null,
+   "passed": [],
+   "why": null
+  }
+ },
+ {
+  "name": "a null kind with where null: no_route",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false,
+     "line": {
+      "five_hour": 90,
+      "week": 95
+     },
+     "in_use": "1"
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "defaults": {
+    "workflow": {
+     "model": null,
+     "effort": "xhigh"
+    },
+    "helper": {
+     "model": {
+      "claude": "sonnet"
+     },
+     "effort": null
+    },
+    "chat": {
+     "model": {
+      "claude": "opus"
+     },
+     "effort": "high"
+    }
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": null,
+  "here": "claude",
+  "now": 1764239000.0,
+  "where": null,
+  "want": {
+   "do": "nothing",
+   "reason": "no_route",
+   "kind": null,
+   "passed": [],
+   "why": null
+  }
+ },
+ {
+  "name": "a null kind in a plan with no defaults key: no_route",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false,
+     "line": {
+      "five_hour": 90,
+      "week": 95
+     },
+     "in_use": "1"
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": null,
+  "here": "claude",
+  "now": 1764239000.0,
+  "where": "workflow",
+  "want": {
+   "do": "nothing",
+   "reason": "no_route",
+   "kind": null,
+   "passed": [],
+   "why": null
+  }
+ },
+ {
+  "name": "a plan past its time is old_plan before any default",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false,
+     "line": {
+      "five_hour": 90,
+      "week": 95
+     },
+     "in_use": "1"
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "defaults": {
+    "workflow": {
+     "model": null,
+     "effort": "xhigh"
+    },
+    "helper": {
+     "model": {
+      "claude": "sonnet"
+     },
+     "effort": null
+    },
+    "chat": {
+     "model": {
+      "claude": "opus"
+     },
+     "effort": "high"
+    }
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "plan",
+  "here": "claude",
+  "now": 1764239181.0,
+  "where": "workflow",
+  "want": {
+   "do": "nothing",
+   "reason": "old_plan",
+   "kind": "plan",
+   "passed": [],
+   "why": null
+  }
+ },
+ {
+  "name": "a plan turned off is off before any default",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": false,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false,
+     "line": {
+      "five_hour": 90,
+      "week": 95
+     },
+     "in_use": "1"
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "defaults": {
+    "workflow": {
+     "model": null,
+     "effort": "xhigh"
+    },
+    "helper": {
+     "model": {
+      "claude": "sonnet"
+     },
+     "effort": null
+    },
+    "chat": {
+     "model": {
+      "claude": "opus"
+     },
+     "effort": "high"
+    }
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "plan",
+  "here": "claude",
+  "now": 1764239000.0,
+  "where": "workflow",
+  "want": {
+   "do": "nothing",
+   "reason": "off",
+   "kind": "plan",
+   "passed": [],
+   "why": null
+  }
+ },
+ {
+  "name": "a default is applied where the work was started, never handed: in codex too",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false,
+     "line": {
+      "five_hour": 90,
+      "week": 95
+     },
+     "in_use": "1"
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "defaults": {
+    "workflow": {
+     "model": null,
+     "effort": "xhigh"
+    },
+    "helper": {
+     "model": {
+      "claude": "sonnet",
+      "codex": "gpt-6-luna"
+     },
+     "effort": null
+    },
+    "chat": {
+     "model": {
+      "claude": "opus"
+     },
+     "effort": "high"
+    }
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "plan",
+  "here": "codex",
+  "now": 1764239000.0,
+  "where": "helper",
+  "want": {
+   "do": "model",
+   "model": "gpt-6-luna",
+   "effort": null,
+   "reason": "default",
+   "kind": "plan",
+   "passed": [],
+   "why": null
+  }
+ },
+ {
+  "name": "a default does not look at room: here out of room still gets it",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "out",
+     "back_at": 1764239600.0,
+     "at_lines": false
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "out",
+     "back_at": 1764239300.0,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "defaults": {
+    "workflow": {
+     "model": null,
+     "effort": "xhigh"
+    },
+    "helper": {
+     "model": {
+      "claude": "sonnet"
+     },
+     "effort": null
+    },
+    "chat": {
+     "model": {
+      "claude": "opus"
+     },
+     "effort": "high"
+    }
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "plan",
+  "here": "claude",
+  "now": 1764239000.0,
+  "where": "workflow",
+  "want": {
+   "do": "model",
+   "model": null,
+   "effort": "xhigh",
+   "reason": "default",
+   "kind": "plan",
+   "passed": [],
+   "why": null
+  }
+ },
+ {
+  "name": "a trial plan answers the default too (the adapter records it as would)",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": true,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false,
+     "line": {
+      "five_hour": 90,
+      "week": 95
+     },
+     "in_use": "1"
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "defaults": {
+    "workflow": {
+     "model": null,
+     "effort": "xhigh"
+    },
+    "helper": {
+     "model": {
+      "claude": "sonnet"
+     },
+     "effort": null
+    },
+    "chat": {
+     "model": {
+      "claude": "opus"
+     },
+     "effort": "high"
+    }
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "plan",
+  "here": "claude",
+  "now": 1764239000.0,
+  "where": "workflow",
+  "want": {
+   "do": "model",
+   "model": null,
+   "effort": "xhigh",
+   "reason": "default",
+   "kind": "plan",
+   "passed": [],
+   "why": null
+  }
+ },
+ {
+  "name": "a route for the kind that is null counts as no route: the default",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false,
+     "line": {
+      "five_hour": 90,
+      "week": 95
+     },
+     "in_use": "1"
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ],
+    "plan": null
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "defaults": {
+    "workflow": {
+     "model": null,
+     "effort": "xhigh"
+    },
+    "helper": {
+     "model": {
+      "claude": "sonnet"
+     },
+     "effort": null
+    },
+    "chat": {
+     "model": {
+      "claude": "opus"
+     },
+     "effort": "high"
+    }
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "plan",
+  "here": "claude",
+  "now": 1764239000.0,
+  "where": "chat",
+  "want": {
+   "do": "model",
+   "model": "opus",
+   "effort": "high",
+   "reason": "default",
+   "kind": "plan",
+   "passed": [],
+   "why": null
+  }
+ },
+ {
+  "name": "a route for the kind that is an empty list counts as no route: the default",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false,
+     "line": {
+      "five_hour": 90,
+      "week": 95
+     },
+     "in_use": "1"
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ],
+    "plan": []
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "defaults": {
+    "workflow": {
+     "model": null,
+     "effort": "xhigh"
+    },
+    "helper": {
+     "model": {
+      "claude": "sonnet"
+     },
+     "effort": null
+    },
+    "chat": {
+     "model": {
+      "claude": "opus"
+     },
+     "effort": "high"
+    }
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "plan",
+  "here": "claude",
+  "now": 1764239000.0,
+  "where": "workflow",
+  "want": {
+   "do": "model",
+   "model": null,
+   "effort": "xhigh",
+   "reason": "default",
+   "kind": "plan",
+   "passed": [],
+   "why": null
+  }
+ },
+ {
+  "name": "a route for the kind that cannot be read is no_plan, never the default",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false,
+     "line": {
+      "five_hour": 90,
+      "week": 95
+     },
+     "in_use": "1"
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ],
+    "plan": "opus"
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "defaults": {
+    "workflow": {
+     "model": null,
+     "effort": "xhigh"
+    },
+    "helper": {
+     "model": {
+      "claude": "sonnet"
+     },
+     "effort": null
+    },
+    "chat": {
+     "model": {
+      "claude": "opus"
+     },
+     "effort": "high"
+    }
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "plan",
+  "here": "claude",
+  "now": 1764239000.0,
+  "where": "workflow",
+  "want": {
+   "do": "nothing",
+   "reason": "no_plan",
+   "kind": "plan",
+   "passed": [],
+   "why": null
+  }
+ },
+ {
+  "name": "defaults that are not an object: no default, no_route",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false,
+     "line": {
+      "five_hour": 90,
+      "week": 95
+     },
+     "in_use": "1"
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "defaults": [
+    "xhigh"
+   ],
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "plan",
+  "here": "claude",
+  "now": 1764239000.0,
+  "where": "workflow",
+  "want": {
+   "do": "nothing",
+   "reason": "no_route",
+   "kind": "plan",
+   "passed": [],
+   "why": null
+  }
+ },
+ {
+  "name": "a default for where that is not an object: no default, no_route",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false,
+     "line": {
+      "five_hour": 90,
+      "week": 95
+     },
+     "in_use": "1"
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "defaults": {
+    "workflow": "xhigh"
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "plan",
+  "here": "claude",
+  "now": 1764239000.0,
+  "where": "workflow",
+  "want": {
+   "do": "nothing",
+   "reason": "no_route",
+   "kind": "plan",
+   "passed": [],
+   "why": null
+  }
+ },
+ {
+  "name": "a default whose model is a number cannot be read: no default, no_route",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false,
+     "line": {
+      "five_hour": 90,
+      "week": 95
+     },
+     "in_use": "1"
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "defaults": {
+    "workflow": {
+     "model": 5,
+     "effort": "high"
+    }
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "plan",
+  "here": "claude",
+  "now": 1764239000.0,
+  "where": "workflow",
+  "want": {
+   "do": "nothing",
+   "reason": "no_route",
+   "kind": "plan",
+   "passed": [],
+   "why": null
+  }
+ },
+ {
+  "name": "a default with a missing effort key is that effort null",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false,
+     "line": {
+      "five_hour": 90,
+      "week": 95
+     },
+     "in_use": "1"
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "defaults": {
+    "helper": {
+     "model": {
+      "claude": "haiku"
+     }
+    }
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "plan",
+  "here": "claude",
+  "now": 1764239000.0,
+  "where": "helper",
+  "want": {
+   "do": "model",
+   "model": "haiku",
+   "effort": null,
+   "reason": "default",
+   "kind": "plan",
+   "passed": [],
+   "why": null
+  }
+ },
+ {
+  "name": "a where that is not one of the three is no where: no_route",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false,
+     "line": {
+      "five_hour": 90,
+      "week": 95
+     },
+     "in_use": "1"
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "defaults": {
+    "teammate": {
+     "model": {
+      "claude": "haiku"
+     },
+     "effort": "low"
+    }
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "plan",
+  "here": "claude",
+  "now": 1764239000.0,
+  "where": "teammate",
+  "want": {
+   "do": "nothing",
+   "reason": "no_route",
+   "kind": "plan",
+   "passed": [],
+   "why": null
+  }
+ },
+ {
+  "name": "a route sets its effort down: high to low",
+  "current": "high",
+  "answer": "low",
+  "reason": "route",
+  "want": "low"
+ },
+ {
+  "name": "a route sets its effort up: low to max",
+  "current": "low",
+  "answer": "max",
+  "reason": "route",
+  "want": "max"
+ },
+ {
+  "name": "a route at the same effort sets it",
+  "current": "medium",
+  "answer": "medium",
+  "reason": "route",
+  "want": "medium"
+ },
+ {
+  "name": "a route sets xhigh over max",
+  "current": "max",
+  "answer": "xhigh",
+  "reason": "route",
+  "want": "xhigh"
+ },
+ {
+  "name": "a route on work with no effort sets nothing",
+  "current": null,
+  "answer": "high",
+  "reason": "route",
+  "want": null
+ },
+ {
+  "name": "a route on work whose effort is a word outside the five sets nothing",
+  "current": "ultra",
+  "answer": "high",
+  "reason": "route",
+  "want": null
+ },
+ {
+  "name": "a route whose effort is a word outside the five sets nothing",
+  "current": "high",
+  "answer": "auto",
+  "reason": "route",
+  "want": null
+ },
+ {
+  "name": "a route with no effort sets nothing",
+  "current": "high",
+  "answer": null,
+  "reason": "route",
+  "want": null
+ },
+ {
+  "name": "a route on work whose effort is a number sets nothing",
+  "current": 3,
+  "answer": "low",
+  "reason": "route",
+  "want": null
+ },
+ {
+  "name": "a default lowers work above it: max to xhigh",
+  "current": "max",
+  "answer": "xhigh",
+  "reason": "default",
+  "want": "xhigh"
+ },
+ {
+  "name": "a default lowers work far above it: max to low",
+  "current": "max",
+  "answer": "low",
+  "reason": "default",
+  "want": "low"
+ },
+ {
+  "name": "a default lowers high to medium",
+  "current": "high",
+  "answer": "medium",
+  "reason": "default",
+  "want": "medium"
+ },
+ {
+  "name": "a default leaves work at the same effort",
+  "current": "xhigh",
+  "answer": "xhigh",
+  "reason": "default",
+  "want": null
+ },
+ {
+  "name": "a default leaves work below it: medium under xhigh",
+  "current": "medium",
+  "answer": "xhigh",
+  "reason": "default",
+  "want": null
+ },
+ {
+  "name": "a default never raises: low under max",
+  "current": "low",
+  "answer": "max",
+  "reason": "default",
+  "want": null
+ },
+ {
+  "name": "a default on work with no effort sets nothing",
+  "current": null,
+  "answer": "xhigh",
+  "reason": "default",
+  "want": null
+ },
+ {
+  "name": "a default effort word in capitals is outside the five: nothing",
+  "current": "max",
+  "answer": "LOW",
+  "reason": "default",
+  "want": null
+ },
+ {
+  "name": "a default on work whose effort is outside the five sets nothing",
+  "current": "MAX",
+  "answer": "low",
+  "reason": "default",
+  "want": null
+ },
+ {
+  "name": "a default with no effort sets nothing",
+  "current": "max",
+  "answer": null,
+  "reason": "default",
+  "want": null
+ },
+ {
+  "name": "a reason that is neither route nor default sets nothing",
+  "current": "high",
+  "answer": "low",
+  "reason": "stays",
+  "want": null
+ },
+ {
+  "name": "a null reason sets nothing",
+  "current": "high",
+  "answer": "low",
+  "reason": null,
+  "want": null
+ },
+ {
+  "name": "a default model for the other agent only, no effort: no default here, no_route",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false,
+     "line": {
+      "five_hour": 90,
+      "week": 95
+     },
+     "in_use": "1"
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "defaults": {
+    "helper": {
+     "model": {
+      "codex": "gpt-6-luna"
+     },
+     "effort": null
+    }
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "want": {
+   "do": "nothing",
+   "reason": "no_route",
+   "kind": "plan",
+   "passed": [],
+   "why": null
+  },
+  "kind": "plan",
+  "here": "claude",
+  "now": 1764239000.0,
+  "where": "helper"
+ },
+ {
+  "name": "a default model for the other agent only, with an effort: the effort here, no model",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false,
+     "line": {
+      "five_hour": 90,
+      "week": 95
+     },
+     "in_use": "1"
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "defaults": {
+    "helper": {
+     "model": {
+      "codex": "gpt-6-luna"
+     },
+     "effort": "low"
+    }
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "want": {
+   "do": "model",
+   "model": null,
+   "effort": "low",
+   "reason": "default",
+   "kind": "plan",
+   "passed": [],
+   "why": null
+  },
+  "kind": "plan",
+  "here": "claude",
+  "now": 1764239000.0,
+  "where": "helper"
+ },
+ {
+  "name": "a default model for each agent: this agent takes its own",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false,
+     "line": {
+      "five_hour": 90,
+      "week": 95
+     },
+     "in_use": "1"
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "defaults": {
+    "helper": {
+     "model": {
+      "codex": "gpt-6-luna",
+      "claude": "haiku"
+     },
+     "effort": null
+    }
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "want": {
+   "do": "model",
+   "model": "haiku",
+   "effort": null,
+   "reason": "default",
+   "kind": "plan",
+   "passed": [],
+   "why": null
+  },
+  "kind": "plan",
+  "here": "claude",
+  "now": 1764239000.0,
+  "where": "helper"
+ },
+ {
+  "name": "a default model as a bare word names no agent and cannot be read: no_route",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false,
+     "line": {
+      "five_hour": 90,
+      "week": 95
+     },
+     "in_use": "1"
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "defaults": {
+    "helper": {
+     "model": "sonnet",
+     "effort": "low"
+    }
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "want": {
+   "do": "nothing",
+   "reason": "no_route",
+   "kind": "plan",
+   "passed": [],
+   "why": null
+  },
+  "kind": "plan",
+  "here": "claude",
+  "now": 1764239000.0,
+  "where": "helper"
+ },
+ {
+  "name": "a default model for this agent that is not text cannot be read: no_route",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false,
+     "line": {
+      "five_hour": 90,
+      "week": 95
+     },
+     "in_use": "1"
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "defaults": {
+    "helper": {
+     "model": {
+      "claude": 5
+     },
+     "effort": "low"
+    }
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "want": {
+   "do": "nothing",
+   "reason": "no_route",
+   "kind": "plan",
+   "passed": [],
+   "why": null
+  },
+  "kind": "plan",
+  "here": "claude",
+  "now": 1764239000.0,
+  "where": "helper"
+ },
+ {
+  "name": "a default model entry for another agent that is not text is not looked at",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false,
+     "line": {
+      "five_hour": 90,
+      "week": 95
+     },
+     "in_use": "1"
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "defaults": {
+    "helper": {
+     "model": {
+      "claude": "haiku",
+      "codex": 5
+     },
+     "effort": null
+    }
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "want": {
+   "do": "model",
+   "model": "haiku",
+   "effort": null,
+   "reason": "default",
+   "kind": "plan",
+   "passed": [],
+   "why": null
+  },
+  "kind": "plan",
+  "here": "claude",
+  "now": 1764239000.0,
+  "where": "helper"
+ },
+ {
+  "name": "a default model entry for this agent that is null: the effort only",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false,
+     "line": {
+      "five_hour": 90,
+      "week": 95
+     },
+     "in_use": "1"
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "defaults": {
+    "helper": {
+     "model": {
+      "claude": null
+     },
+     "effort": "high"
+    }
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "want": {
+   "do": "model",
+   "model": null,
+   "effort": "high",
+   "reason": "default",
+   "kind": "plan",
+   "passed": [],
+   "why": null
+  },
+  "kind": "plan",
+  "here": "claude",
+  "now": 1764239000.0,
+  "where": "helper"
+ },
+ {
+  "name": "a default model that is a list cannot be read: no_route",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false,
+     "line": {
+      "five_hour": 90,
+      "week": 95
+     },
+     "in_use": "1"
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "defaults": {
+    "helper": {
+     "model": [
+      "haiku"
+     ],
+     "effort": "low"
+    }
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "want": {
+   "do": "nothing",
+   "reason": "no_route",
+   "kind": "plan",
+   "passed": [],
+   "why": null
+  },
+  "kind": "plan",
+  "here": "claude",
+  "now": 1764239000.0,
+  "where": "helper"
+ },
+ {
+  "name": "a default model that is an empty object names no model: no_route",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false,
+     "line": {
+      "five_hour": 90,
+      "week": 95
+     },
+     "in_use": "1"
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "defaults": {
+    "helper": {
+     "model": {},
+     "effort": null
+    }
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "want": {
+   "do": "nothing",
+   "reason": "no_route",
+   "kind": "plan",
+   "passed": [],
+   "why": null
+  },
+  "kind": "plan",
+  "here": "claude",
+  "now": 1764239000.0,
+  "where": "helper"
+ },
+ {
+  "name": "a default model object whose only key is __proto__ names no model here: no_route",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false,
+     "line": {
+      "five_hour": 90,
+      "week": 95
+     },
+     "in_use": "1"
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "defaults": {
+    "helper": {
+     "model": {
+      "__proto__": "haiku"
+     },
+     "effort": null
+    }
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "want": {
+   "do": "nothing",
+   "reason": "no_route",
+   "kind": "plan",
+   "passed": [],
+   "why": null
+  },
+  "kind": "plan",
+  "here": "claude",
+  "now": 1764239000.0,
+  "where": "helper"
+ },
+ {
+  "name": "in codex, a default model for claude only gives codex the effort alone",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false,
+     "line": {
+      "five_hour": 90,
+      "week": 95
+     },
+     "in_use": "1"
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "defaults": {
+    "workflow": {
+     "model": {
+      "claude": "opus"
+     },
+     "effort": "medium"
+    }
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": null,
+  "here": "codex",
+  "now": 1764239000.0,
+  "where": "workflow",
+  "want": {
+   "do": "model",
+   "model": null,
+   "effort": "medium",
+   "reason": "default",
+   "kind": null,
+   "passed": [],
+   "why": null
+  }
+ },
+ {
+  "name": "a plan made more than 60 s after now is old_plan",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false,
+     "line": {
+      "five_hour": 90,
+      "week": 95
+     },
+     "in_use": "1"
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "defaults": {
+    "workflow": {
+     "model": null,
+     "effort": "xhigh"
+    },
+    "helper": {
+     "model": {
+      "claude": "sonnet"
+     },
+     "effort": null
+    },
+    "chat": {
+     "model": {
+      "claude": "opus"
+     },
+     "effort": "high"
+    }
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "find",
+  "here": "claude",
+  "now": 1764238939.0,
+  "where": "workflow",
+  "want": {
+   "do": "nothing",
+   "reason": "old_plan",
+   "kind": "find",
+   "passed": [],
+   "why": null
+  }
+ },
+ {
+  "name": "a plan made 60 s after now is still usable",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 180,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false,
+     "line": {
+      "five_hour": 90,
+      "week": 95
+     },
+     "in_use": "1"
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "defaults": {
+    "workflow": {
+     "model": null,
+     "effort": "xhigh"
+    },
+    "helper": {
+     "model": {
+      "claude": "sonnet"
+     },
+     "effort": null
+    },
+    "chat": {
+     "model": {
+      "claude": "opus"
+     },
+     "effort": "high"
+    }
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "find",
+  "here": "claude",
+  "now": 1764238940.0,
+  "where": "workflow",
+  "want": {
+   "do": "model",
+   "model": "haiku",
+   "effort": "medium",
+   "reason": "route",
+   "kind": "find",
+   "passed": [],
+   "why": "your route for lookups"
+  }
+ },
+ {
+  "name": "a plan good for more than an hour cannot be read: no_plan",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 3601,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false,
+     "line": {
+      "five_hour": 90,
+      "week": 95
+     },
+     "in_use": "1"
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "defaults": {
+    "workflow": {
+     "model": null,
+     "effort": "xhigh"
+    },
+    "helper": {
+     "model": {
+      "claude": "sonnet"
+     },
+     "effort": null
+    },
+    "chat": {
+     "model": {
+      "claude": "opus"
+     },
+     "effort": "high"
+    }
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "find",
+  "here": "claude",
+  "now": 1764239000.0,
+  "where": "workflow",
+  "want": {
+   "do": "nothing",
+   "reason": "no_plan",
+   "kind": "find",
+   "passed": [],
+   "why": null
+  }
+ },
+ {
+  "name": "a plan good for an hour is usable to its last second",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 3600,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false,
+     "line": {
+      "five_hour": 90,
+      "week": 95
+     },
+     "in_use": "1"
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "defaults": {
+    "workflow": {
+     "model": null,
+     "effort": "xhigh"
+    },
+    "helper": {
+     "model": {
+      "claude": "sonnet"
+     },
+     "effort": null
+    },
+    "chat": {
+     "model": {
+      "claude": "opus"
+     },
+     "effort": "high"
+    }
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "find",
+  "here": "claude",
+  "now": 1764242600.0,
+  "where": "workflow",
+  "want": {
+   "do": "model",
+   "model": "haiku",
+   "effort": "medium",
+   "reason": "route",
+   "kind": "find",
+   "passed": [],
+   "why": "your route for lookups"
+  }
+ },
+ {
+  "name": "a plan good for an hour is old a second later",
+  "plan": {
+   "v": 1,
+   "made_at": 1764239000.0,
+   "good_for_s": 3600,
+   "on": true,
+   "dry": false,
+   "by": "switchboard 0.2.0 (abc1234)",
+   "order": [
+    "claude",
+    "codex"
+   ],
+   "agents": {
+    "claude": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false,
+     "line": {
+      "five_hour": 90,
+      "week": 95
+     },
+     "in_use": "1"
+    },
+    "codex": {
+     "can": true,
+     "why_not": null,
+     "room": "room",
+     "back_at": null,
+     "at_lines": false
+    }
+   },
+   "routes": {
+    "find": [
+     {
+      "agent": "claude",
+      "model": "haiku",
+      "effort": "medium"
+     },
+     {
+      "agent": "codex",
+      "model": "gpt-6-luna",
+      "effort": "medium"
+     }
+    ],
+    "review": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": "high"
+     }
+    ],
+    "build": [
+     {
+      "agent": "codex",
+      "model": "gpt-6.2-astra",
+      "effort": "high"
+     },
+     {
+      "agent": "claude",
+      "model": "opus",
+      "effort": "high"
+     }
+    ],
+    "write": [
+     {
+      "agent": "claude",
+      "model": "sonnet",
+      "effort": null
+     }
+    ],
+    "fix": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": "high"
+     }
+    ],
+    "other": [
+     {
+      "agent": "claude",
+      "model": null,
+      "effort": null
+     }
+    ]
+   },
+   "why": {
+    "find": "your route for lookups",
+    "review": "your route for reviews",
+    "build": "your route for builds",
+    "write": "your route for writing",
+    "fix": "your route for fixes",
+    "other": "your route for other jobs"
+   },
+   "defaults": {
+    "workflow": {
+     "model": null,
+     "effort": "xhigh"
+    },
+    "helper": {
+     "model": {
+      "claude": "sonnet"
+     },
+     "effort": null
+    },
+    "chat": {
+     "model": {
+      "claude": "opus"
+     },
+     "effort": "high"
+    }
+   },
+   "helpers": {
+    "force": false
+   },
+   "chat": {
+    "effort": false,
+    "model_on_first_turn": false
+   },
+   "hand": {
+    "on": true,
+    "write": false,
+    "max_s": 900
+   },
+   "carry_on": false,
+   "kinds": {
+    "order": [
+     "build",
+     "fix",
+     "review",
+     "plan",
+     "find",
+     "write",
+     "other"
+    ],
+    "light": "find",
+    "cut": 300,
+    "table": {
+     "build": [
+      "add",
+      "implement"
+     ],
+     "fix": [
+      "fix",
+      "debug"
+     ]
+    }
+   },
+   "types": {
+    "Explore": "find",
+    "Plan": "plan",
+    "explorer": "find"
+   }
+  },
+  "kind": "find",
+  "here": "claude",
+  "now": 1764242601.0,
+  "where": "workflow",
+  "want": {
+   "do": "nothing",
+   "reason": "old_plan",
+   "kind": "find",
+   "passed": [],
+   "why": null
+  }
+ }
+]

@@ -472,11 +472,13 @@ def link_app_block(team, text=None):
     at = where(text, '\napple_tool_real() {') + 1               # one line, or up to its closing brace
     end = text.index('\n', at) if text[at:text.index('\n', at)].rstrip().endswith('}') else where(text, '\n}\n', at) + 2
     tool = text[at:end]
-    block = text[where(text, '# ---- the link app, Switchboard Links'):where(text, "# ---- the menu bar item's app")]
+    old = next(line for line in text.splitlines() if line.startswith('OLD_LABEL='))     # an older install's ids
+    at = where(text, '# ---- the link app, Switchboard Links')
+    block = text[at:where(text, '\n# ---- ', at) + 1]                  # up to the installer's next part
     if len(re.findall(r'(?m)^LINKS_TEAM="[A-Z0-9]*"$', block)) != 1:
         raise AssertionError('install.sh\'s link app block must have exactly one LINKS_TEAM="..." line')
     block = re.sub(r'(?m)^LINKS_TEAM="[A-Z0-9]*"$', 'LINKS_TEAM="%s"' % team, block)
-    return ('set -eu\nDIM=""; BOLD=""; PLAIN=""\n' + helpers + '\n' + tool + '\n'
+    return ('set -eu\nDIM=""; BOLD=""; PLAIN=""\n' + old + '\n' + helpers + '\n' + tool + '\n'
             'DATA="$1"; PY="$2"; LINKAPP="$3"; MACHINE="$4"; LS=0\n' + block + 'echo "the block ended"\n')
 
 
@@ -694,9 +696,19 @@ class InstallerTakesThePrebuiltApp(unittest.TestCase):
     def test_a_marker_that_moved_is_named(self):
         text = install_sh()
         for marker in ('\nLINE_OPEN=0\n', '\nLSREGISTER=', '\napple_tool_real() {',
-                       '# ---- the link app, Switchboard Links', "# ---- the menu bar item's app"):
+                       '# ---- the link app, Switchboard Links'):
             with self.assertRaisesRegex(AssertionError, re.escape(repr(marker))):
                 link_app_block(TEAM, text.replace(marker, '\n# moved\n'))
+
+    def test_the_block_ends_at_the_installers_next_part(self):
+        # The link app's part ends where the next part starts, whichever it is: the one-time move of an older
+        # install (it calls launchctl, which the test fence refuses) sits between it and the menu bar item's app.
+        at = install_sh().index('# ---- the link app, Switchboard Links')
+        nxt = install_sh().index('\n# ---- ', at) + 1
+        block = link_app_block(TEAM)
+        self.assertIn([x for x in install_sh()[at:nxt].splitlines() if x.strip()][-1], block)
+        self.assertNotIn(install_sh()[nxt:install_sh().index('\n', nxt)], block)
+        self.assertNotIn('launchctl', block)
 
     def test_a_helper_written_over_several_lines_is_lifted_whole(self):
         text = install_sh()

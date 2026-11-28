@@ -38,7 +38,11 @@ HELP = ('switchboard auto [on|off]   whether auto-switch is on; on or off change
         '                            switchboard auto line NAME off puts it back on the shared ones\n'
         'switchboard auto rank NAME N|off\n'
         '                            auto-switch lands on rank 1 first, then 2, and on an account with no rank after\n'
-        '                            every ranked one; N is 1 to 99; off takes its rank away\n')
+        '                            every ranked one; N is 1 to 99; off takes its rank away\n'
+        'switchboard auto signed-in [on|off]\n'
+        "                            keep Claude Code signed in: when its sign-in is lost and can't be put back, or is\n"
+        '                            about to end, move it to another signed-in account, also with auto-switch off (on\n'
+        '                            until you turn it off)\n')
 
 
 class Three(Sandbox):
@@ -133,7 +137,8 @@ class TheCommand(Three):
                  'switchboard auto last NAME\n'
                  'switchboard auto out NAME\nswitchboard auto in NAME\n'
                  'switchboard auto line NAME [--five-hour N] [--week N]\n'
-                 'switchboard auto line NAME off\nswitchboard auto rank NAME N|off\n')
+                 'switchboard auto line NAME off\nswitchboard auto rank NAME N|off\n'
+                 'switchboard auto signed-in [on|off]\n')
         for args in (('maybe',), ('last',), ('last', B, C), ('first', B), ('on', B), ('LAST', B)):
             with self.subTest(args=args):
                 self.assertEqual(self.run_cli('auto', *args), (2, forms))
@@ -184,10 +189,9 @@ class TheAccountsLine(unittest.TestCase):
     def test_the_two_notes_where_the_line_has_its_small_notes(self):
         got = '\n'.join(lines(self.view({'ana@fernhill.example': 'last', 'ana@mail.example': 'out',
                                          'ana@harbor.example': 'in'})))
-        self.assertIn('2  ana@fernhill.example   Max 20x · Personal  used last · checked 10 min ago\n', got)
-        self.assertIn('5  ana@mail.example       Max 20x · Personal  in use · kept out of auto-switch · checked 3 min '
-                      'ago\n', got)
-        self.assertIn('3  ana@harbor.example     Team · Harbor       checked 5 min ago\n', got)
+        self.assertIn('2  ana@fernhill.example   Max 20x · Personal  used last\n', got)
+        self.assertIn('5  ana@mail.example       Max 20x · Personal  in use · kept out of auto-switch\n', got)
+        self.assertIn('3  ana@harbor.example     Team · Harbor\n', got)
         self.assertEqual(lines(self.view({})), lines(VIEW))                       # no rule: the view as before
 
     def test_the_menu_bar_rows_carry_no_note_for_a_rule(self):

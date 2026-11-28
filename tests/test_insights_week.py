@@ -94,7 +94,7 @@ class Payload(unittest.TestCase):
         self.assertEqual(page['week'], {'since': '2026-11-04T12:30:00+00:00', 'until': '2026-11-11T12:30:00+00:00',
                                         'weight': round(WEEK, 2), 'who': page['week']['who']})   # who: test_insights_prices_and_highlights
         self.assertEqual(page['tokens'], {'input': 469, 'output': 2591, 'cache_write': 8912, 'cache_read': 56113,
-                                          'cache_write_1h': 8912})
+                                          'cache_write_1h': 8912, 'cache_read_low': 500})   # 500: n2's, on Fable 5.2
         close(self, usage.weight(page['tokens']), WEEK)
         self.assertEqual(page['last_week'], {'weight': 12345.68, 'who': None, 'days': None})
         (wf,) = page['workflows']

@@ -56,6 +56,13 @@ def adapter_class(pid: str) -> Optional[type]:
     return None
 
 
+def name_of(pid: str, default: Optional[str] = None) -> str:
+    """The name a person reads for pid ('Codex'), as its adapter class says it, for shared code with no adapter at
+    hand (catalog.py, routes.py); else default, else the id with a capital."""
+    cls = adapter_class(pid) if known(pid) else None
+    return getattr(cls, 'name', '') or (default if default is not None else str(pid).capitalize())
+
+
 def load(pid: str, reach: Reach) -> Provider:
     """The adapter for pid, made with reach. Raises ProviderError('not_found') for an id the registry does not have
     or whose module this build does not carry or cannot load."""

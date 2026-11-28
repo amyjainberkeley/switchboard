@@ -279,6 +279,35 @@ class HeadLine(unittest.TestCase):
     def test_none_for_a_missing_file(self):
         self.assertIsNone(lines.head_line(os.path.join(self.dir, 'gone')))
 
+    def test_only_the_first_line_is_read(self):
+        # A big chat file: its first line is read, not the first mebibyte of it.
+        path = write(self.dir, 'a.jsonl', b'{"first":1}\n' + b'y' * (3 << 20) + b'\n')
+        given = []
+        real_open = lines._open
+
+        class Counting:
+            def __init__(self, f):
+                self.f = f
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *a):
+                self.f.close()
+
+            def read(self, n=-1):
+                got = self.f.read(n)
+                given.append(len(got))
+                return got
+
+            def readline(self, n=-1):
+                got = self.f.readline(n)
+                given.append(len(got))
+                return got
+        with mock.patch.object(lines, '_open', lambda p: Counting(real_open(p))):
+            self.assertEqual(lines.head_line(path), b'{"first":1}')
+        self.assertLessEqual(sum(given), 64)
+
     def test_head_lines_reads_forward_within_its_caps(self):
         path = write(self.dir, 'a.jsonl', b'a\nb\n\nc\nd')
         self.assertEqual(list(lines.head_lines(path, max_bytes=1 << 20, max_lines=3)), [b'a', b'b', b'c'])

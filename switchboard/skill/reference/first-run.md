@@ -8,7 +8,7 @@ For macOS, with Claude Code. No administrator is needed.
 - Without Homebrew: the README's one-line install. This line, and `switchboard update` on an install without Homebrew, take the newest code on `main`, with no checksum.
 - To look first with made-up accounts, changing nothing: `switchboard demo` (the page on port 7798), which the person runs in their own Terminal window.
 
-The installer puts the program in `~/.switchboard`, the command in `~/.local/bin` (with Homebrew, in Homebrew's bin folder) and its short name `sb` beside it unless another program already has that name, Switchboard.app in Applications, the link app Switchboard Links in `~/Applications` when Apple's command line tools are there, and two background jobs that start at login: one for the page, one for the menu bar item.
+The installer puts the program in `~/.switchboard`, the command in `~/.local/bin` (with Homebrew, in Homebrew's bin folder) and its short name `sb` beside it unless another program already has that name, Switchboard.app in Applications, the link app Switchboard Links in `~/Applications` when Apple's command line tools are there, and three background jobs that start at login: one for the page, one for the sign-in watch, one for the menu bar item.
 
 Every install ends with a block of facts, each checked as it is printed: where the code came from and whether a checksum was checked, how the apps are signed, that no administrator password was used, what was installed where, what runs, whether the program's files are unchanged, where sign-ins are kept, what leaves the Mac, how to remove it. `switchboard about` prints the same block again at any time, and `switchboard about --json` prints it as JSON.
 

@@ -108,13 +108,16 @@ class AuthOverride(unittest.TestCase):
 
     def test_switch_says_it_after_its_result(self):
         out = io.StringIO()
-        with redirect_stdout(out), mock.patch.object(cli, 'use', lambda name: print('Claude Code is now on b@x.example') or 0), \
+        with redirect_stdout(out), \
+                mock.patch.object(cli, 'use',
+                                  lambda name, why=False: print('Claude Code is now on b@x.example') or 0), \
                 mock.patch.dict(os.environ, {'ANTHROPIC_API_KEY': 'made-up'}):
             self.assertEqual(cli.switch_command(['b@x.example']), 0)
         self.assertEqual(out.getvalue(), 'Claude Code is now on b@x.example\n' +
                          cli.auth_line('ANTHROPIC_API_KEY', 'this shell', None) + '\n')      # (no answer on record)
         out = io.StringIO()
-        with redirect_stdout(out), mock.patch.object(cli, 'use', lambda name: print('Claude Code is now on b@x.example') or 0):
+        with redirect_stdout(out), \
+                mock.patch.object(cli, 'use', lambda name, why=False: print('Claude Code is now on b@x.example') or 0):
             cli.switch_command(['b@x.example'])
         self.assertEqual(out.getvalue(), 'Claude Code is now on b@x.example\n')
 
@@ -220,7 +223,7 @@ class AuthOverride(unittest.TestCase):
                                    "nothing for those.")
             self.assertIsNone(cli.auth_said(after_switch=True))        # the switch did move the chats: nothing to add
             out = io.StringIO()
-            with redirect_stdout(out), mock.patch.object(cli, 'use', lambda name: print('moved') or 0):
+            with redirect_stdout(out), mock.patch.object(cli, 'use', lambda name, why=False: print('moved') or 0):
                 cli.switch_command(['b@x.example'])
             self.assertEqual(out.getvalue(), 'moved\n')
             self.answered(key, 'approved')

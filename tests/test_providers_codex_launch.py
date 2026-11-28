@@ -194,6 +194,38 @@ class Resume(Base):
         self.assertEqual(got.why, codex_facts.NO_APP_RESUME)
 
 
+class OpenHere(Base):
+    """A key press in the list with no chat to carry over: the terminal app in the folder, with no first message."""
+
+    def test_terminal_argv_env_and_folder_exact(self):
+        launch = self.p.open_here(self.folder, IN_TERMINAL)
+        self.assertEqual(launch.argv, (self.fake.path, '-C', self.folder))
+        self.assertEqual((launch.provider, launch.how, launch.cwd, launch.first_words),
+                         ('codex', IN_TERMINAL, self.folder, ''))
+        self.assertEqual(dict(launch.env), child_env(self.rig.reach.env))
+        self.assertNotIn('CODEX_API_KEY', launch.env)
+        self.assert_never_loosened(launch.argv)
+        self.assert_nothing_started()
+
+    def test_the_printed_line_exact(self):
+        q = shlex.quote
+        self.assertEqual(self.p.open_here(self.folder, PRINT).line,
+                         'cd %s && env -u CODEX_API_KEY %s -C %s' % (q(self.folder), q(self.fake.path), q(self.folder)))
+
+    def test_no_app_link_and_no_relative_folder(self):
+        for folder, how in ((self.folder, IN_APP), ('my site', IN_TERMINAL)):
+            with self.assertRaises(ValueError):
+                self.p.open_here(folder, how)
+        self.assert_nothing_started()
+
+    def test_too_old_starts_nothing(self):
+        self.rig.chatfiles.newest = '0.170.0'
+        with self.assertRaises(contract.ProviderError) as e:
+            self.p.open_here(self.folder, IN_TERMINAL)
+        self.assertEqual(e.exception.kind, 'too_old')
+        self.assert_nothing_started()
+
+
 class TheStandInTakesEachArgumentList(unittest.TestCase):
     """Each Launch's argument list, run on a stand-in of each copied version: it accepts exactly what that version's
     help has, so these lists would not stop at the real program's parser."""
@@ -205,15 +237,17 @@ class TheStandInTakesEachArgumentList(unittest.TestCase):
             case.setUp()
             try:
                 for launch in (case.p.start(case.folder, case.handoff, IN_TERMINAL),
-                               case.p.resume(case.chat(), case.handoff, IN_TERMINAL)):
+                               case.p.resume(case.chat(), case.handoff, IN_TERMINAL),
+                               case.p.open_here(case.folder, IN_TERMINAL)):
                     ran = run_real(list(launch.argv), env=dict(launch.env), cwd=launch.cwd, timeout=20.0)
                     self.assertEqual(ran.code, 0, (version, ran.err))
                 self.assertEqual(case.fake.forbidden(), [])
                 starts = [r for r in case.fake.records() if r.get('command') in ('', 'resume')]
-                self.assertEqual([r['command'] for r in starts], ['', 'resume'])
+                self.assertEqual([r['command'] for r in starts], ['', 'resume', ''])
                 self.assertEqual(starts[0]['options'], {'--cd': [case.folder]})
                 self.assertEqual(starts[0]['positionals'], [case.first()])
                 self.assertEqual(starts[1]['positionals'], [CHAT, case.back()])
+                self.assertEqual((starts[2]['options'], starts[2]['positionals']), ({'--cd': [case.folder]}, []))
             finally:
                 case.doCleanups()
 

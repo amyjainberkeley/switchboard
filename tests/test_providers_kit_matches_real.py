@@ -25,7 +25,7 @@ sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.abspath(os.path.join(HERE, '..')))
 
 import fakes_provider_kit as kit  # noqa: E402
-from switchboard.providers import cli  # noqa: E402
+from switchboard.providers import cli, contract  # noqa: E402
 
 REAL = {
     'handoff': {
@@ -36,6 +36,7 @@ REAL = {
         'answer_path': '(task, hop, reach)',
         'back_note': '(handoff, *, other_name, start, end)',
         'prune': '(reach, now)',
+        'write_task': '(text, *, hop, task, to_name, kind_line, asked=(), folder, reach)',   # switchboard do's
     },
     'tasks': {
         'new_hop_id': '()',
@@ -47,6 +48,8 @@ REAL = {
         'open_continue': '(folder, to_chat=None)',
         'continued_from': '(folder, from_chat)',
         'prune': '(now)',
+        'add_task': '(task_id, folder, job, at)',                  # switchboard do's task row, and its state
+        'update_task': '(task_id, **changes)',
     },
     'place': {
         'room_of': '(provider, name, limits, now, fresh_s)',
@@ -56,6 +59,7 @@ REAL = {
         'added': '()',
         'order': '()',
         'add': '(pid, now)',
+        'remove': '(pid)',
         'set_order': '(ids)',
         'consent': '(folder, pid)',
         'set_consent': '(folder, pid, state, now)',
@@ -67,6 +71,8 @@ REAL = {
         'set_ask_ok': '(now, pid)',
         'hand_ack': '(pid)',
         'set_hand_ack': '(now, pid)',
+        'notice_said': '(pid)',
+        'set_notice_said': '(now, pid)',
         'open_with': '(pid)',
         'set_open_with': '(pid, how)',
         'handoff_budget': '()',
@@ -159,6 +165,46 @@ class TheStandIns(unittest.TestCase):
             self.assertIsInstance(held, bool)
         self.assertRegex(rig.tasks.new_task_id(), r'^t-[0-9a-f]{8}\Z')
         self.assertRegex(rig.tasks.new_hop_id(), r'^h-[0-9a-f]{8}\Z')
+
+
+class TheStandInAdapterLaunchesAsTheRealOne(unittest.TestCase):
+    """FakeProvider builds the key press's launches the way CodexProvider does (the argument list, the environment,
+    the folder and the line to run), so the tests of the key press that use it cannot drift from the real one."""
+
+    def setUp(self):
+        from fakes_codex import Rig
+        self.rig = Rig(self)
+        self.rig.app('ChatGPT.app', '0.169.1')
+        self.real = self.rig.provider
+        self.fake = kit.FakeProvider(self.rig.reach, 'codex', found=self.real.detect())
+        self.folder = os.path.join(self.rig.root, 'site')
+        os.makedirs(self.folder)
+
+    def same(self, a, b):
+        self.assertEqual((a.provider, a.how, a.program.path, a.argv, dict(a.env), a.cwd, a.line, a.first_words),
+                         (b.provider, b.how, b.program.path, b.argv, dict(b.env), b.cwd, b.line, b.first_words))
+
+    def test_open_here(self):
+        for how in (contract.IN_TERMINAL, contract.PRINT):
+            with self.subTest(how=how):
+                self.same(self.fake.open_here(self.folder, how), self.real.open_here(self.folder, how))
+
+    def test_start_task(self):
+        path = os.path.join(self.rig.root, 'task.md')
+        for how, extra in ((contract.IN_TERMINAL, ()), (contract.PRINT, ('-m', 'gpt-made-up'))):
+            with self.subTest(how=how):
+                self.same(self.fake.start_task(self.folder, 'h-0000000a', path, how, extra),
+                          self.real.start_task(self.folder, 'h-0000000a', path, how, extra))
+
+    def test_start_in_a_terminal_up_to_its_first_message(self):
+        h = contract.Handoff(hop='h-0000000a', path=os.path.join(self.rig.root, 'note.md'),
+                             meta_path=os.path.join(self.rig.root, 'note.json'), bytes=1, sha256='0' * 64)
+        a, b = self.fake.start(self.folder, h, contract.IN_TERMINAL), self.real.start(self.folder, h,
+                                                                                       contract.IN_TERMINAL)
+        self.assertEqual((a.argv[:-1], dict(a.env), a.cwd), (b.argv[:-1], dict(b.env), b.cwd))
+        for launch in (a, b):
+            self.assertIn('h-0000000a', launch.argv[-1])
+            self.assertIn(h.path, launch.argv[-1])
 
 
 class WhatTheCommandsCall(unittest.TestCase):

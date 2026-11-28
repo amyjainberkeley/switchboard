@@ -58,7 +58,7 @@ class SeamCase(unittest.TestCase):
     def deps(self):
         return autoloop.Deps(load=lambda: 0.5, power=lambda: (True, 100), procs=lambda: 1,
                              disk_free=lambda: 10 ** 12, net_ready=lambda: True,
-                             history_note=lambda *a, **k: None)
+                             history_note=lambda *a, **k: None, notify_move=lambda note: None)
 
 
 class TheLiveState(SeamCase):

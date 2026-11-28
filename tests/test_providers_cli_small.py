@@ -5,7 +5,8 @@ import _isolate  # noqa: F401  (first: it gives switchboard a throwaway data fol
 # test's own temp folder.
 #
 # - add: an unknown word (2), not on this Mac (1), already added (0), added with each of the three sign-in lines,
-#   added with a program older than the one that wrote the chats; never a login: add only reads Found.signed_in.
+#   added with a program older than the one that wrote the chats, each ending with what a press on its row sends;
+#   never a login: add only reads Found.signed_in.
 # - allow: answered at a terminal only (1 otherwise, and no question is asked); the question is the continue one
 #   without the note's size and without `s`; y lifts a typed never and leaves a stay alone; n changes nothing (1);
 #   never records never; no flag gives a yes.
@@ -25,6 +26,8 @@ from switchboard.providers import words  # noqa: E402
 
 HELP = {k: v + '\n' for k, v in words.HELP.items()}
 DAY_BEFORE = words.date(NOW - 86400, NOW)
+NOTICE = ["Pressing the Codex row asks no more: it sends your folder's newest chat,",
+          "your words and files, to OpenAI under your ChatGPT plan and OpenAI's terms."]
 ALLOW_QUESTION = (
     "Carry this chat on in Codex? A note of it goes to OpenAI: what you asked, what Claude answered, tool results and\n"
     "file names, with anything that looks like a secret taken out as well as Switchboard can.\n"
@@ -76,21 +79,23 @@ class Add(KitCase, unittest.TestCase):
                         '--ask).'))
         for signed_in, line in cases:
             with self.subTest(signed_in=signed_in):
-                r = self.rig(codex_added=False, codex_found_=codex_found(self.root, signed_in=signed_in))
+                r = self.rig(codex_added=False, codex_found_=codex_found(self.root, signed_in=signed_in), tty=True)
                 self.assertEqual(r('add', 'codex'), 0)
                 self.assertEqual(r.lines(), [
                     'Added Codex. Your order: Claude, then Codex.',
                     'Switchboard will run Codex 0.169.1 (ChatGPT.app). Codex keeps its own sign-in; Switchboard '
                     'never reads or keeps it.',
-                    line])
+                    line] + NOTICE)                     # then what a press on its row sends, said this once
+                self.assertTrue(r.choices.notice_said('codex'))             # kept: said at a terminal
                 self.assertEqual(r.choices.added(), {'claude': 0, 'codex': NOW})
                 self.assertEqual(r.said, [('Added Codex to the providers you use', 'setting', {'to': 'Codex'})])
 
     def test_added_with_a_program_older_than_the_chats(self):
         r = self.rig(codex_added=False, codex_found_=codex_found(self.root, version='0.164.0', seen='0.169.1'))
         self.assertEqual(r('add', 'codex'), 0)
-        self.assertEqual(r.lines()[-1], 'The newest Codex here (0.164.0) is older than the one that wrote your Codex '
+        self.assertEqual(r.lines()[-3], 'The newest Codex here (0.164.0) is older than the one that wrote your Codex '
                                         'chats (0.169.1). Update Codex before carrying a chat on in it.')
+        self.assertEqual(r.lines()[-2:], NOTICE)
         self.assertEqual(r.lines()[0], 'Added Codex. Your order: Claude, then Codex.')
 
     def test_no_usable_copy_is_not_added(self):
@@ -102,6 +107,48 @@ class Add(KitCase, unittest.TestCase):
         self.assertEqual(r.text(), 'Codex is on this Mac, but no copy of it can be used: its folder can be changed '
                                    'by other users.\n')
         self.assertNotIn('codex', r.choices.added())
+
+
+class Remove(KitCase, unittest.TestCase):
+    # switchboard remove PROVIDER: off the list (out of added and out of the order) and its notice record with it, so
+    # adding it again says the notice again. What was said per folder stays. The accounts' remove NAME is another
+    # command (switchboard/__main__.py sends only `remove <another provider's id>` here).
+    def test_takes_it_off_the_list_and_says_so(self):
+        r = self.rig(order=['codex', 'claude'])
+        r.choices.set_consent(r.folder, 'codex', 'never', NOW)
+        self.assertEqual(r('remove', 'codex'), 0)
+        self.assertEqual(r.lines(), ['Took Codex off your order; Codex itself stays as it is. Your order: Claude.'])
+        self.assertNotIn('codex', r.choices.added())
+        self.assertNotIn('codex', r.choices.order())
+        self.assertFalse(r.choices.notice_said('codex'))
+        self.assertEqual(r.choices.consent(r.folder, 'codex'), 'never')    # a never typed in a folder stays
+        self.assertEqual(r.said, [('Took Codex off the providers you use', 'setting', {'to': 'Codex'})])
+
+    def test_added_again_it_says_the_notice_again(self):
+        r = self.rig(codex_found_=codex_found(self.root, signed_in=True), tty=True)
+        r('remove', 'codex')
+        r('add', 'codex')
+        self.assertEqual(r.lines()[-2:], NOTICE)
+        self.assertTrue(r.choices.notice_said('codex'))
+
+    def test_not_added_changes_nothing(self):
+        r = self.rig(codex_added=False)
+        self.assertEqual(r('remove', 'codex'), 0)
+        self.assertEqual((r.lines(), r.said), (['Codex is not in your order.'], []))
+
+    def test_the_first_provider_stays(self):
+        r = self.rig()
+        self.assertEqual(r('remove', 'claude'), 1)
+        self.assertEqual(r.lines(), ['Claude is always in your order. switchboard remove NAME forgets one of its '
+                                     'accounts.'])
+        self.assertIn('codex', r.choices.added())
+
+    def test_wrong_words(self):
+        r = self.rig()
+        self.assertEqual(r('remove'), 2)
+        self.assertEqual(r('remove', 'codex', 'now'), 2)
+        self.assertEqual(r('remove', 'gemini'), 2)
+        self.assertIn('codex', r.choices.added())
 
 
 class Allow(KitCase, unittest.TestCase):

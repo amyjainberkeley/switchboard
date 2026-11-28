@@ -111,23 +111,37 @@ class TheLostLogin(Base):
         self.assertEqual(putback.last_put_back(self.ctx)['account'], 'ana@home.example')
 
     def test_with_no_item_at_all_the_saved_copy_is_written_whole_with_its_connector_logins(self):
-        # A login saved here keeps no connector logins (vault.saved_text: a switch takes those from the live item), so
-        # the saved copy written whole brings the account login back alone; a copy an older build kept with its
-        # connector logins brings those back too.
+        # A login saved here keeps only its account's parts (vault.bound_text: a switch takes the connector logins from
+        # the live item); the Mac-wide parts Switchboard last saw in Claude Code's item are kept once for the Mac
+        # (vault.keep_shared), so the saved copy written whole into no item at all brings the connector logins back
+        # with it. A copy an older build kept with its connector logins brings those back too where no such record is.
+        self.assertNotIn('mcpOAuth', json.loads(self.saved_b))
         self.lose_login(siblings=False)
         self.look(0)
         res = self.look()
         self.assertEqual(res.action, 'put_back', res.reason)
-        self.assertEqual(json.loads(self.rig.live_text()), json.loads(self.saved_b))     # no live object: written whole
-        older = live.dump(dict(json.loads(self.saved_b), **MCP))
+        blob = json.loads(self.rig.live_text())
+        self.assertEqual(blob['claudeAiOauth'], json.loads(self.saved_b)['claudeAiOauth'])
+        self.assertEqual(blob['mcpOAuth'], MCP['mcpOAuth'])     # no live object: nothing to keep, as a switch does it
+        self.assertEqual(blob, dict(json.loads(self.saved_b), **MCP))       # written whole, with the Mac's own parts
+        older = live.dump(dict(json.loads(self.saved_b), mcpOAuth={'docs-server': {'accessToken': 'mcp-made-up-0'}}))
         self.rig.sec.put('Switchboard login', 'uuid-b', older)
+        self.look(putback.HOLD_TIDY_S + 1)                      # the spare copy in the plain login file is taken away
+        self.assertFalse(os.path.exists(os.path.join(self.rig.home, '.claude', '.credentials.json')))
         self.lose_login(siblings=False)
         self.look(0)
         res = self.look(putback.PUT_BACK_WAITS[1] + 1)
         self.assertEqual(res.action, 'put_back', res.reason)
+        self.assertEqual(json.loads(self.rig.live_text())['mcpOAuth'], MCP['mcpOAuth'])     # the record is the newer
+        self.rig.sec.drop(vault.SERVICE_SHARED, self.rig.service)                          # an older build kept none
+        self.look(putback.HOLD_TIDY_S + 1)
+        self.lose_login(siblings=False)
+        self.look(0)
+        res = self.look(putback.PUT_BACK_WAITS[2] + 1)
+        self.assertEqual(res.action, 'put_back', res.reason)
         blob = json.loads(self.rig.live_text())
         self.assertEqual(blob['claudeAiOauth'], json.loads(self.saved_b)['claudeAiOauth'])
-        self.assertEqual(blob['mcpOAuth'], MCP['mcpOAuth'])     # no live object: nothing to keep, as a switch does it
+        self.assertEqual(blob['mcpOAuth'], json.loads(older)['mcpOAuth'])
 
     def test_an_item_without_a_login_keeps_its_own_connector_state_as_it_is(self):
         self.lose_login(siblings=False)
@@ -237,17 +251,18 @@ class NeverOverASignOutOrASignIn(Base):
     def test_a_login_that_appears_between_the_decision_and_the_write_is_left_alone(self):
         self.lose_login()
         self.look(0)
+        putback.reset()                                # another process made the first look: nothing is kept here
         new = self.rig.server.add('uuid-b', 'ana@home.example', 'org-b')
         reads = []
 
         def on_call(verb, service, account):
             if verb == 'read' and service == vault.SERVICE_CURRENT and account == 'uuid-b':
                 reads.append(1)
-                if len(reads) == 2:                    # the second read of the saved login is under the locks
+                if len(reads) == 1:                    # the one read of the saved login is under the locks
                     self.rig.set_live(new)
         self.rig.kc.on_call = on_call
         res = self.look()
-        self.assertEqual(len(reads), 2, res)
+        self.assertEqual(len(reads), 1, res)
         self.assertNotEqual(res.action, 'put_back')
         self.assertEqual(self.live_writes(), 0)
         self.assertEqual(self.rig.live_text(), new)
@@ -261,11 +276,11 @@ class NeverOverASignOutOrASignIn(Base):
         def on_call(verb, service, account):
             if verb == 'read' and service == self.rig.service:
                 live_reads.append(1)
-                if len(live_reads) == 3:              # outside the locks, under them, then last before the write
-                    self.rig.set_live(new)
+                if len(live_reads) == 1:              # the look after a sighting reads the item only under Claude
+                    self.rig.set_live(new)            # Code's save lock: the last read before the write
         self.rig.kc.on_call = on_call
         res = self.look()
-        self.assertGreaterEqual(len(live_reads), 3, res)
+        self.assertGreaterEqual(len(live_reads), 1, res)
         self.assertEqual(self.live_writes(), 0)
         self.assertEqual(self.rig.live_text(), new)
 
@@ -290,14 +305,28 @@ class NeverOverASignOutOrASignIn(Base):
         self.assertEqual(self.live_writes(), 0)
 
     def test_a_login_in_claude_codes_login_file_is_never_written_over(self):
+        # The item holds no login and Claude Code's own login sits in its plaintext file: Claude Code is signed out then
+        # (an item that is there wins over the file). The file's own login goes into the item at the second look; the
+        # saved copy never takes its place. Claude Code's own login there: its renewal of B's sign-in (a second sign-in
+        # of B ends on another day, and is not proven B's newest).
         path = os.path.join(self.rig.home, '.claude', '.credentials.json')
+        filed = self.rig.server.refresh_for(self.b_text)
         with open(path, 'w') as f:
-            f.write(self.rig.server.add('uuid-b', 'ana@home.example', 'org-b'))
+            f.write(filed)
+        saved = self.rig.vault('uuid-b')
         self.lose_login()
         res = [self.look() for _ in range(4)]
-        self.assertEqual([r.action for r in res], ['leave'] * 4)
+        self.assertEqual([r.action for r in res], ['wait', 'put_back', 'leave', 'leave'])
         self.assertEqual(len([r for r in res if r.line]), 1)
-        self.assertEqual(self.live_writes(), 0)
+        self.assertEqual(self.live_writes(), 1)
+        now = json.loads(self.rig.live_text())
+        self.assertEqual(now['claudeAiOauth'], json.loads(filed)['claudeAiOauth'])
+        self.assertNotEqual(now['claudeAiOauth'], json.loads(saved)['claudeAiOauth'])
+        for key in MCP:                                                 # the Mac's own parts of the item are kept
+            self.assertEqual(now[key], MCP[key])
+        with open(path) as f:                                           # the file now holds the item's very text, kept
+            self.assertEqual(f.read(), self.rig.live_text())            # a while for the processes still reading it
+        self.assertIsNotNone(putback._hold_note(self.ctx))              # as a file the sign-in hold takes away
 
 
 class TheSettingsRightAfterASwitch(Base):
@@ -616,8 +645,10 @@ class ManyMadeUpInterleavings(Base):
     """From a fixed seed: the item erased, the item saved without a login, a chosen sign-out, a sign-in in Claude Code,
     a switch, a look, in any order and at any pace. After every step: (a) the put-back never wrote over an account
     login; (b) after a chosen sign-out nothing is written until someone signs in; (c) what it writes is always the
-    saved login of the account the settings name; (d) never more than four writes in any hour; (e) no token appears in
-    a log line, a History line or what the loop is told."""
+    saved login of the account the settings name (a promote: the login in the plain login file, where a put-back left
+    a copy of the sign-in for the processes still reading it); (d) never more than four put-backs in any hour, and
+    never more writes than the limits of the promote's episodes allow beside them; (e) no token appears in a log line,
+    a History line or what the loop is told."""
 
     SEQUENCES = 150
     STEPS = 24
@@ -635,6 +666,8 @@ class ManyMadeUpInterleavings(Base):
         writes = []
         state = {'signed_out': False}
         problems = []
+        put_backs = []
+        cred = os.path.join(self.rig.home, '.claude', '.credentials.json')
 
         def on_call(verb, service, account):
             if verb != 'write' or service != self.rig.service or not looked['in']:
@@ -648,8 +681,8 @@ class ManyMadeUpInterleavings(Base):
             writes.append((self.clock.wall(), block.get('accountUuid')))
             hour = len([t for t, _ in writes if self.clock.wall() - t < putback.PUT_BACK_SPAN_S])
             busiest[0] = max(busiest[0], hour)
-            if hour > putback.PUT_BACK_MAX:
-                problems.append('(d) more than four writes in an hour')
+            if hour > putback.PUT_BACK_MAX + putback.EPISODE_WRITES * putback.EPISODES_PER_HOUR:
+                problems.append('(d) more writes in an hour than the limits allow')
 
         self.rig.kc.on_call = on_call
         for n in range(self.SEQUENCES):
@@ -677,17 +710,31 @@ class ManyMadeUpInterleavings(Base):
                 else:
                     looked['in'] = True
                     before = len(writes)
+                    filed = None
+                    if os.path.exists(cred):
+                        with open(cred) as f:
+                            filed = f.read()
                     try:
                         res = putback.look(self.ctx)
                     finally:
                         looked['in'] = False
                     told.extend(x for x in (res.line, res.reason) if x)
+                    block = self.rig.config().get('oauthAccount') or {}
+                    aid = block.get('accountUuid')
                     if res.action == 'put_back':
-                        block = self.rig.config().get('oauthAccount') or {}
-                        aid = block.get('accountUuid')
                         got = json.loads(self.rig.live_text())['claudeAiOauth']
                         if got != json.loads(self.rig.vault(aid))['claudeAiOauth']:
                             problems.append('(c) wrote something other than the saved login of %s' % aid)
+                        if writes[-1][1] != aid:
+                            problems.append('(c) the settings named another account at the write')
+                        put_backs.append(self.clock.wall())
+                        if len([t for t in put_backs if self.clock.wall() - t < putback.PUT_BACK_SPAN_S]) > \
+                                putback.PUT_BACK_MAX:
+                            problems.append('(d) more than four put-backs in an hour')
+                    elif res.action == putback.PROMOTE:
+                        got = json.loads(self.rig.live_text())['claudeAiOauth']
+                        if filed is None or got != json.loads(filed)['claudeAiOauth']:
+                            problems.append('(c) a promote wrote something other than the login in the plain file')
                         if writes[-1][1] != aid:
                             problems.append('(c) the settings named another account at the write')
                     elif len(writes) > before and res.action != 'failed':

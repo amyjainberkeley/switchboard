@@ -19,6 +19,7 @@ import tempfile
 import time
 import types
 import unittest
+from unittest import mock
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
@@ -188,6 +189,125 @@ class ClaudeHasRoomCodexIsOut(Board):
         self.assertEqual([p['id'] for p in b['providers']], ['claude', 'codex'])
 
 
+class TheFourFields(Board):
+    """What a row needs of an entry, from the same files and still with nothing started: the account's email, a
+    desktop app among its copies, the newest version that wrote its chats, and why it cannot be continued to (None:
+    as far as files can tell, it can)."""
+
+    def sign_in(self):
+        with open(os.path.join(self.chome, 'auth.json'), 'w') as f:      # its existence is all that is looked at
+            f.write('{"made": "up"}')
+
+    def keep_email(self, email, login=True):
+        """The email Codex said when it was last asked, kept beside its numbers (contract.READINGS_FILE). login:
+        whether Codex's sign-in file was there then (False: its sign-in is in the Keychain)."""
+        path = os.path.join(core.data_dir(), contract.READINGS_FILE)
+        os.makedirs(os.path.dirname(path), mode=0o700, exist_ok=True)
+        entry = {'seat': 'codex', 'read_at': self.now - 60, 'plan': 'plus', 'reached': None,
+                 'windows': [{'label': 'weekly', 'used_pct': 21.0, 'resets_at': self.now + 2 * DAY,
+                              'length_min': 10080}],
+                 'email': email, 'email_at': time.time(), 'login': login}       # read after the sign-in file was
+        with open(path, 'w') as f:
+            json.dump({'v': 1, 'codex': entry}, f)
+
+    def test_a_codex_that_can_be_continued_to(self):
+        self.keep_version(self.codex)
+        self.codex_numbers(40.0)
+        self.sign_in()
+        self.keep_email('ana@made-up.example')
+        b = self.board()
+        self.assert_nothing_started()
+        codex = self.entry(b, 'codex')
+        self.assertEqual((codex['email'], codex['has_app'], codex['newest_seen'], codex['fit_why']),
+                         ('ana@made-up.example', False, '0.169.1', None))
+        self.assertIsNone(self.entry(b, 'claude')['fit_why'])             # its accounts are the rows above
+        self.assertEqual(b['v'], 1)
+        json.dumps(b, allow_nan=False)
+
+    def test_signed_in_through_the_keychain_a_kept_email_is_a_sign_in(self):
+        # No sign-in file: Codex keeps its sign-in in the Keychain. Once Codex answered an ask with its account, the
+        # email kept then (with no sign-in file there) says it is signed in, so it has a row and a number.
+        from switchboard.providers import rows
+        self.codex_numbers(40.0)
+        self.keep_version(self.codex)
+        self.keep_email('ana@made-up.example', login=False)
+        b = self.board()
+        codex = self.entry(b, 'codex')
+        self.assertEqual((codex['signed_in'], codex['fit_why'], codex['email']), (True, None, 'ana@made-up.example'))
+        self.assertEqual([r['provider'] for r in rows.from_board(b)], ['codex'])
+        self.assert_nothing_started()
+
+    def test_sign_in_not_seen_says_the_step(self):
+        # Nothing says it is signed in, and nothing says it is not (the missing file alone never does): the line
+        # under the list says how to find out, and how to sign in, in the adapter's own words.
+        self.codex_numbers(40.0)
+        self.keep_version(self.codex)
+        b = self.board()
+        codex = self.entry(b, 'codex')
+        self.assertEqual((codex['signed_in'], codex['fit_why']), (None, 'sign-in not seen here'))
+        self.assertEqual(view.under_list(b, self.now)[0], (
+            'provider', 'Codex', 'sign-in not seen here: switchboard providers --ask, or run codex login, or open '
+                                 'the ChatGPT app'))
+        self.assertEqual(codex['fit_line'], view.under_list(b, self.now)[0][2])
+        self.assert_nothing_started()
+
+    def test_a_codex_with_only_refused_copies_has_no_row_and_says_the_copys_reason(self):
+        # The only copy is in a folder other users can change: never run, so not "never read". No row, and the
+        # line under the list says the copy's own reason.
+        from switchboard.providers import rows
+        self.codex_numbers(40.0)
+        self.sign_in()
+        os.chmod(self.bin, 0o777)
+        self.addCleanup(os.chmod, self.bin, 0o755)
+        b = self.board()
+        codex = self.entry(b, 'codex')
+        self.assertEqual(codex['fit_why'], 'no copy here can be run')
+        self.assertEqual(rows.from_board(b), [])
+        self.assertEqual(view.under_list(b, self.now)[0],
+                         ('provider', 'Codex', 'no copy here can be run: its folder can be changed by other users'))
+        self.assert_nothing_started()
+
+    def test_carry_counts_only_a_provider_a_chat_can_go_to(self):
+        # A provider the list gives no row (its fit_why) is nowhere to carry a chat on: no carry line under its own.
+        self.codex_numbers(40.0)
+        self.keep_version(self.codex)                                     # sign-in not seen here
+        b = self.board()
+        self.assertFalse(b['carry'])
+        self.assertEqual([x[0] for x in view.under_list(b, self.now)], ['provider'])
+        self.sign_in()
+        self.keep_version(self.codex, '0.150.0')                          # older than the one that wrote its chats
+        self.assertFalse(self.board()['carry'])
+        self.keep_version(self.codex)
+        self.assertTrue(self.board()['carry'])
+        self.assert_nothing_started()
+
+    def test_why_it_cannot_be_continued_to_in_the_lists_words(self):
+        self.codex_numbers(40.0)                                          # written by 0.169.1
+        self.keep_version(self.codex)
+        self.assertEqual(self.entry(self.board(), 'codex')['fit_why'], 'sign-in not seen here')
+        self.sign_in()
+        self.keep_version(self.codex, '0.150.0')
+        self.assertEqual(self.entry(self.board(), 'codex')['fit_why'], 'older than the one that wrote your chats')
+        os.remove(self.codex)
+        self.assertEqual(self.entry(self.board(), 'codex')['fit_why'], 'not on this Mac')
+        self.assert_nothing_started()
+
+    def test_a_copy_whose_version_was_never_read_is_fit_and_is_not_run(self):
+        self.codex_numbers(40.0)
+        self.sign_in()
+        codex = self.entry(self.board(), 'codex')
+        self.assert_nothing_started()
+        self.assertEqual((codex['version'], codex['fit_why'], codex['email']), (None, None, None))
+
+    def test_each_seat_says_its_own_room(self):
+        self.keep_version(self.codex)
+        self.codex_numbers(100.0)
+        self.sign_in()
+        (seat,) = self.entry(self.board(), 'codex')['seats']
+        self.assertEqual(seat['state'], contract.OUT)
+        self.assertAlmostEqual(seat['back_at'], int(self.now + 2 * DAY), delta=1)
+
+
 class NotKnownAndNotFound(Board):
     def test_codex_with_no_readings(self):
         self.keep_version(self.codex)
@@ -270,6 +390,14 @@ class InWords(unittest.TestCase):
         self.assertEqual(view.state_words(self.p(state=contract.SIGNED_OUT), n), 'not signed in')
         self.assertEqual(view.state_words(self.p(state=contract.NOT_INSTALLED), n), 'not on this Mac')
 
+    def test_one_rule_for_how_fresh_room_is(self):
+        # "has room" in words and a row's fresh both follow cli.WORDS_FRESH_S, the one constant.
+        self.assertFalse(hasattr(view, 'FRESH_WORDS_S'))
+        n, p = self.NOW, self.p(read_at=self.NOW - 1000)
+        self.assertEqual(view.state_words(p, n), 'has room')
+        with mock.patch.object(cli, 'WORDS_FRESH_S', 600.0):
+            self.assertEqual(view.state_words(p, n), 'had room when last read 16 min ago')
+
     def test_summary(self):
         n = self.NOW
         self.assertEqual(view.summary(self.p(), n), 'has room · ChatGPT Pro · weekly 42%%, refills %s'
@@ -308,6 +436,29 @@ class InWords(unittest.TestCase):
         self.assertEqual(view.lines({'providers': 'damaged'}, n), [])
         self.assertEqual(view.lines({'providers': 7, 'add': 3, 'carry': False}, n), [])
         self.assertIsNone(view.out_note({'providers': 7}, n))
+
+    def test_under_the_list_only_what_the_rows_do_not_say(self):
+        n = self.NOW
+        claude = self.p(id='claude', name='Claude', account_list=True, plan=None, seats=[], fit_why=None)
+        fit = self.p(fit_why=None)
+        unfit = self.p(fit_why='not signed in')
+        offer = {'id': 'codex', 'name': 'Codex', 'app': 'Codex'}
+        self.assertEqual(view.under_list({'providers': [claude, fit], 'add': [], 'carry': True}, n,
+                                         rows=[{'provider': 'codex'}]), [])
+        self.assertEqual(view.under_list({'providers': [claude, unfit], 'add': [], 'carry': False}, n),
+                         [('provider', 'Codex', 'not signed in')])
+        self.assertEqual(view.under_list({'providers': [claude], 'add': [offer], 'carry': False}, n),
+                         [('add', 'Codex', 'Codex is on this Mac too: switchboard add codex adds it.')])
+        carry = ('carry', '', 'To carry a chat on in the next one with room, type in its folder: switchboard continue')
+        self.assertEqual(view.under_list({'providers': [claude, unfit], 'add': [], 'carry': True}, n),
+                         [('provider', 'Codex', 'not signed in'), carry])
+        self.assertEqual(view.under_list({'providers': [claude, unfit], 'add': [], 'carry': True}, n,
+                                         rows=[{'provider': 'tern'}]), [('provider', 'Codex', 'not signed in')])
+        for damaged in (None, 7, {'providers': 'damaged'}, {'providers': 7, 'add': 3, 'carry': False}):
+            self.assertEqual(view.under_list(damaged, n), [])
+        board = {'providers': [claude, unfit], 'add': [offer], 'carry': True}
+        view.under_list(board, n)
+        self.assertEqual(board, {'providers': [claude, unfit], 'add': [offer], 'carry': True})    # pure
 
 
 if __name__ == '__main__':

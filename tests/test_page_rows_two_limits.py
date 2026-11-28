@@ -2,13 +2,16 @@ import _isolate  # noqa: F401  (first: it gives switchboard a throwaway data fol
 # The page's accounts list shows at most two limits per account:
 #
 # - 5-hour only when there is a 5-hour number to show: no 5-hour line at all (no label, no dash, no empty bar, no gap)
-#   for an account with no 5-hour limit, for a reading too old to show, or for one never read. 0% not started stays.
+#   for a reading too old to show or for one never read. An account with no 5-hour limit says so in words in the
+#   5-hour place ("No 5-hour limit on this plan"), with no bar and no percent. 0% not started stays.
 # - Weekly always; not known, a dash with its age under it.
 # - No line for a model's own week. The weekly line's hover says each model week the reading has; a model week that
 #   auto-switch counts, at or over its switch line, is one short red note at the end of the weekly line (the highest
 #   when several are), never one auto-switch does not count, never under its line.
 # - A row with one line and a row with two line up: the first limit line beside the email, the state column beside
-#   both, at 680 and 1280 px. A screen reader still gets four cells a row (a hidden one for the 5-hour column).
+#   both, at 680 and 1280 px. A plan with no 5-hour limit is a row of two: its words where a 5-hour line is, its
+#   weekly line where the second of two is. A screen reader still gets four cells a row (a hidden one for the 5-hour
+#   column).
 # - The switch line names only what the rows show: no model field; the 5-hour field only when an account has a
 #   5-hour limit. The model's line is set in Settings, as before.
 #
@@ -85,7 +88,7 @@ class TheLines(test_app.ChromePage):
         set_up(old=HARBOR, never=FERN)
         got = self.run_page(ROWS + "done({mail: of('%s'), harbor: of('%s'), fern: of('%s'), work: of('%s')});"
                             % (MAIL, HARBOR, FERN, WORK))
-        for key, why in (('mail', 'No 5-hour limit'), ('harbor', 'Not known'), ('fern', 'Not known')):
+        for key, why in (('mail', 'No 5-hour limit on this plan'), ('harbor', 'Not known'), ('fern', 'Not known')):
             with self.subTest(account=key):
                 r = got[key]
                 self.assertEqual([l[0] for l in r['lines']], ['week'])                # one line: no label, no dash
@@ -182,6 +185,8 @@ LOOK = r"""
           whoBottom: Math.max(...who.map((x) => box(x).bottom)), cellsBottom: Math.max(...lines.map((c) => box(c).bottom)),
           lines: lines.map((c) => ({kind: c.dataset.kind, name: box(c.querySelector('.ml')), pct: box(c.querySelector('.pct')), bar: box(c.querySelector('.bar'))})),
           cut: em.scrollWidth > em.clientWidth};
+        const nf = b.querySelector(':scope > .c-nofive');            // a plan with no 5-hour limit: its words
+        rows[em.textContent].nofive = nf ? box(nf) : null;
       }
       const strip = d.getElementById('auto');
       out[w] = {rows, wide: d.documentElement.scrollWidth > w,
@@ -205,21 +210,32 @@ class OneLineAndTwoLineRows(framed.FramedPage):
                 self.assertEqual([len(rows[e]['lines']) for e in (WORK, MAIL, FERN, HARBOR, IVY)], [2, 1, 2, 1, 2])
                 bars = [l['bar'] for r in rows.values() for l in r['lines']]
                 self.assertEqual(len(set((b['left'], b['right']) for b in bars)), 1, bars)    # one left edge, one width
-                one, two = rows[MAIL], rows[WORK]
+                # one line: HARBOR (its reading too old to show: no 5-hour line); two: WORK; MAIL's plan has no
+                # 5-hour limit: its words where a 5-hour line is, its weekly line the second of two
+                one, two, words = rows[HARBOR], rows[WORK], rows[MAIL]
+                self.assertIsNotNone(words['nofive'])
                 if w == '1280':
-                    # the first limit line sits beside the email, in a one-line row as in a two-line one
+                    # the first limit line sits beside the email, in a one-line row as in a two-line one; a plan with
+                    # no 5-hour limit has its words there, and its weekly line where the second of two is
                     for r in (one, two):
                         self.assertLess(abs(r['lines'][0]['name']['mid'] - r['em']['mid']), 4)
-                        self.assertLess(abs(r['state']['top'] - r['row']['top'] - (two['state']['top'] - two['row']['top'])), 2)
-                    harbor = rows[HARBOR]                                     # one line (and its age), no sign-in line
-                    self.assertLess(harbor['row']['bottom'] - harbor['row']['top'], two['row']['bottom'] - two['row']['top'])
+                    self.assertLess(abs(words['nofive']['mid'] - words['em']['mid']), 4)
+                    down = lambda r, at: at['top'] - r['row']['top']                       # noqa: E731
+                    self.assertLess(abs(down(words, words['lines'][0]['name']) - down(two, two['lines'][1]['name'])), 2)
+                    for r in (one, two, words):
+                        self.assertLess(abs(down(r, r['state']) - down(two, two['state'])), 2)
+                    # one line (and its age), no sign-in line: a shorter row
+                    self.assertLess(one['row']['bottom'] - one['row']['top'], two['row']['bottom'] - two['row']['top'])
                 else:
                     # a block: the email and its state on one line, the limits under the plan (and the sign-in line);
-                    # the one line where the first of two is
-                    gap = lambda r: r['lines'][0]['name']['top'] - r['whoBottom']          # noqa: E731
-                    self.assertLess(abs(gap(one) - gap(two)), 2)
-                    self.assertLess(abs(gap(rows[HARBOR]) - gap(two)), 2)
-                    for r in (one, two):
+                    # the one line where the first of two is, the words of a plan with no 5-hour limit there too, and
+                    # its weekly line where the second of two is
+                    gap = lambda r, at: at['top'] - r['whoBottom']                         # noqa: E731
+                    first = gap(two, two['lines'][0]['name'])
+                    self.assertLess(abs(gap(one, one['lines'][0]['name']) - first), 2)
+                    self.assertLess(abs(gap(words, words['nofive']) - first), 2)
+                    self.assertLess(abs(gap(words, words['lines'][0]['name']) - gap(two, two['lines'][1]['name'])), 2)
+                    for r in (one, two, words):
                         self.assertLess(abs(r['state']['mid'] - r['em']['mid']), 6)
                 for email, r in rows.items():
                     self.assertFalse(r['cut'], email)

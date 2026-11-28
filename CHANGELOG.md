@@ -2,6 +2,73 @@
 
 Every change people will notice, newest first. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 1.0.0 (2026-11-27)
+
+Codex joins your Claude accounts in one list, Claude Code's sign-in is watched and kept, and routing can set the model each kind of work starts on.
+
+### Added
+
+**Other assistants in the one list**
+
+- Pressing another assistant's number in `switchboard` (or typing `switchboard 3` for row 3) carries this folder's newest chat on there: a note of it is made and that app starts on it in this terminal. Adding the assistant says once what pressing its row sends, to whom and under whose terms; when that was never said at a terminal, as for one added on an earlier version, the first press at a terminal in a folder with no yes of its own says it and asks once. `--why` says what was done along the way.
+- Continue here, in the menu bar and on the page, opens that app with the note in its message box, and you send it there; without the app, it gives the line to run in a terminal.
+- `switchboard remove codex` takes Codex off your order and the list, and `switchboard add codex` adds it again. Bare `switchboard add` asks before it adds a signed-in Codex, at a terminal only.
+
+**Keeping Claude Code signed in**
+
+- Keep Claude Code signed in (`switchboard auto signed-in`, on until you turn it off): when the sign-in in use is lost and can't be put back, or ten minutes before it stops working, Claude Code moves to another signed-in account, also with auto-switch off.
+- The sign-in watch, a third background job, notices within a second when Claude Code's sign-in changes and has Switchboard look at once; the page and the watch each start the other again when it stops. `switchboard about` names it among what runs.
+- Claude Code's sign-in is also kept in its plain login file (`.credentials.json` in Claude Code's folder, which only you can read), as an exact copy of its Keychain item, so a chat or a status check whose Keychain read gives nothing on a busy Mac finds the sign-in there. The copy follows each renewal, switch and put-back, is never made from a blank or refused login, and goes when you sign out of Claude Code, at uninstall, or when `auto_policy.keep_signin_file` is false; then only a copy for about 35 seconds after a put-back is kept, as before. While the copy holds the login, a lost sign-in is put back only after 10 seconds, so a sign-out you choose is not taken for a lost sign-in. A file Claude Code wrote itself is never written over.
+- When the Keychain gives no answer during an uninstall, the program and its data folder stay, and one line gives the command that runs the uninstall again.
+
+**Routing**
+
+- `switchboard routing on` sets the model and the effort a helper or a workflow agent starts on in Claude Code, as your route for that kind of work says, through a plugin Claude Code loads (Claude Code 2.1.287 or newer). With Codex in your list, it also puts two hooks in Codex's folder and a helper file for each kind of work your routes send to a Codex model; Codex asks you once to trust the hooks. The Codex part follows Codex's published formats and has not yet been seen working in a running Codex. With no routes and no defaults nothing changes. `switchboard routing off` takes back everything turning it on wrote, and `switchboard routing trial on` records what would happen and changes nothing.
+- `switchboard routing` shows whether routing is on, every switch, your defaults, your routes and the last five decisions, each with its reason. Once routing is on, a line under the list in `switchboard` says so.
+- `switchboard routing cache` counts how often helpers stored their whole context again after a wait, from the records Claude Code keeps on this Mac; `switchboard routing cache on` sets Claude Code's hour cache for helpers, and `off` puts back what was there.
+- The first run turns routing on in a step of its own and says what it changed.
+
+**The front door**
+
+- `switchboard do TASK`, in a terminal: type a task once. Switchboard works out its kind from its first sentence by a fixed table of words (build, fix, review, plan, find, write), picks the provider and model your routes name for that kind, says why and which providers it passed, asks the same yes for the folder as `continue`, and starts that provider's own app on it in this folder. Your words go into one private file; the app's first message names only the file.
+- `switchboard route TASK`: the same pick and why, starting nothing.
+- `switchboard routes`: your routes kind by kind, with `set`, `reset` and `preset`. A fresh install has none, and the one preset, `by-the-job`, is off until you turn it on.
+
+**Models, the week and artifacts**
+
+- Models by the job (`switchboard models on`, off until you turn it on): four helpers in Claude Code, each on the model that fits its job (lookup on Haiku; reader, reviewer and verifier on Sonnet), and one short note that says which is for what. It changes no setting, and `switchboard models off` takes out exactly the files it added.
+- Your week on the page shows up to three takeaways, each on a number the week already shows, and says what it means for you; where a documented change exists, one press makes it and Undo takes it back.
+- What stopped your work, on the page under your accounts: how many chats, helpers and workflow agents stopped early in the last 7 days, each cause in the last 14 days with the step for it, and the workflow runs that lost agents. It is read from files on this Mac and never keeps what a message said.
+- `switchboard run --roomiest -- ARGS` runs as the account with the most room that auto-switch is not about to leave, and names that account first.
+- When a chat's Artifact or Claude Docs call says "not found" and Switchboard knows the item is another account's (it never guesses), Claude Code moves to that account while auto-switch is on: at most once in 10 minutes for each owner, and only when every other rule for a move allows it. The chat is told whether Claude Code is moving.
+
+### Changed
+
+- Another assistant you added is a numbered row in the same list as your Claude accounts, in `switchboard`, on the page and in the menu bar, with its plan and its limits, in place of a group of its own; an assistant with no row gets one line that says why. `switchboard doctor` says whether each has room, its plan and its limits.
+- When every Claude account you can use is at your switch lines and another assistant has room, one notification says so and which number to press, and so does the S in the menu bar; when another assistant is first in your order, the notification says when that one is out and which has room.
+- `switchboard models on` and `off` now turn Models by the job on and off; Sonnet for helpers is `switchboard models sonnet on` and `off`.
+- Only an account's own 5-hour and weekly limits decide whether it can work. A model's own week decides only whether the account can take that model, and Next and the notification follow the same rule.
+- `switchboard` shows under each account only its 5-hour line (or "no 5-hour limit") and its weekly line: no line or note for a model's own week, and no "checked 3 min ago" after its status. Another assistant's row says "had room when last read 2 hours ago" when its numbers are over an hour old.
+- A notification when a long turn ends is its own setting now, off on a new install: `switchboard notify done on`.
+- The page opens only for you. Open it once in each browser with `switchboard page` or Open Switchboard in the menu bar; its address is `http://127.0.0.1:7799`. `switchboard page --new-key` makes a new key.
+- Chat search leaves out text that looks like a key, token or password, and `python3 -m switchboard.packs.memory erase` erases its index. The note each chat gets at its start names no email address.
+- Your week weighs each cache read at its own model's price.
+- A switch's line in History names the account it left.
+- After a Homebrew update, one line says when a newer version is out that Homebrew does not have yet.
+- The skill also answers about another assistant's row, Keep Claude Code signed in and its login copy, routing (a page of its own), `switchboard run --roomiest` and `switchboard notify done`.
+
+### Fixed
+
+- `switchboard current` and `switchboard status --json` name no account when Claude Code is on a login that no account here is.
+- Removing an account says plainly when its kept token's record could not be removed.
+- `switchboard doctor` says an install with no background jobs has none, instead of naming a step that adds nothing.
+- A job of yours whose files sit in a folder with "claude" and "switch" in its name is no longer taken for another program that switches Claude Code's login, which kept auto-switch from turning on and ended `switchboard` with a line asking you to turn that job off. A job is judged by its label and the names of its program and files, never by its folders.
+
+### Not built
+
+- Handing work to the other app by its route: inside each app, routing sets models and never starts the other app. You start it yourself, with `switchboard do` or `switchboard hand` at a terminal.
+- A move, a job or an ask that starts without you at a terminal, apart from Continue here in the menu bar and on the page, which only opens the other app with the note in its message box: you send it there.
+
 ## 0.3.0 (2026-11-27)
 
 The first run moves into the terminal, and every install says what it checked.

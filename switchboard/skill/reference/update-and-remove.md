@@ -16,7 +16,7 @@
 
 ## Remove
 
-Removing takes out the program, Switchboard.app, the link app, the background jobs and the command, and puts back what Switchboard changed in Claude Code: the status line, the hooks, Sonnet for helpers, house rules, the code map and claude-mem's settings. It takes out this skill too, Switchboard's own copy only (the folder with its marker). It never touches the login Claude Code is using. If Switchboard Links is the default browser, macOS asks which browser gets it back.
+Removing takes out the program, Switchboard.app, the link app, the background jobs and the command, and puts back what Switchboard changed in Claude Code: the status line, the hooks, Models by the job, Sonnet for helpers, house rules, the code map and claude-mem's settings. It takes out this skill too, Switchboard's own copy only (the folder with its marker). It never touches the login Claude Code is using. If Switchboard Links is the default browser, macOS asks which browser gets it back.
 
 - A plain remove keeps `~/.switchboard` (settings, accounts, History), the accounts' logins in the Keychain and `~/.switchboard-notes`, so a reinstall picks them up. Its last line is the command that removes the rest: `sh ~/.switchboard/uninstall.sh --all`.
 - `--all` also removes the accounts (their logins leave the Keychain), the gateway's keys, everything in `~/.switchboard` and `~/.switchboard-notes`.

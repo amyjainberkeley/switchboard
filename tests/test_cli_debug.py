@@ -32,6 +32,16 @@ SECRETS = (TOKEN, KEY, JWT, 'correct horse', LONG, 'refresh_token=', A, B, '@')
 
 
 class Debug(Cli):
+    def setUp(self):
+        super().setUp()
+        # The list and status wait at most BOARD_WAIT seconds for the board read here, then print without the other
+        # assistants' rows and one line that says so: on a busy Mac a run may cross that line. These tests compare
+        # whole outputs of two runs, so here the board always gets its answer: no limit, no clock.
+        # (test_one_list's test_a_slow_board_leaves_the_other_rows_out_of_the_list proves the line a late board leaves.)
+        p = mock.patch.object(cli, 'BOARD_WAIT', None)
+        p.start()
+        self.addCleanup(p.stop)
+
     def lines(self, err):
         got = [x for x in err.splitlines() if x]
         self.assertTrue(got, 'nothing on standard error')

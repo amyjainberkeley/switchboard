@@ -1,14 +1,14 @@
 """The person's choices for the other assistants, in one file (contract.SETTINGS_FILE), written whole under the
 providers lock: the order to carry on in, which providers are added, the yes (or never) per folder and provider, a
-folder's `stay`, the one-time yeses to asking a provider's app for its numbers and to its first job, how each app
-opens, and the note's size.
+folder's `stay`, the one-time yeses to asking a provider's app for its numbers and to its first job, when the notice
+of what a press on its row sends was said, how each app opens, and the note's size.
 
     {"v": 1, "order": [P1, P2], "added": {P1: 0, P2: 1795600000.0},
      "folders": {"/Users/maya/site": {"id": [16777220, 1234567],
                                       "consent": {P2: {"state": "yes", "at": 1795600000.0}},
                                       "stay": null, "stay_set": []}},
      "open_with": {P2: "terminal"}, "handoff_budget": 96000,
-     "ask_ok": {P2: 1795600000.0}, "hand_ack": {P2: 1795600000.0}}
+     "ask_ok": {P2: 1795600000.0}, "hand_ack": {P2: 1795600000.0}, "notice": {P2: 1795600000.0}}
 
 P1 and P2 stand for provider ids from the registry (switchboard/providers/__init__.py). The registry's first provider
 (the one Switchboard's own account list serves) is always added, at 0, and always in the order.
@@ -131,6 +131,24 @@ def add(pid: str, now: float) -> None:
         data['added'] = current
         if isinstance(data.get('order'), list) and pid not in data['order']:
             data['order'].append(pid)
+
+
+def remove(pid: str) -> bool:
+    """Take a provider off the list (`switchboard remove PROVIDER`): out of added and out of the order, and its notice
+    record with it, so adding it again says the notice again. What the person said per folder (a yes, a never, a stay)
+    stays. The first provider is always added (ValueError). True when it was added."""
+    _check(pid)
+    if pid == first():
+        raise ValueError('the first provider is always added')
+    with _changing() as data:
+        current = _added(data)
+        was = current.pop(pid, None) is not None
+        data['added'] = current
+        if isinstance(data.get('order'), list):
+            data['order'] = [p for p in data['order'] if p != pid]
+        if isinstance(data.get('notice'), dict):
+            data['notice'].pop(pid, None)
+    return was
 
 
 def set_order(ids: List[str]) -> None:
@@ -303,6 +321,16 @@ def hand_ack(pid: str) -> bool:
 
 def set_hand_ack(now: float, pid: str) -> None:
     _set_once('hand_ack', now, pid)
+
+
+def notice_said(pid: str) -> bool:
+    """The notice of what a press on pid's row sends, to whom and under whose terms, was said to the person: when it
+    was added, or answered yes at a first press. Until then a press at a terminal says it first and asks."""
+    return _once('notice', pid)
+
+
+def set_notice_said(now: float, pid: str) -> None:
+    _set_once('notice', now, pid)
 
 
 # ---------- how ----------

@@ -127,7 +127,7 @@ class TheTerminal(unittest.TestCase):
     def test_the_weekly_line_says_when_it_would_be_full(self):
         words = 'at this pace, full by %s' % term.clock(full_at(80), NOW, TZ)
         self.assertEqual(words, 'at this pace, full by Sat 4:23 PM')
-        line = self.blocks()[FAST].split('\n')[1]
+        line = self.blocks()[FAST].split('\n')[-1]          # the weekly line: last, under "no 5-hour limit"
         self.assertEqual(line, '   weekly  ' + '━' * 19 + '─' * 5 + '   80%  resets Mon 12:00 PM · in 3 days · ' + words)
         week = term.read(view(), tz=TZ)['accounts'][0]['limits'][-1]
         self.assertEqual(week['pace'], words)
@@ -137,7 +137,7 @@ class TheTerminal(unittest.TestCase):
         for email in (SLOW, EARLY, OLD):
             self.assertNotIn('pace', blocks[email], email)
             self.assertNotIn('full', blocks[email], email)
-        self.assertTrue(blocks[SLOW].split('\n')[1].endswith('40%  resets Mon 12:00 PM · in 3 days'))
+        self.assertTrue(blocks[SLOW].split('\n')[-1].endswith('40%  resets Mon 12:00 PM · in 3 days'))
 
     def test_pace_words_are_never_red_and_the_reset_stays_dim(self):
         coloured = term.view(term.read(view(), tz=TZ), colour=True)

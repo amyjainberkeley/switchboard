@@ -15,7 +15,8 @@ ones over that are held and said together by flush_held().
   use [...]", `elicitation_dialog` and `elicitation_url_dialog` (an MCP server asks for input), and
   `agent_needs_input` (a background session waits on you). `idle_prompt` ("Claude finished
   responding about 60 seconds ago and you haven't typed since") follows every answer, short ones
-  too, so it is not a "done": Stop is, for a turn of a minute or more.
+  too, so it is not a "done": Stop is, for a turn of a minute or more, and only while "done" is turned on
+  (notify_hooks.done_on: off on a new install).
 - `agent_id`: "Unique identifier for the subagent or in-process teammate the hook fires in." Helpers
   and workflow agents never get a note.
 from_hook() turns those hook inputs into a Note. The hooks themselves are an entry in Claude Code's
@@ -328,18 +329,27 @@ def kept(name, n):
                 None, None)
 
 
-def from_hook(event, started=None, now=None, long_turn=LONG_TURN):
+def signed_out(email, text, at):
+    """Claude Code lost its sign-in and no other account is signed in to move it to (the automatic loop, once per
+    event: `at` is when it was first seen). About a sign-in, never a limit."""
+    return Note('signed-out:%s' % (email or ''), 'Switchboard', text, '%.0f' % (at or 0), None)
+
+
+def from_hook(event, started=None, now=None, long_turn=LONG_TURN, done=True):
     """A Stop or Notification hook input -> "done" or "needs you". Never shows conversation text.
 
     started: when the turn began (notify_hooks notes it at UserPromptSubmit), or None when that isn't known. A
     Stop under long_turn seconds after it is quiet; with no start known, it is a "done" (one note too many is
-    better than a long run's end never said)."""
+    better than a long run's end never said). done: False when "done" is turned off (notify_hooks.done_on): then a
+    Stop gives nothing, and "needs you" is the same."""
     if not isinstance(event, dict) or event.get('agent_id') is not None:
         return None                         # a helper, an in-process teammate or a workflow agent: never
     name, session = event.get('hook_event_name'), str(event.get('session_id') or '')
     folder = os.path.basename(str(event.get('cwd') or '').rstrip('/'))
     where = ('In %s.' % folder) if folder else ''
     if name == 'Stop':
+        if not done:
+            return None                     # "done" is turned off: a turn's end is never said
         if event.get('stop_hook_active') or event.get('background_tasks'):
             return None                     # continuing, or background work still in flight: not done yet
         began = _finite(started)

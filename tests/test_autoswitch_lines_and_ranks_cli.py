@@ -188,7 +188,8 @@ class TheCommand(Three):
         code, out = self.run_cli('auto', 'maybe')
         self.assertEqual(code, 2)
         self.assertTrue(out.endswith('switchboard auto line NAME [--five-hour N] [--week N]\n'
-                                     'switchboard auto line NAME off\nswitchboard auto rank NAME N|off\n'), out)
+                                     'switchboard auto line NAME off\nswitchboard auto rank NAME N|off\n'
+                                     'switchboard auto signed-in [on|off]\n'), out)
 
     def test_both_go_through_the_running_page(self):
         page = Page(VIEW)
@@ -231,7 +232,10 @@ class TheCommand(Three):
 
     def test_the_help_lines(self):
         got = cli.command_help('auto') + '\n'
-        self.assertTrue(got.endswith(NEW_HELP), got)
+        self.assertTrue(got.endswith(NEW_HELP + 'switchboard auto signed-in [on|off]\n' + UNDER +
+                                     "keep Claude Code signed in: when its sign-in is lost and can't be put back, or is\n"
+                                     + UNDER + 'about to end, move it to another signed-in account, also with '
+                                     'auto-switch off (on\n' + UNDER + 'until you turn it off)\n'), got)
         self.assertIn('switchboard switch --best   move Claude Code now to the account auto-switch would pick, and '
                       'say why', cli.command_help('switch'))
         doc = cli.__doc__

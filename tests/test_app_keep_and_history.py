@@ -594,7 +594,7 @@ class AnotherProgramOnThePort(KeepSandbox):
         self.assertIn(cli.NOT_RUNNING_HERE, out)
         self.assertEqual((self.fake.auto.get('enabled'), core.settings().get('auto_set_by_you')), (True, True))
         code, out = self.run_cli('doctor')                      # it asks whether the page runs, auto-switch on
-        self.assertIn(' --  Page at http://localhost:%s\n' % os.environ['SWITCHBOARD_PORT'], out)
+        self.assertIn(' --  Page at http://127.0.0.1:%s\n' % os.environ['SWITCHBOARD_PORT'], out)
         self.assertIn('It runs inside the page: start it with `switchboard serve`.', out)
 
 

@@ -108,10 +108,12 @@ class TheTerminal(unittest.TestCase):
 
     def test_no_5_hour_line_for_an_account_with_no_5_hour_limit(self):
         got = self.limits()
-        self.assertEqual(got[ULTRA], [('weekly', 27, 'resets Sat 12:00 PM · in 20 hours')])   # Fable's week: no line
+        self.assertEqual(got[ULTRA], [('5-hour', None, 'no 5-hour limit'),                   # said in words, no bar
+                                      ('weekly', 27, 'resets Sat 12:00 PM · in 20 hours')])   # Fable's week: no line
         blocks = '\n'.join(term.view(term.read(view(), tz=TZ))).split('\n\n')[1:]      # after the header line
         ultra = next(b for b in blocks if ULTRA in b)
         self.assertNotRegex(ultra, r'(?m)^\s+5-hour\b')
+        self.assertRegex(ultra, r'(?m)^   no 5-hour limit$')
         self.assertRegex(ultra, r'(?m)^   weekly  ━{6}─{18}   27%  resets Sat 12:00 PM')
         self.assertRegex(next(b for b in blocks if IDLE in b), r'(?m)^   5-hour  ─{24}    0%  not started$')
 
@@ -124,8 +126,9 @@ class TheTerminal(unittest.TestCase):
         self.assertEqual(self.limits(v)[BUSY][0], ('5-hour', 40, 'started'))
 
     def test_a_reading_not_known_is_a_weekly_dash_alone(self):
-        # (it was a dash for both: the 5-hour line is now drawn only when there is a 5-hour number to show)
-        self.assertEqual(self.limits()[UNREAD], [('weekly', None, '')])
+        # (it was a dash for both: the 5-hour line is now drawn only when there is a 5-hour number to show; a reading
+        # too old to show still tells the plan, so this Ultra account's 5-hour place says it has no 5-hour limit)
+        self.assertEqual(self.limits()[UNREAD], [('5-hour', None, 'no 5-hour limit'), ('weekly', None, '')])
         v = view()
         v['accounts'][0]['usage'] = None                             # no reading at all
         self.assertEqual(self.limits(v)[ULTRA], [('weekly', None, '')])
@@ -141,14 +144,15 @@ class TheMenuBar(unittest.TestCase):
         r = self.row(ULTRA)
         self.assertIsNone(r['five'])
         ops = menubar.row_ops(r)
-        self.assertEqual([(op[2], op[5][0][0]) for op in ops if op[0] == 'text'], [(28.0, 'Weekly'), (28.0, '27%')])
+        self.assertEqual([(op[2], op[5][0][0]) for op in ops if op[0] == 'text'],
+                         [(28.0, 'No 5-hour limit'), (46.0, 'Weekly'), (46.0, '27%')])   # words in the 5-hour place
         self.assertEqual([op[2] for op in ops if op[0] == 'pair'], [8.0])          # the email line, no reset line
-        self.assertEqual(menubar.row_height(r), 54.0)
-        self.assertEqual(menubar.row_label(r), 'ana@ultra.example, in use, weekly 27%')
+        self.assertEqual(menubar.row_height(r), 72.0)
+        self.assertEqual(menubar.row_label(r), 'ana@ultra.example, in use, no 5-hour limit, weekly 27%')
         v = view()
         v['accounts'][0]['usage'].update(weekly={'pct': None, 'resets': SAT_NOON}, scoped=[])   # weekly not known
         r = self.row(ULTRA, v)
-        self.assertEqual((menubar.pct_text(r['week']), menubar.row_height(r)), ('—', 54.0))
+        self.assertEqual((menubar.pct_text(r['week']), menubar.row_height(r)), ('—', 72.0))
 
     def test_a_5_hour_window_at_0_with_no_reset_has_not_started(self):
         r = self.row(IDLE)
@@ -161,7 +165,7 @@ class TheMenuBar(unittest.TestCase):
         # (it kept both dashes: the 5-hour row is now drawn only when there is a 5-hour number to show)
         r = self.row(UNREAD)
         self.assertEqual((r['five'], menubar.pct_text(r['week'])), (None, '—'))
-        self.assertEqual(menubar.row_height(r), 54.0)
+        self.assertEqual((r['no_five'], menubar.row_height(r)), ('No 5-hour limit', 72.0))    # its plan has none
 
     def test_the_item_reads_the_weekly_limit_alone(self):
         r = menubar.reading(view())
@@ -280,7 +284,8 @@ class LiveNumbers(unittest.TestCase):
                 server.apply_live_numbers(st, self.now)
                 u = st['accounts'][ULTRA]['usage']
                 self.assertEqual((u['session'], u['weekly']['pct']), (None, 30.0))     # the live number stands in
-                self.assertEqual(self.shown(st), [('weekly', 30, 'resets')])          # Fable's week: no line
+                self.assertEqual(self.shown(st), [('5-hour', None, 'no 5-h'),         # no 5-hour limit: words,
+                                                  ('weekly', 30, 'resets')])          # Fable's week: no line
 
     def test_a_5_hour_window_that_has_reset_since_has_not_started(self):
         # The engine read 40% twenty minutes ago; that window reset half a minute ago, and Claude Code dropped it.
@@ -338,7 +343,7 @@ class TheDemo(unittest.TestCase):
     def test_the_terminal_and_the_menu_bar_draw_it_so(self):
         v = demo.view()
         rows = dict((a['email'], [l['label'] for l in a['limits']]) for a in term.read(v)['accounts'])
-        self.assertEqual(rows['maya.reyes@mail.example'], ['weekly'])
+        self.assertEqual(rows['maya.reyes@mail.example'], ['5-hour', 'weekly'])     # the 5-hour place: words
         self.assertEqual(rows['maya@fernhill.example'], ['5-hour', 'weekly'])
         bar = next(r for r in menubar.rows(v) if r['email'] == 'maya.reyes@mail.example')
         self.assertIsNone(bar['five'])

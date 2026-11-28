@@ -265,8 +265,8 @@ CODEX_SKIPPED_LINES = ('world_state', 'token_usage_record', 'inter_agent_communi
 # event_msg payload types left out (token_count is read by saved_limits only).
 CODEX_SKIPPED_EVENTS = ('token_count', 'task_started', 'turn_aborted', 'thread_settings_applied', 'agent_message')
 # response_item payload types left out; role 'developer' messages are the app's own instructions [inferred].
-# configuration_update: the app's own record of a setting changed in the chat (seen on 0.169.1: a reasoning effort
-# and nothing else; no chat text).
+# configuration_update: the app's own record of a setting changed in the chat (0.169.1, seen Nov 26: a reasoning
+# effort and nothing else; no chat text).
 CODEX_SKIPPED_RESPONSES = ('compaction', 'agent_message', 'additional_tools', 'configuration_update')
 CODEX_SKIPPED_ROLES = ('developer', 'system')
 CODEX_PLAN_TOOLS = ('update_plan',)     # [not seen on 0.169: every custom_tool_call is named exec]

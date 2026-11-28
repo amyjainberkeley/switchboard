@@ -44,16 +44,22 @@ def w(i, o, cw, cr):
     return i + 5 * o + 2 * cw + 0.05 * cr
 
 
+def w_fable(i, o, cw, cr):
+    # the same on Fable 5.2, but a cache read there is 0.025 of its input token ($0.20 against $8)
+    return i + 5 * o + 2 * cw + 0.025 * cr
+
+
 # The requests of Nov 10 (UTC) by hour, from test_usage.py's hand count:
 CHAT_9 = w(10, 200, 1000, 5000) + w(5, 100, 0, 6000) + w(5, 50, 100, 6100)              # m1 m2 m3: 4825
 HELPERS_9 = (w(3, 300, 2000, 0) + w(2, 100, 0, 2000) + w(100, 20, 0, 0) + w(4, 80, 500, 1000)
              + w(6, 60, 0, 3000) + w(7, 70, 700, 0))                                    # h1 h2 f1 h3 h4: 9972
 WORKFLOWS_10 = w(50, 500, 3000, 10000) + w(5, 50, 0, 12000) + w(8, 400, 1000, 4000)       # w1a (10:00:00.000) w1b w2a
 CHAT_12 = w(3, 40, 0, 6200) + w(1, 10, 0, 100)                                          # m4 m5: 569
-N2, N1, R1 = w(30, 300, 400, 500), w(20, 100, 0, 0), w(1, 2, 3, 4)                      # 14:00Z, 15:00:00 (no zone), 23:59:59.999
+# 14:00Z, 15:00:00 (no zone), 23:59:59.999; n1 and n2 are the Fable chat's
+N2, N1, R1 = w_fable(30, 300, 400, 500), w_fable(20, 100, 0, 0), w(1, 2, 3, 4)
 M0, R0, R2 = w(9, 9, 9, 9), w(100, 100, 100, 100), w(100, 100, 100, 100)                # Nov 9 23:59:59.999, Nov 9 22:00, Nov 11 00:00
-TOTAL = CHAT_9 + HELPERS_9 + WORKFLOWS_10 + CHAT_12 + N2 + N1 + R1                      # 32371.2
-WEEK = TOTAL + M0 + R0 + R2                                                              # NOW’s week: 34053.65
+TOTAL = CHAT_9 + HELPERS_9 + WORKFLOWS_10 + CHAT_12 + N2 + N1 + R1                      # 32358.7
+WEEK = TOTAL + M0 + R0 + R2                                                              # NOW’s week: 34041.15
 
 
 def close(test, a, b, msg=None):

@@ -41,6 +41,14 @@ class NearestWord(Cli):
             with self.subTest(typed=typed):
                 self.assertEqual(self.asked(typed), (2, 'Unknown command: %s.\n' % typed + short_help()))
 
+    def test_a_two_letter_command_is_never_the_answer(self):
+        # Almost any short word is close to a two-letter command (do): "doc" and "dot" say what they said before it
+        # was in the help, and doctor is still found from a closer word.
+        for typed in ('doc', 'dot', 'dos'):
+            with self.subTest(typed=typed):
+                self.assertEqual(self.asked(typed), (2, 'Unknown command: %s.\n' % typed + short_help()))
+        self.assertEqual(self.asked('doctr'), (2, 'Unknown command: doctr. Did you mean doctor?\n' + short_help()))
+
 
 if __name__ == '__main__':
     unittest.main()

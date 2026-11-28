@@ -364,7 +364,8 @@ class EngineRequirements(ApiCase):
         api.switch('1')
         r, j = switcher.read_journal(self.ctx)
         self.assertEqual(j['step'], 'write_unknown')
-        self.assertEqual(api.resolve_journal(), 'Repaired the switch that was cut off')
+        self.assertEqual(api.resolve_journal(), 'Put away the record of a switch that was cut off: Claude Code holds '
+                                                'the login it had before, so nothing was changed.')
         self.assertEqual(self.rig.config()['oauthAccount']['accountUuid'], 'uuid-b')
 
     def test_every_file_is_written_atomically_and_owner_only(self):

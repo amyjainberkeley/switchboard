@@ -56,7 +56,8 @@ class TheAutoSwitchFunctions(Home):
         api.set_auto(enabled=True)
         self.feed('a1', 92.0, 30.0)
         self.feed('a2', 10.0, 20.0, resets=1000)
-        d = api.decide()
+        with mock.patch('switchboard.accounts.autoloop.load_per_core', lambda: 0.5):   # a calm Mac: no wait for it
+            d = api.decide()
         self.assertEqual((d.action, d.kind, d.target), ('switch', 'forced', 'a2'))
         self.assertEqual(self.engine.live_calls, 1)
 

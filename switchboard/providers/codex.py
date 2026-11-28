@@ -8,7 +8,8 @@ What it reads and what it runs:
   person's chats is never run on them.
 - Its numbers: from Codex's own session files (the chat reader, `chatfiles`), with no process and no network. Asked of
   Codex now only on the person's command, after their one yes, paced and one at a time: its own app server on stdio,
-  four lines that only read, and an email that is dropped while the answer is parsed.
+  four lines that only read. Of the account, only its plan and its email are kept (the email names Codex's row in
+  the list); its ids are dropped while each answer is parsed.
 - Its login: never opened, never copied. Whether `auth.json` exists is all that is looked at, with os.stat.
 - Starting it: start() and resume() only say how (a Launch); the command runs it. job() runs `codex exec` read-only,
   the prompt on standard input, an environment of a few plain names, and reads the answer from the one file it is
@@ -20,11 +21,12 @@ import dataclasses
 import json
 import os
 import plistlib
+import re
 import stat as stat_mod
 from typing import Optional, Tuple
 from urllib.parse import quote
 
-from . import codex_facts, contract, words
+from . import codex_facts, contract, place, words
 from .contract import (ASK, CHAT_ID_RE, CHATS, DETECT, HOW, IN_APP, IN_TERMINAL, JOB, LIMITS, PRINT, READ, RESUME,
                        SEATS, START, START_APP, Answer, Found, Launch, Limits, Program, Provider, ProviderError, Seat,
                        Window)
@@ -32,6 +34,7 @@ from .run import child_env, shell_line, version_key
 
 _JSON_MAX = 1 << 20             # a file of Switchboard's own, or an app's Info.plist, read at most this far
 _ANSWER_BYTES = 4 * codex_facts.ANSWER_MAX
+_HOP_RE = re.compile(r'^h-[0-9a-f]{8}\Z')    # a hop id (tasks.new_hop_id), the only id a first message names
 
 
 def _read_json(path, cap=_JSON_MAX):
@@ -79,9 +82,17 @@ def _write_json(path, data):
     core.write_json(path, data)
 
 
-def _drop_keys(pairs):
-    """json object hook: an answer's email and account ids are left out as it is parsed, so they are never held."""
-    return {k: v for k, v in pairs if k not in codex_facts.DROP_KEYS}
+def _drop_keys(pairs, keep=()):
+    """json object hook: an answer's email and account ids are left out as it is parsed, so they are never held. keep:
+    the keys of DROP_KEYS this answer may hold (only account/read's email, which names Codex's row in the list)."""
+    return {k: v for k, v in pairs if k not in codex_facts.DROP_KEYS or k in keep}
+
+
+def _email(value) -> Optional[str]:
+    """An email as Codex said it, when it is one: plain text, the shape of an address, at most EMAIL_MAX characters."""
+    if not isinstance(value, str) or len(value) > codex_facts.EMAIL_MAX or words.safe(value) != value:
+        return None
+    return value if codex_facts.EMAIL_RE.match(value) else None
 
 
 def _request_id(value):
@@ -97,6 +108,7 @@ class CodexProvider(Provider):
     billing_prefixes = ('OPENAI_', 'CODEX_')
     job_question = words.HAND_TERMS     # OpenAI's terms on a plan sign-in for scripts: asked once on this Mac
     rule_files = ('AGENTS.md', 'AGENTS.override.md')
+    plan_phrase = 'ChatGPT plan'
 
     def __init__(self, reach):
         super().__init__(reach)
@@ -251,10 +263,11 @@ class CodexProvider(Provider):
         env[codex_facts.CODEX_HOME_ENV] = home
         return env, home
 
-    def _versions(self, paths):
+    def _versions(self, paths, unread=None):
         """Each path's version, from the cache when its size and time are unchanged, else from one `--version` run
         in Switchboard's own empty Codex folder. The cache file is shared with the other adapters: only the key
-        'programs' is Codex's, and it is written back only when it changed (_keep_versions)."""
+        'programs' is Codex's, and it is written back only when it changed (_keep_versions). unread: a set that gets
+        each path whose version nothing answered (none kept, and no run made or the program not there to run)."""
         cache_path = self._data(contract.PROGRAMS_FILE)
         cache = _read_json(cache_path).get('programs')
         cache = cache if isinstance(cache, dict) else {}
@@ -274,10 +287,14 @@ class CodexProvider(Provider):
                 probe = self._probe_env() or False
             if not probe:
                 out[path] = None
+                if unread is not None:
+                    unread.add(path)
                 continue
             env, home = probe
             ran = self.reach.run([path, '--version'], stdin=None, timeout=self.facts['probe_seconds'], env=env,
                                  cwd=home)
+            if ran.missing and unread is not None:
+                unread.add(path)
             version = None
             if ran.code == 0:
                 m = codex_facts.VERSION_RE.search(ran.out or '')
@@ -317,7 +334,8 @@ class CodexProvider(Provider):
     def detect(self) -> Found:
         cands = self._candidates()
         fit = [c for c in cands if c[3] is None and self._trusted(c[0])]
-        versions = self._versions([c[0] for c in fit])
+        unread = set()
+        versions = self._versions([c[0] for c in fit], unread)
         fit_paths = {c[0] for c in fit}
         programs = []
         for path, source, where, refused in cands:
@@ -326,7 +344,8 @@ class CodexProvider(Provider):
                 refused = codex_facts.REFUSED_TRUST
             elif refused is None and version is None:
                 refused = codex_facts.REFUSED_NO_VERSION
-            programs.append(Program(path=path, version=version, source=source, where=where, refused=refused))
+            programs.append(Program(path=path, version=version, source=source, where=where, refused=refused,
+                                    unread=path in unread))
         programs.sort(key=lambda p: version_key(p.version), reverse=True)     # stable: a tie keeps list order
         chosen = next((p for p in programs if p.refused is None), None)
         seen, read_ok = self._newest_seen()
@@ -337,10 +356,17 @@ class CodexProvider(Provider):
             problems.append(codex_facts.NO_FIT_PROGRAM.format(why=programs[0].refused))
         lo, hi = (version_key(v) for v in codex_facts.CHECKED_ON)
         tested = chosen is not None and lo <= version_key(chosen.version) <= hi
-        login = os.path.join(self.codex_home(), codex_facts.LOGIN_FILE)
-        signed_in = True if os.path.exists(login) else None        # os.stat only: the file is never opened
         return Found(provider=self.id, installed=bool(programs), program=chosen, programs=tuple(programs),
-                     signed_in=signed_in, newest_seen=seen, tested=tested, problems=tuple(problems))
+                     signed_in=self.signed_in(), newest_seen=seen, tested=tested, problems=tuple(problems))
+
+    def signed_in(self) -> Optional[bool]:
+        """True when Codex's login file is there, or when the email Codex gave at its last ask is still current
+        (account_email: only Codex's own answer can have kept it, so its sign-in, in the Keychain then, is proved);
+        else None (not known). Never False: a missing file says nothing. os.stat and Switchboard's own file only:
+        Codex's login is never opened, and nothing runs."""
+        if os.path.exists(os.path.join(self.codex_home(), codex_facts.LOGIN_FILE)):
+            return True
+        return True if self.account_email() is not None else None
 
     def _runnable(self, chat_version=None) -> Program:
         """The program to run on the person's own Codex folder, or ProviderError: none fit, or older than the newest
@@ -381,20 +407,27 @@ class CodexProvider(Provider):
                           error=error)
         return self._lined(saved, ask=ask, error=error or saved.error)
 
-    def _keep_reading(self, limits: Limits) -> None:
-        """Codex's answer to an ask, kept in READINGS_FILE under the key 'codex' (numbers, labels, times and the plan's
-        name only), so the next command shows it until a newer reading comes. The file is shared: under the shared lock
-        only this key changes; a file that is not JSON is left as it is, and a write that fails is let go."""
+    def _keep_reading(self, limits: Limits, email: Optional[str] = None, email_at: Optional[float] = None) -> None:
+        """Codex's answer to an ask, kept in READINGS_FILE under the key 'codex' (numbers, labels, times, the plan's
+        name, and the account's email when Codex said one, with when it was read and whether Codex's sign-in file was
+        there then: _login_as_it_was), so the next command shows it until a newer reading comes. An answer with no
+        email keeps the one kept before while it is still current. The file is shared: under the shared lock only this
+        key changes; a file that is not JSON is left as it is, and a write that fails is let go."""
         from switchboard import core
         entry = {'seat': limits.seat, 'read_at': limits.read_at, 'plan': limits.plan, 'reached': limits.reached,
                  'windows': [{'label': w.label, 'used_pct': w.used_pct, 'resets_at': w.resets_at,
                               'length_min': w.length_min} for w in limits.windows]}
+        if _email(email) and _number(email_at) is not None:
+            entry.update(email=email, email_at=float(email_at), login=self._login_stat() is not None)
         path = self._data(contract.READINGS_FILE)
         try:
             with core.file_lock(contract.LOCK_NAME):
                 doc = _json_object(path)
                 if doc is None:
                     return
+                old = doc.get(self.id) if isinstance(doc.get(self.id), dict) else {}
+                if 'email' not in entry and self._current_email(old):
+                    entry.update(email=old['email'], email_at=old['email_at'], login=old['login'])
                 doc['v'], doc[self.id] = 1, entry
                 _write_json(path, doc)
         except OSError:
@@ -402,7 +435,8 @@ class CodexProvider(Provider):
 
     def _kept(self, now) -> Optional[Limits]:
         """The reading _keep_reading kept, when it is there, whole and no older than KEPT_DAYS; a window whose reset
-        has passed since has refilled, and its use is not known (None)."""
+        has passed since has refilled, and its use is not known (None); a limit word is dropped once every window has
+        refilled."""
         doc = _json_object(self._data(contract.READINGS_FILE)) or {}
         e = doc.get(self.id)
         if not isinstance(e, dict):
@@ -421,17 +455,51 @@ class CodexProvider(Provider):
                 used = None
             windows.append(Window(label=w['label'][:40], used_pct=used, resets_at=resets, length_min=length))
         plan, reached = e.get('plan'), e.get('reached')
+        if place.refilled(windows, now):
+            reached = None          # every window has refilled since Codex said a limit was reached
         return Limits(provider=self.id, seat='codex', windows=tuple(windows), read_at=read_at, source='ask',
                       plan=plan if isinstance(plan, str) else None,
                       reached=reached if isinstance(reached, str) else None)
 
     def seats(self) -> Tuple[Seat, ...]:
-        plan = self._saved().plan
+        """Its one seat, named by the plan of the numbers limits() last read here (one walk of Codex's files for a
+        board), else of the numbers read now."""
+        last = getattr(self, '_last_limits', None)
+        plan = (last if last is not None else self._saved()).plan
         label = words.PLAN_NAMES.get(plan, words.PLAN_OTHER) if plan else self.name
         return (Seat(provider=self.id, key='codex', label=label, plan=plan, in_use=True),)
 
+    def account_email(self) -> Optional[str]:
+        """The email of the account Codex is signed in to, as Codex said it when it was last asked (kept by
+        _keep_reading), however long ago, while Codex's sign-in file is as it was then (_current_email); None before
+        Codex was ever asked, when it said none, or when the sign-in may have changed since (the row is then named by
+        the app until the next ask). Never read from Codex's login."""
+        e = (_json_object(self._data(contract.READINGS_FILE)) or {}).get(self.id)
+        return e['email'] if isinstance(e, dict) and self._current_email(e) else None
+
+    def _login_stat(self):
+        """os.stat of Codex's sign-in file, or None when it is not there. The file is never opened."""
+        try:
+            return os.stat(os.path.join(self.codex_home(), codex_facts.LOGIN_FILE))
+        except OSError:
+            return None
+
+    def _current_email(self, e) -> bool:
+        """A kept email still names the account Codex is signed in to, as far as a stat can tell: the sign-in file is
+        there now exactly when it was there as the email was read, and it has not changed since (its change time is no
+        later than the email's own time). Codex rewrites the file when it signs in again, and also when it renews its
+        own sign-in, so a renewal hides the email too until the next ask."""
+        if not isinstance(e, dict) or not _email(e.get('email')) or _number(e.get('email_at')) is None or \
+                not isinstance(e.get('login'), bool):
+            return False
+        st = self._login_stat()
+        if (st is not None) != e['login']:
+            return False
+        return st is None or st.st_mtime <= e['email_at']
+
     def limits(self, ask: bool = False) -> Tuple[Limits, ...]:
-        return (self._ask() if ask else self._saved(),)
+        self._last_limits = self._ask() if ask else self._saved()
+        return (self._last_limits,)
 
     # ---------- the ask ----------
 
@@ -471,11 +539,12 @@ class CodexProvider(Provider):
             state = self._ask_state()           # another command may have asked while this one looked
             if self._paced(state, now):
                 return self._saved(ask=contract.ASK_PACED)
-            outcome, result, why, backoff = self._exchange(program)
+            outcome, result, why, backoff, *said = self._exchange(program)
+            ended = self.reach.wall()           # after the helper ended: a sign-in it renewed is older than this
             self._ask_record(state, now, backoff)
         if outcome == contract.ASK_DONE:
             if result.error is None:
-                self._keep_reading(result)
+                self._keep_reading(result, said[0] if said else None, ended)
             return result
         if outcome == contract.ASK_API_KEY:
             return Limits(provider=self.id, seat='codex', windows=(), read_at=now, source='ask',
@@ -501,9 +570,10 @@ class CodexProvider(Provider):
                 'capabilities': {'experimentalApi': False, 'requestAttestation': False,
                                  'optOutNotificationMethods': list(codex_facts.OPT_OUT)}}
 
-    def _await(self, pipe, want, deadline):
+    def _await(self, pipe, want, deadline, keep=()):
         """('ok', result) or ('error', code) for the answer to request `want`; ('timeout',) or ('closed',). A server
-        request on the way is answered -32601; notifications are read past."""
+        request on the way is answered -32601; notifications are read past. keep: the keys of DROP_KEYS this answer
+        may hold (_drop_keys)."""
         mono = self.reach.mono
         while True:
             left = deadline - mono()
@@ -513,7 +583,7 @@ class CodexProvider(Provider):
             if line is None:
                 return ('timeout',) if deadline - mono() <= 0.05 else ('closed',)
             try:
-                msg = json.loads(line, object_pairs_hook=_drop_keys)
+                msg = json.loads(line, object_pairs_hook=lambda pairs: _drop_keys(pairs, keep))
             except ValueError:
                 continue
             if not isinstance(msg, dict):
@@ -543,7 +613,8 @@ class CodexProvider(Provider):
         return contract.ASK_REFUSED, None, why, True
 
     def _exchange(self, program):
-        """The four lines of 8.3 to Codex's own app server, and its answers. (outcome, Limits or None, why, backoff)."""
+        """The four lines of 8.3 to Codex's own app server, and its answers. (outcome, Limits or None, why, backoff),
+        and after a whole answer a fifth: the account's email, or None."""
         facts = self.facts
         deadline = self.reach.mono() + facts['ask_seconds']
         try:
@@ -568,20 +639,23 @@ class CodexProvider(Provider):
             return contract.ASK_REFUSED, None, codex_facts.ASK_WRONG_HOME, True
         pipe.send(self.message('initialized'))
         pipe.send(self.message('account/read', 2, codex_facts.ASK_PARAMS['account/read']))
-        got = self._await(pipe, 2, deadline)
+        got = self._await(pipe, 2, deadline, keep=('email',))
         if got[0] != 'ok':
             return self._refusal(got)
         account = got[1].get('account') if isinstance(got[1], dict) else None
+        got = None                      # the answer held the email: only the checked copy below goes on
         if not isinstance(account, dict):
             return contract.ASK_REFUSED, None, codex_facts.ASK_SIGNED_OUT, False
         if account.get('type') != 'chatgpt':
             return contract.ASK_API_KEY, None, codex_facts.ASK_API_KEY, False
         plan = account.get('planType') if isinstance(account.get('planType'), str) else None
+        email = _email(account.get('email'))
+        account = None
         pipe.send(self.message('account/rateLimits/read', 3, codex_facts.ASK_PARAMS['account/rateLimits/read']))
         got = self._await(pipe, 3, deadline)
         if got[0] != 'ok':
             return self._refusal(got)
-        return contract.ASK_DONE, self._asked_limits(got[1], plan), None, False
+        return contract.ASK_DONE, self._asked_limits(got[1], plan), None, False, email
 
     def _asked_limits(self, result, plan) -> Limits:
         """Limits from account/rateLimits/read: Codex's own bucket (rateLimitsByLimitId['codex']), else the single
@@ -670,6 +744,53 @@ class CodexProvider(Provider):
                           line=line, url=url, app=app, first_words=first)
         return Launch(provider=self.id, how=how, program=program, argv=argv, env=env, cwd=folder, line=line,
                       first_words=first)
+
+    def open_here(self, folder, how):
+        """How to open its terminal app in folder with no first message: a key press in the list with no chat to carry
+        over (0.155.1 and 0.169.1 top-level help: `-C, --cd <DIR>`, `[PROMPT]` optional). No other word: the person's
+        own sandbox and approvals stay as they are. how: IN_TERMINAL, or PRINT for the line to run."""
+        if how not in (IN_TERMINAL, PRINT):
+            raise ValueError('how is %s or %s' % (IN_TERMINAL, PRINT))
+        if not os.path.isabs(folder):
+            raise ValueError('the folder must be absolute')
+        program = self._runnable()
+        argv = (program.path,) + codex_facts.START_ARGS + (folder,)
+        return Launch(provider=self.id, how=how, program=program, argv=argv, env=child_env(self.reach.env), cwd=folder,
+                      line=shell_line(argv, folder, self.reach.env))
+
+    @staticmethod
+    def _task_words(extra) -> Tuple[str, ...]:
+        """The extra words of a start on a new task, checked: only pairs of the model option and its model, or of -c
+        and the reasoning effort (codex_facts.TASK_*). Anything else, a word that loosens the sandbox or approvals
+        among them, is refused (ValueError): no such word is ever passed."""
+        words_ = tuple(str(w) for w in (extra or ()))
+        if len(words_) % 2:
+            raise ValueError('the extra words of a start come in pairs')
+        for flag, value in zip(words_[::2], words_[1::2]):
+            fits = (flag in codex_facts.TASK_MODEL_FLAGS and codex_facts.TASK_VALUE_RE.match(value)) or \
+                (flag == codex_facts.TASK_CONFIG_FLAG and codex_facts.TASK_CONFIG_RE.match(value))
+            if not fits or flag in codex_facts.NEVER_FLAGS or flag.startswith(codex_facts.NEVER_PREFIX):
+                raise ValueError('a word a start on a new task never carries')
+        return words_
+
+    def start_task(self, folder, hop, path, how, extra=()):
+        """How to start Codex's own app in folder on a new task (switchboard do): its first message is fixed words,
+        the hop id and the task file's path (words.TASK_WORDS), and extra holds the model and effort words from the
+        catalog. The same checks as start(): the program detect() chose, never one older than the Codex that wrote
+        the person's chats (ProviderError 'too_old'), the person's own sandbox and approvals kept (no word that
+        loosens them is ever passed). Its desktop link cannot carry a model: Unsupported."""
+        if how == IN_APP:
+            return self._unsupported(START_APP, codex_facts.NO_APP_TASK)
+        if how not in (IN_TERMINAL, PRINT):
+            raise ValueError('how is one of %s' % (HOW,))
+        if not os.path.isabs(folder) or not os.path.isabs(path or '') or not _HOP_RE.match(str(hop)):
+            raise ValueError('an absolute folder and task file, and a hop id')
+        extra = self._task_words(extra)
+        program = self._runnable()
+        first = words.TASK_WORDS.format(hop=hop, path=path)
+        argv = (program.path,) + codex_facts.START_ARGS + (folder,) + extra + (first,)
+        return Launch(provider=self.id, how=how, program=program, argv=argv, env=child_env(self.reach.env),
+                      cwd=folder, line=shell_line(argv, folder, self.reach.env), first_words=first)
 
     def resume(self, chat, handoff, how):
         if how == IN_APP:

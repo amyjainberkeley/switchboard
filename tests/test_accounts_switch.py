@@ -348,7 +348,8 @@ class Undo(SwitchCase):
 
     def test_a_keychain_write_that_times_out_leaves_a_journal_that_the_next_start_settles(self):
         for lands, word in ((True, 'Repaired the cut-off switch: Claude Code is on a@example.com'),
-                            (False, 'Repaired the switch that was cut off')):
+                            (False, 'Put away the record of a switch that was cut off: Claude Code holds the '
+                                    'login it had before, so nothing was changed.')):
             self.rig.kc.rule('write', service=self.rig.service, why='timeout', land=lands)
             res = switcher.switch(self.ctx, 'uuid-a')
             self.assertFalse(res.ok)

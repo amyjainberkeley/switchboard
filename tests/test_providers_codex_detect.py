@@ -145,6 +145,42 @@ class FourCopies(unittest.TestCase):
             self.assertEqual(fake.forbidden(), [])
 
 
+class UnreadCopies(unittest.TestCase):
+    # Which copies were never asked their version (Program.unread): a copy that may be chosen and that nothing ran to
+    # ask, as when the board, which runs nothing, looks. A refused copy (not trusted, the copy the app keeps for
+    # itself, a version that could not be read when it was asked) is never unread.
+    def setUp(self):
+        self.rig = Rig(self)
+
+    def quiet(self):
+        import copy
+        from switchboard.providers import view
+        p = copy.copy(self.rig.provider)
+        p.reach = view.quiet(p.reach)
+        return p
+
+    def test_a_copy_nothing_asked_is_unread_and_one_that_answered_without_a_version_is_not(self):
+        app = self.rig.app('ChatGPT.app', '0.169.1')
+        (prog,) = self.quiet().detect().programs
+        self.assertEqual((prog.version, prog.refused, prog.unread), (None, codex_facts.REFUSED_NO_VERSION, True))
+        app.spec(version='a word, not a version')
+        (prog,) = self.rig.provider.detect().programs                  # asked: it answered with nothing to read
+        self.assertEqual((prog.version, prog.refused, prog.unread), (None, codex_facts.REFUSED_NO_VERSION, False))
+        (prog,) = self.quiet().detect().programs                       # its answer is kept: asked, not unread
+        self.assertFalse(prog.unread)
+
+    def test_refused_copies_are_never_unread(self):
+        shared = os.path.join(self.rig.root, 'shared')
+        FakeCodex(shared, '0.169.1')
+        os.chmod(shared, 0o777)
+        self.addCleanup(os.chmod, shared, 0o755)
+        os.symlink(os.path.join(shared, 'fake-codex'), os.path.join(self.rig.bin, 'fake-codex'))
+        self.rig.plugin('0.167.0-alpha.4.1')
+        found = self.quiet().detect()
+        self.assertEqual(sorted((p.refused, p.unread) for p in found.programs),
+                         sorted([(codex_facts.REFUSED_PLUGIN, False), (codex_facts.REFUSED_TRUST, False)]))
+
+
 class Trust(unittest.TestCase):
 
     def setUp(self):

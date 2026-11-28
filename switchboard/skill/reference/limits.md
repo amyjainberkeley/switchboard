@@ -4,9 +4,9 @@ Switchboard shows the limits Anthropic reports for each account. It counts nothi
 
 ## What each bar is
 
-- 5-hour: how much of the 5-hour limit is used, a bar, and when it refills. It shows only when there is a 5-hour number to show: some plans report no 5-hour limit, and an account with none has no 5-hour line.
+- 5-hour: how much of the 5-hour limit is used, a bar, and when it refills. It has a bar only when there is a 5-hour number to show. Some plans report no 5-hour limit: an account with none says "No 5-hour limit" in that place (on the page, "No 5-hour limit on this plan"), and an account that has shown a 5-hour number before is never said to have none.
 - Weekly: how much of the week is used, and when it refills. When, at the pace of its use so far, the week would be full before it refills, the line says when ("Full by Thu 2 PM") in the refill's place.
-- A model's own week, such as Fable's: it has no bar. The weekly line's hover names each one, and when auto-switch counts that model and it is at or over its line, its name and percent are a short red note at the end of the weekly line.
+- A model's own week, such as Fable's: it has no bar. The weekly line's hover names each one, and when auto-switch counts that model and it is at or over its line, its name and percent are a short red note at the end of the weekly line on the page. The list in `switchboard` shows only the 5-hour and weekly lines.
 - Spend: on a plan with a spend limit, a line of its own ("Spend 41%", "$412 of $1,000"), with no switch line, so it never turns red. It is known only for the account in use, from Claude Code's own numbers.
 - Each bar has a thin mark at its switch line and turns red at or past it.
 

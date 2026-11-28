@@ -11,6 +11,8 @@
    ~/Library/Caches).
 4. Notes the size and change time (never the contents) of this Mac's real ~/.claude/settings.json
    and of every file in the real ~/.switchboard, to compare at the end.
+5. Marks the run with SWITCHBOARD_TEST_RUN=1 in the environment, which every process a test starts inherits:
+   switchboard's Keychain helper (accounts/keychain.py) never starts the real /usr/bin/security while it is set.
 
 tests/test_zz_real_folders.py runs last and fails on anything noted. If a partial run never
 reaches it, the same check runs when the process exits and turns the exit code into 1. A change to the
@@ -22,7 +24,12 @@ start are headless Chrome (its own temp profile), /bin/sh and Python running the
 SWITCHBOARD_HOME and CLAUDE_CONFIG_DIR in temp folders), and osascript (only the exact read-back below).
 A command that names the real folders is refused before it starts, and so is a child whose environment points
 HOME, CLAUDE_CONFIG_DIR or SWITCHBOARD_HOME at them; the size-and-time check of ~/.switchboard at the end
-catches the rest. A write through a descriptor is checked when the descriptor is opened.
+catches the rest. A write through a descriptor is checked when the descriptor is opened. A child that inherits
+this process's environment cannot run the real Keychain tool through switchboard (point 5); one started with an
+environment of its own does not carry the mark.
+
+Run the suite only as:
+    SWITCHBOARD_HOME="$(mktemp -d)/data" python3 -m unittest discover -s tests
 """
 import atexit
 import os
@@ -34,6 +41,10 @@ import tempfile
 # test may write (importing a module from a folder it has no cache for yet would make it create folders there).
 sys.dont_write_bytecode = True
 os.environ['PYTHONDONTWRITEBYTECODE'] = '1'
+
+# Point 5: a test's child processes are outside the audit hook below; this mark reaches them, and the Keychain helper
+# refuses the real tool while it is there (keychain.TEST_RUN_VAR).
+os.environ['SWITCHBOARD_TEST_RUN'] = '1'
 
 if 'switchboard.core' in sys.modules and not os.environ.get('SWITCHBOARD_HOME'):
     raise RuntimeError('switchboard was imported before tests/_isolate.py: these tests would use the real data folder')
@@ -84,6 +95,10 @@ LIVE_REWRITES = frozenset(('state.json', '.lock', 'switchboard.log', 'switchboar
                            'week.json',                                     # (the last week read, kept for a restart)
                            'read-request.json',             # (the page asks the loop for a read by writing this)
                            'put-back.json',                 # (what the engine notes about putting a lost sign-in back)
+                           # A Switchboard newer than this copy can be the one running on this Mac. Its sign-in
+                           # watch rewrites its heartbeat every few seconds, with its lease, log, record and hold:
+                           'signin-watch.json', 'signin-watch.lease', 'signin-watch.log', 'signin-watch.log.1',
+                           'signin-watch.out', 'signin-record.jsonl', 'signin-record.jsonl.1', 'signin-hold.json',
                            # the last good copy of settings.json kept at each write, and what was repaired by itself
                            'settings.json.last-good', 'repairs.json', 'repairs.lock',
                            # the records of what Switchboard put in Claude Code's settings: its self-check rewrites
@@ -95,7 +110,12 @@ LIVE_REWRITES = frozenset(('state.json', '.lock', 'switchboard.log', 'switchboar
                            # starts of the menu bar, and the spells of the notes said when Switchboard is not doing
                            # its job. (menubar-quit.json is left out: only Quit in the menu bar writes it.)
                            'page-watch.json', 'page-starts.json', 'page-stopped.json', 'page-port.json',
-                           'page-tries.json', 'page-tries.lock', 'menubar-tries.json', 'watch-spells.json'))
+                           'page-tries.json', 'page-tries.lock', 'menubar-tries.json', 'watch-spells.json',
+                           # The sign-in watch, a process of its own: its heartbeat (every 10 s), lease, log, its
+                           # job's output and its record of what happened to Claude Code's sign-in; and what the
+                           # engine keeps of Claude Code's own fallback file.
+                           'signin-watch.json', 'signin-watch.lease', 'signin-watch.log', 'signin-watch.log.1',
+                           'signin-watch.out', 'signin-record.jsonl', 'signin-record.jsonl.1', 'signin-hold.json'))
 # A Switchboard running for real on this Mac rewrites the auto-switch loop's files, its logs, the menu bar
 # app (rebuilt at each start) and the engine's whole store, and the folders' own times move when a file in them is
 # replaced. This process's own writes there are refused by the audit hook, and a child given the real home is
@@ -110,6 +130,10 @@ LIVE_PREFIXES = ('state.json.', 'statusline.json.', 'usage-cache.json.', 'notify
                  'keychain-argv.json.', '.switch-journal.json.', '.auto-restarted.json.', 'serve.out.',
                  '.week.json.', 'providers/', 'read-request.json.', '.read-request.json.', 'put-back.json.',
                  '.put-back.json.',
+                 # the sign-in watch's heartbeat, logs and records while they are written or rolled over, and the
+                 # engine's hold note
+                 'signin-watch.json.', '.signin-watch.json.', 'signin-watch.log.', 'signin-record.jsonl.',
+                 'signin-hold.json.', '.signin-hold.json.',
                  # a damaged settings file the self-check set aside as settings.json.damaged-<time>
                  'settings.json.damaged-', '.settings.json.damaged-')
 

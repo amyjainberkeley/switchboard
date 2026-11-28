@@ -91,7 +91,6 @@ PAGE_DOWN = ('Accounts are added through the page, which is not running and did 
              'see why, then add them with switchboard add.')
 PAGE_WAITING = 'Starting the page…'
 NO_TERMINAL_ADD = 'Add each one at a terminal with: switchboard add'
-CODEX_ASK = '%s is on this Mac too. Add it to your list?  Enter adds it, s skips.'
 
 LINKS_WHY = ('A claude.ai link opens only for the account that made it. Switchboard can open each claude.ai link in '
              'the browser profile of its owner. Every other link opens in %s exactly as it does now. For this, '
@@ -110,6 +109,7 @@ WHERE_MENU_LOGIN = 'It starts when you log in.'
 WHERE_CODE = 'Claude Code'
 WHERE_STATUSLINE = 'a status line with the account and its limits'
 WHERE_NOTIFY = 'a notification when a long turn is done or it needs you'
+WHERE_NEEDS_YOU = 'a notification when it needs you'       # "done" after a long turn: its own setting, off at first
 WHERE_PAGE = 'The page'
 WHERE_PAGE_WORDS = 'switchboard page   (every account, chat and artifact, at 127.0.0.1:%d)'
 WHERE_PAGE_DOWN = 'switchboard page   (at 127.0.0.1:%d; not running now: switchboard doctor says why)'
@@ -129,7 +129,7 @@ MOVE_SKIPPED = 'Nothing moved. Move it any time with: switchboard switch'
 MOVE_NONE_ONE = ('There is no other account to move to yet. Add one any time with switchboard add, and Claude Code '
                  'moves at your lines.')
 MOVE_NONE_FULL = 'No other account is under its lines now, so Claude Code stays on %s.'
-ROUTING_FAILED = 'Routing could not be turned on: %s. Turn it on later with: switchboard router on'
+ROUTING_FAILED = 'Routing could not be turned on: %s. Turn it on later with: switchboard routing on'
 
 # The short help: what a new person needs, on one screen of 80 columns. `switchboard help all` is every command.
 HELP_LINES = (
@@ -437,6 +437,17 @@ def without_a_terminal(cli):
     return 0
 
 
+def notify_words():
+    """What Claude Code's notifications say, as they are set now: "done" after a long turn is a setting of its own
+    (switchboard notify done on), off on a new install, so it is named only while it is on."""
+    try:
+        from . import notify_hooks
+        return WHERE_NOTIFY if notify_hooks.done_on() else WHERE_NEEDS_YOU
+    except Exception as e:  # noqa: BLE001 - the shorter words are true either way
+        core.log('reading whether "done" is on for the first run: %r' % e)
+        return WHERE_NEEDS_YOU
+
+
 def where(cli, out, end):
     """Step 4: only what is on on this Mac now. The page is always named."""
     from . import menubar
@@ -449,7 +460,7 @@ def where(cli, out, end):
         menu = at_login = False
     if menu:
         rows.append((WHERE_MENU[0], WHERE_MENU[1] + ('. ' + WHERE_MENU_LOGIN if at_login else '.')))
-    code = [w for w, on in ((WHERE_STATUSLINE, end.get('statusline')), (WHERE_NOTIFY, end.get('notify'))) if on]
+    code = [w for w, on in ((WHERE_STATUSLINE, end.get('statusline')), (notify_words(), end.get('notify'))) if on]
     if code:
         rows.append((WHERE_CODE, ', and '.join(code)))
     running = cli.page_running()
@@ -507,46 +518,62 @@ def added_providers():
 
 
 def providers_offered():
-    """[(id, name)] of each provider on this Mac that is not added yet (Codex). Its adapter tells whether it is here
-    from files only, and never opens its login file. [] when the board can't be built."""
+    """[(id, name)] of each provider the first run offers now (Codex): on this Mac, not added yet, and one the
+    providers code's offer asks about (providers.cli.offerable: signed in by its own say, with a copy that can be
+    used). The board says what is here from files only, and never opens a login file. [] when the board can't be
+    built. A first run without Claude Code plans its step by it, so that step is never shown with nothing in it."""
     try:
+        from .providers import cli as providers_cli
         from .providers import view as provider_view
         return [(a['id'], a.get('name') or a['id']) for a in provider_view._listed(board(), 'add')
-                if a.get('id') and a.get('id') != 'claude']
+                if a.get('id') and a.get('id') != 'claude' and providers_cli.offerable(a['id'])]
     except Exception as e:  # noqa: BLE001 - nothing offered when the board can't be built
         core.log('reading the providers for the first run: %r' % e)
         return []
 
 
 def offer_codex(cli, tty, out):
-    """Each provider on this Mac that is not added yet (Codex), offered once. Yes runs `switchboard add PROVIDER` and
-    prints its lines."""
-    for pid, name in providers_offered():
-        if answer(tty, out, CODEX_ASK % name) != 'go':
-            continue
-        add_provider(pid, out)
+    """Codex (each provider besides Claude on this Mac, signed in and not added yet): the one place the first run and
+    `switchboard add` reach it, so a person is asked about it once, in one voice. The providers code says its notice,
+    asks once and adds it on a yes, at a terminal only (__main__.add_others, which is providers.cli.add_signed_in;
+    `switchboard add codex` says the same notice through the same code). Inside a step (out's indent), what it prints
+    and asks is indented as the step's own lines are. How many were added."""
+    indent = getattr(out, 'indent', '')
+    with contextlib.redirect_stdout(Indented(sys.stdout, indent)) if indent else contextlib.nullcontext():
+        return cli.add_others()
 
 
-def add_provider(pid, out):
-    """`switchboard add PROVIDER`, its lines indented under the step and wrapped to the terminal."""
-    import dataclasses
-    from .providers import cli as providers_cli
+class Indented(object):
+    """Standard output with every line started by `indent`: what the providers code prints inside a step of the first
+    run, its notice and its question, lines up with the step's other lines. isatty() answers as the stream's does, so
+    a terminal stays one. It has no fileno, so input() writes its question here too, and the person's Enter, which the
+    terminal shows, ends that line: the flush input() makes after its question starts the next line afresh."""
 
-    class Indented(object):
-        def write(self, text):
-            for line in text.splitlines(True):
-                if line.strip():
-                    out.para(line.rstrip('\n'))
-                else:
-                    sys.stdout.write(line)
+    def __init__(self, stream, indent):
+        self.stream, self.indent, self.fresh = stream, indent, True
 
-        def flush(self):
-            sys.stdout.flush()
-    try:
-        kit = dataclasses.replace(providers_cli.default_kit(), out=Indented())
-    except ImportError:
-        kit = None
-    return providers_cli.main(['add', pid], kit)
+    def write(self, text):
+        out = []
+        for part in str(text).splitlines(True):
+            if self.fresh and part != '\n':
+                out.append(self.indent)         # a line of its own: indented (an empty line stays empty)
+            out.append(part)
+            self.fresh = part.endswith('\n')
+        self.stream.write(''.join(out))
+        return len(text)
+
+    def flush(self):
+        self.fresh = True
+        try:
+            self.stream.flush()
+        except (AttributeError, ValueError, OSError):
+            pass
+
+    def isatty(self):
+        try:
+            return bool(self.stream.isatty())
+        except (AttributeError, ValueError, OSError):
+            return False
 
 
 # ---------- other accounts, through the page ----------

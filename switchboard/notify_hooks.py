@@ -4,7 +4,8 @@ when Notifications is turned on, and the small program they run.
 Three hooks go into Claude Code's user settings (the file the status line uses), each running the same command:
 
   UserPromptSubmit  notes when a turn starts: its session, its prompt's id and the time, nothing else
-  Stop              a turn ended: "Claude Code is done" when it took a minute or more (notify.from_hook)
+  Stop              a turn ended: "Claude Code is done" when it took a minute or more and "done" is on (done_on,
+                    off on a new install; notify.from_hook)
   Notification      Claude Code waits on you: a permission prompt, an MCP server's question or link, a background
                     session's question ("Claude Code needs you")
 
@@ -73,6 +74,32 @@ def notes_on():
     """False when Notifications is turned off in Switchboard (its settings.json says "notify": false): the hooks
     stay quiet even if they could not be taken out of Claude Code's settings."""
     return _read(os.path.join(_sl.data_dir(), 'settings.json')).get('notify') is not False
+
+
+def set_before(s):
+    """True when Notifications were set in this data folder before "done" was a setting of its own: a first run put
+    the hooks in (notify_by_itself holds its time), the person turned Notifications on or off (notify_set_by_you, or a
+    "notify" value from before that mark was kept), or Switchboard's record of the hooks it put in is there (a file of
+    its own, so it stays when the settings file lost those marks). This version writes "notify_done" before its hooks
+    go in, so a record beside no value is an older version's. `s` is Switchboard's settings."""
+    return bool(s.get('notify_by_itself')) or s.get('notify_set_by_you') is True or 'notify' in s or bool(_records())
+
+
+def done_wanted(s):
+    """Whether a turn of a minute or more ends with "Claude Code is done", from Switchboard's settings `s`: the
+    "notify_done" value when it is on or off. With none, an install where Notifications were set before (set_before)
+    keeps "done" as it had it, and a new one has it off. Every first run and first choice made since writes a value
+    before the hooks go in (keep.notify_by_itself, keep.notify_set_by_you), so "none" never means a new install
+    there. A settings file that can't be read is read as none: then the record decides."""
+    v = s.get('notify_done')
+    if isinstance(v, bool):
+        return v
+    return set_before(s)
+
+
+def done_on():
+    """done_wanted for Switchboard's settings file as it is now."""
+    return done_wanted(_read(os.path.join(_sl.data_dir(), 'settings.json')))
 
 
 def _read(path):
@@ -250,10 +277,10 @@ def _notify():
     return notify
 
 
-def _show(event, started, now, env):
-    """The note for a Stop or a Notification, shown once (notify.send remembers)."""
+def _show(event, started, now, env, done=True):
+    """The note for a Stop or a Notification, shown once (notify.send remembers). done: whether "done" is on."""
     nt = _notify()
-    note = nt.from_hook(event, started=started, now=now)
+    note = nt.from_hook(event, started=started, now=now, done=done)
     if note is None:
         return False
     run, osa = nt._run, env.get('SWITCHBOARD_OSASCRIPT')
@@ -283,7 +310,7 @@ def hook(stdin=None, env=None, now=None):
         if name == 'UserPromptSubmit':
             mark(event, now)
         elif name == 'Stop':
-            _show(event, take(event, now), now, env)
+            _show(event, take(event, now), now, env, done=done_on())     # the turn's start is taken either way
         elif name == 'Notification':
             _show(event, None, now, env)
     except BaseException:

@@ -8,11 +8,13 @@ import json
 import os
 import sys
 import unittest
+from unittest import mock
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, '..'))
 
 from switchboard import __main__ as cli
+from switchboard import comeup
 from switchboard.accounts import api
 from test_cli_commands import Cli, A, B, C
 from test_cli_with_page import FakePage
@@ -123,6 +125,53 @@ class ItRefused(SwitchJson):
         self.assertEqual(self.run_cli('switch', A, B)[0], 2)                # the plain command's own code
         code, doc, _ = self.doc('use', '--json')
         self.assertEqual((code, doc['refused']), (2, 'switchboard use NAME [--json]'))
+
+
+class AnotherProvidersRow(SwitchJson):
+    # The scripted forms move Claude Code only. A number that is another provider's row in the list (Codex's, after
+    # the Claude accounts) is refused in their own form: one document, 'refused' says why, exit 1, as for any other
+    # refusal; nothing starts (no chat is carried, no app opens) and Claude Code stays where it is.
+    def setUp(self):
+        super().setUp()
+        from switchboard.providers import cli as providers_cli
+        from test_one_list import codex_row
+        self.started, self.next_ = [], False
+        board = {'v': 1, 'now': None, 'order': ['claude', 'codex'], 'providers': [], 'add': [], 'carry': False}
+        for target, name, value in ((cli, 'provider_board', lambda: board),
+                                    (cli, 'provider_rows', lambda b: [codex_row(next=self.next_)]),
+                                    (comeup, 'with_next', lambda st: st),      # the rows' own marks
+                                    (providers_cli, 'move', lambda pid, why=False, kit=None:
+                                     self.started.append(pid) or 0)):
+            p = mock.patch.object(target, name, value)
+            p.start()
+            self.addCleanup(p.stop)
+
+    def test_its_number_is_refused_and_nothing_starts(self):
+        self.two()
+        for args in (('use', '3', '--json'), ('switch', '3', '--json'), ('switch', '--json', '3'),
+                     ('switch', '3', '--why', '--json')):
+            with self.subTest(args=args):
+                code, doc, err = self.doc(*args)
+                self.assertEqual(code, 1)
+                self.assertEqual((doc['moved'], doc['from'], doc['to'], doc['in_use']), (False, A, None, A))
+                self.assertEqual(doc['refused'], cli.SCRIPT_CLAUDE_ONLY.format(number=3, name='Codex'))
+        self.assertEqual(doc['refused'], '3 is Codex\'s row: with --json, Switchboard moves Claude Code only. '
+                                         'Without --json, switchboard 3 carries your chat to Codex.')
+        self.assertEqual(self.started, [])
+        self.assertEqual(self.fake.block()['emailAddress'], A)
+        self.assertEqual(self.run_cli('use', '3'), (0, '', ''))         # the plain command presses the row
+        self.assertEqual(self.started, ['codex'])
+
+    def test_switch_alone_stays_among_the_claude_accounts(self):
+        # Codex's row marked next: the plain switch goes there; the scripted one moves to the next Claude account.
+        self.two()
+        self.next_ = True
+        code, doc, _ = self.doc('switch', '--json')
+        self.assertEqual((code, doc['moved'], doc['to']), (0, True, B))
+        self.assertEqual(self.started, [])
+        self.fake.sign_in(A, 'org-w')
+        self.assertEqual(self.run_cli('switch')[0], 0)
+        self.assertEqual(self.started, ['codex'])
 
 
 class PlainIsUnchanged(SwitchJson):

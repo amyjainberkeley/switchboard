@@ -78,7 +78,11 @@ OPT_OUT = ('item/agentMessage/delta', 'item/reasoning/summaryTextDelta', 'item/r
 ASK_PARAMS = {'account/read': {'refreshToken': False},
               'account/rateLimits/read': {'excludeResetCreditDetails': True}}
 # Keys taken out of every answer while it is parsed, so they are never held: an email, ids of the person's account.
+# The one exception is account/read's email: it names Codex's row in the list, as a Claude account's email names its
+# row, and it is kept in READINGS_FILE beside the numbers. Never a token, never an id of the account.
 DROP_KEYS = frozenset(('email', 'userId', 'accountId', 'chatgptAccountId', 'workspaceName', 'previousAccountId'))
+EMAIL_RE = re.compile(r'^[^@\s"]+@[^@\s"]+\.[A-Za-z]{2,}\Z')
+EMAIL_MAX = 254
 SERVER_REQUEST_ANSWER = {'code': -32601, 'message': 'Unsupported server request'}
 OVERLOADED = -32001                 # "Server overloaded; retry later." (app-server docs, read with 0.155.1)
 BUCKET = 'codex'                    # rateLimitsByLimitId's key for Codex's own limits (0.169.1)
@@ -94,6 +98,13 @@ KEPT_DAYS = 7                       # an asked reading kept in READINGS_FILE is 
 START_ARGS = ('-C',)
 # One of its own chats again (0.155.1 and 0.169.1 `resume --help`: `-C`, `[SESSION_ID] [PROMPT]`).
 RESUME_ARGS = ('resume', '-C')
+# On a new task (switchboard do), a start may also carry these, each as a pair and nothing else: the model option
+# (0.155.1 and 0.169.1 top-level help: `-m, --model <MODEL>`) and one configuration value, the reasoning effort (0.169.1
+# help: `-c, --config <key=value>`; the key is model_reasoning_effort in OpenAI's configuration reference).
+TASK_MODEL_FLAGS = ('-m', '--model')
+TASK_CONFIG_FLAG = '-c'
+TASK_CONFIG_RE = re.compile(r'^model_reasoning_effort="?[a-z][a-z0-9]{0,15}"?\Z')
+TASK_VALUE_RE = re.compile(r'^[A-Za-z0-9][A-Za-z0-9._\[\]-]{0,63}\Z')
 # The desktop app's link: it fills the message box and does not send [notes 05 s4.3, Codex docs read with 0.169.1].
 APP_LINK = 'codex://new?prompt={prompt}&path={path}'
 # One read-only job, its prompt on standard input (0.155.1 and 0.169.1 `exec --help`: "if `-` is used, instructions
@@ -120,6 +131,7 @@ NO_FIT_PROGRAM = 'No copy of Codex here can be used: {why}.'
 BAD_CHAT_ID = "That chat's id is not one Codex writes, so it was not opened."
 CHAT_OPEN = 'That Codex chat was written in the last minute; it may still be open. Close it, then try again.'
 NO_APP_RESUME = 'Codex has no link that opens one of its chats again; run it in a terminal.'
+NO_APP_TASK = 'Codex has no link that starts it on a new task with a model; run it in a terminal.'
 ASK_API_KEY = 'Codex is on an API key here, not a plan.'
 ASK_SIGNED_OUT = 'Codex is not signed in here.'
 ASK_WRONG_HOME = 'Codex answered from another Codex folder than the one expected.'

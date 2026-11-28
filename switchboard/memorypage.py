@@ -44,10 +44,13 @@ def _update():
 
 
 def ensure(fresh=False):
-    """Start bringing the index up to date when it is due; never waits for it."""
+    """Start bringing the index up to date when it is due, or at once when its file is gone (erased by
+    `python3 -m switchboard.packs.memory erase` in another process) and the last run did not fail, or failed over
+    ASKED seconds ago (an erase while a run was writing fails that run); never waits."""
     with LOCK:
         age = time.time() - STATE['at']
-        if not STATE['running'] and (not STATE['at'] or age >= EVERY or (fresh and age >= ASKED)):
+        gone = (not STATE['failed'] or age >= ASKED) and not os.path.exists(memory.index_path())
+        if not STATE['running'] and (not STATE['at'] or age >= EVERY or (fresh and age >= ASKED) or gone):
             STATE['running'] = True
             threading.Thread(target=_update, name='switchboard-memory-index', daemon=True).start()
         return dict(STATE)

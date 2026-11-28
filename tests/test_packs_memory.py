@@ -620,6 +620,35 @@ class TestMeasure(unittest.TestCase):
         self.assertEqual(r['observer_requests'], 1)
         self.assertTrue(obs.endswith('-claude-mem-observer-sessions'))
 
+    def write_reads(self, folder, name, model, ts, reads):
+        os.makedirs(folder, exist_ok=True)
+        with open(os.path.join(folder, name), 'w') as f:
+            f.write(json.dumps({'type': 'assistant', 'requestId': 'r' + name, 'timestamp': ts,
+                                'message': {'id': 'm' + name, 'model': model,
+                                            'content': [{'type': 'text', 'text': 'x'}],
+                                            'usage': {'input_tokens': 0, 'output_tokens': 0,
+                                                      'cache_read_input_tokens': reads}}}) + '\n')
+
+    def test_an_observer_on_fable_weighs_its_reads_as_the_total_does(self):
+        # The observer's 1,000 reads on Fable 5.2 weigh 25 (0.025 each), as inside the total; a chat's 1,000
+        # reads on Opus 5.5 weigh 50 (0.05 each). Share: 25 / 75. Alone, the observer is the whole week: 100%.
+        m = Mem(SEEDED)
+        root = os.path.join(m.cd, 'projects')
+        now = time.time()
+        iso = lambda t: time.strftime('%Y-%m-%dT%H:%M:%S.000Z', time.gmtime(t))  # noqa: E731
+        obs = os.path.join(root, M.project_folder_name(os.path.join(m.data, 'observer-sessions')))
+        self.write_reads(obs, 'o1.jsonl', 'claude-fable-5-2', iso(now - 1800), 1000)
+        r = M.cm_measure(now - M.WEEK, now, m.cd, {}, m.home, os.path.join(m.home, 'cache.json'))
+        self.assertAlmostEqual(r['observer_weight'], 25.0)
+        self.assertAlmostEqual(r['total_weight'], 25.0)
+        self.assertAlmostEqual(r['share'], 100.0)
+        self.write_reads(os.path.join(root, '-Users-x-code-webshop'), 's1.jsonl', 'claude-opus-5-5',
+                         iso(now - 3600), 1000)
+        r = M.cm_measure(now - M.WEEK, now, m.cd, {}, m.home, os.path.join(m.home, 'cache.json'))
+        self.assertAlmostEqual(r['observer_weight'], 25.0)
+        self.assertAlmostEqual(r['total_weight'], 75.0)
+        self.assertAlmostEqual(r['share'], 100.0 * 25 / 75)
+
     def test_folder_name_rule(self):
         self.assertEqual(M.project_folder_name('/Users/x/.claude-mem/observer-sessions'),
                          '-Users-x--claude-mem-observer-sessions')

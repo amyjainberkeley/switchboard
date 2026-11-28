@@ -16,7 +16,7 @@ import shlex
 from typing import Optional, Tuple
 
 from . import chat_facts as facts
-from . import contract, lines, run, words
+from . import contract, lines, place, run, words
 from .contract import ChatRef, Event, Limits, ReadInfo, ReadLimits, Transcript, Window
 
 APP = 'Codex'
@@ -840,7 +840,8 @@ def saved_limits(reach, now: float) -> Optional[Limits]:
 
 
 def _file_limits(reach, path: str, now: float) -> Optional[Limits]:
-    """One session file's newest reading for the 'codex' bucket, or None."""
+    """One session file's newest reading for the 'codex' bucket, or None. Its limit word is dropped once every
+    window has refilled."""
     it = lines.back_lines(path, ReadLimits(max_bytes=facts.SAVED_LIMITS_BYTES, max_seconds=facts.SAVED_LIMITS_SECONDS),
                           reach.mono)
     try:
@@ -858,6 +859,8 @@ def _file_limits(reach, path: str, now: float) -> Optional[Limits]:
             wins = tuple(w for w in (_window(rl.get('primary'), now),
                                      _window(rl.get('secondary'), now)) if w is not None)
             reached = rl.get('rate_limit_reached_type')
+            if place.refilled(wins, now):
+                reached = None          # every window has refilled since this line said a limit was reached
             plan = rl.get('plan_type')
             return Limits(provider='codex', seat='codex', windows=wins, read_at=read_at, source='file',
                           plan=plan if isinstance(plan, str) else None,

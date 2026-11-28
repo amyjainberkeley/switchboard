@@ -11,6 +11,7 @@ import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
 
+from switchboard import core
 from switchboard.accounts import api, autoloop, usage
 from fakes_autoswitch import FakeClock, FakeEngine, FakeNet, FakeTokens, Home, T0, account, make_loop, set_policy, \
     usage_body
@@ -152,6 +153,8 @@ class TheLoopsOwnPasses(Pace):
                 clock = self.clock
                 engine = FakeEngine([account('n%d' % seed, 1), account('t%d' % seed, 2)], 'n%d' % seed, clock)
                 set_policy()
+                # the hard lines alone: at 80% the 5-hour sign line (60) would move it to t as a sign switch
+                core.update_setting(autoloop.POLICY_KEY, lambda old: dict(old or {}, sign_lines=False))
                 self.net.set('tok-n%d' % seed, ok(80.0))
                 self.net.set('tok-t%d' % seed, ok(10.0))
                 loop = make_loop(engine, clock, self.net, self.tokens)

@@ -17,14 +17,17 @@ Settings, as automatic switching has them (accounts.api.auto_settings):
     'most-room'), margin (5: never land within this many points of a line).
 
 Our own rule, the same one the engine's policy keeps (policy.py):
-- Each window is measured against its own line: the 5-hour one against the 5-hour line, the weekly one against the
-  weekly line, a counted model's week against the model line. A model week that is not counted never moves anyone.
+- Whether an account can work is its 5-hour and weekly windows alone, each against its line
+  (policy.unusable_by_windows, the one answer the loop uses too). A model's own week (Fable's) never makes an account
+  unusable: a counted model's week at or over the model line is a note ('no room for Fable'), and among the landing
+  places the ones with room for every counted model (`margin` under the model line) come first. A model week that is
+  not counted never moves anyone.
 - An account is a landing place when it can be switched to, is signed in, has a reading it can be trusted on, and
-  every counted window has at least `margin` points of room under its line (and none is at 100%).
-- The account in use stays first while every counted window is under its line.
+  its 5-hour and weekly windows have at least `margin` points of room under their lines.
+- The account in use stays first while it is usable.
 - The landing places, in order: refills-first takes the one whose week refills soonest (its weekly reset, else its
   counted model week's; unknown resets go last), then the most room; most-room takes the most room (the least room
-  over its counted windows), then the soonest refill. Equal keys keep the order the accounts were given in.
+  under its 5-hour and weekly lines), then the soonest refill. Equal keys keep the order the accounts were given in.
 - With no landing place, nothing is next: automatic switching stays where it is and says when the first account is
   back (the latest reset among the windows that hold it back).
 - An account kept out of auto-switch (rule 'out') is never a landing place (reason 'kept out of auto-switch'), and
@@ -85,18 +88,19 @@ def _ahead(t, now):
 
 
 def _windows(a, s, now):
-    """Every window that counts for this account: [{name, used, line, resets_at, refill}]."""
+    """Every window that counts for this account: [{name, used, line, resets_at, refill, model}]: its 5-hour and weekly
+    windows (model False), and the counted models' weeks (model True: a note and an order, never whether it works)."""
     out = []
     used, resets = a.get('five_hour_used_pct'), a.get('five_hour_resets_at')
     own = dict((k, float(a[k])) for k in ('session_line', 'weekly_line') if _num(a.get(k)))
     if _num(used):
         out.append({'name': 'session', 'used': float(used), 'line': own.get('session_line', s['session_line']),
-                    'resets_at': resets if _num(resets) and resets > now else None, 'refill': INF})
+                    'resets_at': resets if _num(resets) and resets > now else None, 'refill': INF, 'model': False})
     used, resets, _ = _week(a.get('weekly_used_pct'), a.get('weekly_resets_at'), now)
     if _num(used):
         out.append({'name': 'weekly', 'used': float(used), 'line': own.get('weekly_line', s['weekly_line']),
                     'resets_at': resets,
-                    'refill': _ahead(a.get('weekly_resets_at'), now)})
+                    'refill': _ahead(a.get('weekly_resets_at'), now), 'model': False})
     for w in a.get('scoped') or []:
         if not isinstance(w, dict) or not _num(w.get('used_pct')):
             continue
@@ -105,21 +109,36 @@ def _windows(a, s, now):
             continue
         used, resets, _ = _week(w.get('used_pct'), w.get('resets_at'), now)
         out.append({'name': name, 'used': float(used), 'line': s['model_line'], 'resets_at': resets,
-                    'refill': _ahead(w.get('resets_at'), now)})
+                    'refill': _ahead(w.get('resets_at'), now), 'model': True})
     for w in out:
         w['room'] = w['line'] - w['used']
     return out
 
 
+def _unusable(wins, now):
+    """policy.unusable_by_windows on the account's 5-hour and weekly windows: (unusable, back_at)."""
+    from .accounts import policy        # here, not at the top: policy -> term -> pace -> plan
+    by = dict((w['name'], w) for w in wins if not w['model'])
+    five, week = by.get('session') or {}, by.get('weekly') or {}
+    return policy.unusable_by_windows(now, five.get('used'), five.get('resets_at'), week.get('used'),
+                                      week.get('resets_at'), five.get('line'), week.get('line'))
+
+
 def _judge(a, s, now):
-    """One account and what the order compares: room (the least room under its lines), refill (when its week
-    refills, for refills-first), and why it is not a landing place (None when it is)."""
-    wins = _windows(a, s, now)
+    """One account and what the order compares: room (the least room under its 5-hour and weekly lines), refill (when
+    its week refills, for refills-first), model_room (room for every counted model), notes ('no room for Fable'), and
+    why it is not a landing place (None when it is)."""
+    allwins = _windows(a, s, now)
+    wins = [w for w in allwins if not w['model']]
+    models = [w for w in allwins if w['model']]
     weekly = next((w for w in wins if w['name'] == 'weekly'), None)
-    refill = weekly['refill'] if weekly else min([w['refill'] for w in wins if w['name'] != 'session'] or [INF])
+    refill = weekly['refill'] if weekly else min([w['refill'] for w in models] or [INF])
     _, resets_at, estimated = _week(a.get('weekly_used_pct'), a.get('weekly_resets_at'), now)
+    unusable, back = _unusable(wins, now)
+    short = [w['name'] for w in models if w['room'] < s['margin']]
     j = dict(a, windows=wins, room=min(w['room'] for w in wins) if wins else None, refill=refill,
-             resets_at=resets_at, reset_estimated=estimated)
+             resets_at=resets_at, reset_estimated=estimated, unusable=unusable, unusable_back=back,
+             model_room=not short, notes=['no room for %s' % n for n in short])
     if a.get('disabled'):
         j['reason'] = 'not kept here'
     elif a.get('rule') == 'out' and not a.get('active'):     # the account in use is judged on its numbers, as today
@@ -130,9 +149,9 @@ def _judge(a, s, now):
         j['reason'] = 'no trusted reading'
     elif not wins:
         j['reason'] = 'no reading yet'
-    elif any(w['used'] >= 100 for w in wins):
+    elif unusable and any(w['used'] >= 100 for w in wins):
         j['reason'] = 'at its limit'
-    elif any(w['used'] >= w['line'] for w in wins):
+    elif unusable:
         j['reason'] = 'over its line'
     elif any(w['room'] < s['margin'] for w in wins):
         j['reason'] = 'not enough room'
@@ -155,9 +174,10 @@ def _rank_key(j):
 
 def _blocking(j, s):
     """The windows that keep an account from being a landing place, and when they are all back (None if not known)."""
-    if j['reason'] == 'at its limit':
-        blocked = [w for w in j['windows'] if w['used'] >= 100]
-    elif j['reason'] in ('over its line', 'not enough room'):
+    if j['reason'] in ('at its limit', 'over its line'):
+        # what holds it is its 5-hour and weekly windows at their lines, back when policy.unusable_by_windows says
+        return [w['name'] for w in j['windows'] if w['used'] >= w['line']], j['unusable_back']
+    elif j['reason'] == 'not enough room':
         blocked = [w for w in j['windows'] if w['room'] < s['margin']]
     else:
         blocked = []
@@ -170,17 +190,18 @@ def order(accounts, settings, now):
 
     Each comes back as a copy with rank (1 first), usable (a landing place, or the account in use while it is under
     its lines), reason (None, or why not: 'not kept here', 'kept out of auto-switch', 'needs sign-in', 'no trusted
-    reading', 'no reading yet', 'at its limit', 'over its line', 'not enough room'), left_pct (points under its nearest
-    counted line, never below 0), resets_at (its weekly reset as shown) and reset_estimated, blocked_by and back_at
-    (when what holds it back has all refilled, if known), and fallback (always False: nothing is landed on over a
-    line)."""
+    reading', 'no reading yet', 'at its limit', 'over its line', 'not enough room': each about its 5-hour and weekly
+    windows only), left_pct (points under its nearest 5-hour or weekly line, never below 0), notes (['no room for
+    Fable'] for each counted model's week with less than `margin` under the model line: a note, never a reason),
+    resets_at (its weekly reset as shown) and reset_estimated, blocked_by and back_at (when what holds it back has all
+    refilled, if known), and fallback (always False: nothing is landed on over a line)."""
     s = _settings(settings)
     judged = [_judge(a, s, now) for a in accounts]
     active = next((j for j in judged if j.get('active')), None)
     pinned = [active] if active is not None and active['windows'] and active['reason'] in (None, 'not enough room') \
-        and all(w['used'] < w['line'] for w in active['windows']) else []
+        and not active['unusable'] else []
     landing = sorted((j for j in judged if j is not active and j['reason'] is None),
-                     key=lambda j: (j.get('rule') == 'last', _rank_key(j)) + _key(j, s))
+                     key=lambda j: (j.get('rule') == 'last', _rank_key(j), not j['model_room']) + _key(j, s))
     placed = set(id(j) for j in pinned + landing)
     rest = [j for j in judged if id(j) not in placed]
     for j in rest:
@@ -190,7 +211,8 @@ def order(accounts, settings, now):
     out = []
     for i, j in enumerate(pinned + landing + rest):
         resting = id(j) not in placed
-        x = dict((k, v) for k, v in j.items() if k not in ('windows', 'room', 'refill', 'blocked_by', 'back_at'))
+        x = dict((k, v) for k, v in j.items() if k not in ('windows', 'room', 'refill', 'blocked_by', 'back_at',
+                                                            'unusable', 'unusable_back', 'model_room'))
         x.update(rank=i + 1, usable=not resting, fallback=False, reason=j['reason'] if resting else None,
                  left_pct=None if j['room'] is None else max(0.0, j['room']),
                  blocked_by=j['blocked_by'] if resting else [], back_at=j['back_at'] if resting else None)

@@ -42,7 +42,12 @@ CREDENTIALS_FILE = '.credentials.json'
 # Siblings of the login in the same item that belong to the Mac, not to an account: a switch keeps the live copy
 # (present or absent) and never puts back a saved one. designOauth is here on purpose: it is its
 # own grant that Claude Code renews under its own lock, so a saved copy written back would be a spent generation.
-SHARED_SIBLINGS = ('mcpOAuth', 'mcpOAuthClientConfig', 'mcpXaaIdp', 'mcpXaaIdpConfig', 'pluginSecrets', 'designOauth')
+# keychainOverflow is here because it says where THIS Mac's overflow items are (Claude Code 2.1.331, behind a server
+# flag, moves long sections of the item into "<service>-overflow-a" / "-b" and leaves this pointer in the item): a
+# write keeps the live pointer as it is, and a pointer from a saved copy would point at parts that are gone or newer.
+OVERFLOW_KEY = 'keychainOverflow'
+SHARED_SIBLINGS = ('mcpOAuth', 'mcpOAuthClientConfig', 'mcpXaaIdp', 'mcpXaaIdpConfig', 'pluginSecrets', 'designOauth',
+                   OVERFLOW_KEY)
 # What Claude Code's own logout removes from that item (2.1.325): the keys it ties to a sign-in. Kept for doctor and
 # for the record; the rule a switch uses is "everything but SHARED_SIBLINGS travels with the account".
 LOGOUT_REMOVES = ('claudeAiOauth', 'organizationUuid', 'trustedDeviceToken', 'trustedDeviceEnrolledAfterRefusalAtMs',
@@ -54,6 +59,13 @@ CRED_LOCK_STALE_S = 60.0        # both credential locks: stale after 60 s, touch
 CONFIG_LOCK_STALE_S = 10.0      # the global config's lock: stale after 10 s
 CC_TOUCH_S = 5.0
 LOCK_BUDGET_S = 9.0             # our wait for one lock; Claude Code retries a held credential lock 5 times, 1-2 s apart
+# Claude Code makes every save of its Keychain item under this lock (proper-lockfile on <secure-storage
+# folder>/.storage-write, realpath off), with a fresh read of the item inside (2.1.329; the same in 2.1.330 and
+# 2.1.331). Two saves of one item at the same moment make macOS refuse one, and Claude Code answers a refused save by
+# deleting its item, so every write of that item is made under this lock: taken last, let go first.
+STORAGE_LOCK_NAME = '.storage-write.lock'
+STORAGE_LOCK_STALE_S = 15.0     # Claude Code calls it stale after 15 s
+STORAGE_LOCK_BUDGET_S = 9.0     # our wait; Claude Code itself retries 10 times, 0.1 to 1 s apart, then gives up
 
 # ---------- variables that make Claude Code skip the account login (removed for a run-as) ----------
 AUTH_OVERRIDES = ('ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN', 'CLAUDE_CODE_OAUTH_TOKEN',
@@ -93,6 +105,13 @@ FACTS = {
     'locks.credentials': ('<secure-storage folder>/.oauth_refresh.lock then <its real path>.lock, stale 60 s, touched '
                           'every 5 s; a held second lock makes Claude Code let go of the first and retry', CHECKED),
     'locks.config': ('<global config>.lock, stale 10 s', CHECKED),
+    'locks.storage': ('<secure-storage folder>/.storage-write.lock, stale 15 s, retried 10 times 0.1 to 1 s apart; '
+                      'held around every save of the Keychain item, with a fresh read inside; skipped only by a '
+                      'process with no storage folder at all', '2.1.329'),
+    'keychain.overflow': ('behind a server flag, a long item keeps a pointer "keychainOverflow" {slot, key, and '
+                          '"login" when the account login itself moved} and moves long sections, encrypted, into '
+                          '"<service>-overflow-a" or "-b"; an item without the pointer is read as the whole login',
+                          '2.1.331'),
     'oauth.token': ('POST %s {grant_type: refresh_token, refresh_token, client_id}; an answer may carry '
                     'refresh_token, expires_in, refresh_token_expires_in, scope, account, organization' % TOKEN_URL,
                     CHECKED),
@@ -208,6 +227,11 @@ def legacy_lock(env, home):
 
 def config_lock(env, home):
     return global_config(env, home) + '.lock'
+
+
+def storage_lock(env, home):
+    """Claude Code's save lock on its Keychain item: <secure-storage folder>/.storage-write.lock."""
+    return os.path.join(secure_dir(env, home), STORAGE_LOCK_NAME)
 
 
 def default_profile(env, home):

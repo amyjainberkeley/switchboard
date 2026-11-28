@@ -79,7 +79,7 @@ class TheSidebarAndItsAddresses(ChromePage):
         self.assertEqual(got['side'][0], 'Search⌘K')
         self.assertEqual(got['side'][1:3], [False, False])                                # no footer (no shortcuts row, no version)
         self.assertNotIn(core.VERSION, got['side'][3])
-        self.assertTrue(re.match(r'^Switchboard %s · demo · localhost:\d+$' % re.escape(core.VERSION), got['about']), got['about'])   # About, in Settings
+        self.assertTrue(re.match(r'^Switchboard %s · demo · 127\.0\.0\.1:\d+$' % re.escape(core.VERSION), got['about']), got['about'])   # About, in Settings
         self.assertEqual([v[:2] for v in got['views']], [['#accounts', ['sec-accounts']], ['#chats', ['sec-chats']], ['#artifacts', ['sec-artifacts']],
                                                          ['#activity', ['sec-activity']], ['#settings', ['sec-settings']]])
         for (hash, shown, current), name in zip(got['views'], ('Accounts', 'Chats', 'Artifacts', 'Activity', 'Settings')):
@@ -651,6 +651,7 @@ PHONE = r"""
     out.closed = getComputedStyle(d.getElementById('side-body')).display;
     await go('#accounts', 600);
     out.rows = [...d.querySelectorAll('#acc .arow')].map((r) => getComputedStyle(r).gridTemplateAreas);
+    out.others = [...d.querySelectorAll('#acc-other .arow')].map((r) => getComputedStyle(r).gridTemplateAreas);
     out.strip = [...d.querySelectorAll('#auto input.line')].map((i) => Math.round(i.getBoundingClientRect().right) <= w);
     look('Accounts');
     await go('#artifacts', 700); look('Artifacts');
@@ -659,6 +660,7 @@ PHONE = r"""
     out.tiles = getComputedStyle(d.querySelector('#files-list .tiles')).gridTemplateColumns.split(' ').length;
     await go('#activity', 700); look('Activity');
     await go('#settings', 1100); look('Settings');
+    out.pairs = [...d.querySelectorAll('#sec-settings .pairs .pv')].map((x) => getComputedStyle(x).marginTop);
     done(out);
 """
 
@@ -677,6 +679,10 @@ class ThePhoneLayout(FramedPage):
         self.assertFalse(got['menu']['keys'] or got['menu']['ver'])          # no footer, in the menu either
         self.assertEqual(got['closed'], 'none')                              # a choice closes it
         self.assertTrue(all('"who state"' in a for a in got['rows']), got['rows'])   # each account a block
+        self.assertTrue(got['others'])                                       # and the demo's Codex row, the same way
+        self.assertTrue(all('"who state"' in a for a in got['others']), got['others'])
+        self.assertTrue(got['pairs'])                                        # Settings' profile cells, as they were:
+        self.assertEqual(set(got['pairs']), {'0px'})                         # no margin from another list's styles
         self.assertEqual(got['strip'], [True, True])                         # the line (5-hour, weekly) fits on the phone
         self.assertEqual((got['folders'], got['tiles']), (2, 2))             # two to a row: room for a whole email
 

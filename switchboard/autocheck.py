@@ -17,7 +17,9 @@ from. Its lines in auto.log start "check: ".
 A dry run (`--dry-run`, or `why`) decides on what is on disk now, as autoloop.gather sees it: the numbers last read
 (it sends no read to Anthropic, since a read writes usage.json), the live login, Claude Code's activity, the load and
 the battery. It never switches and never writes a file, so it answers whether the loop runs or not. It exits as the
-check would (0 for a move it would make).
+check would (0 for a move it would make). It looks at no sign-in, so it can't foresee a move that keeps Claude Code
+signed in (policy.stay_why: a sign-in lost or about to end), and it says so in one line (DRY_RUN_SIGNIN); a check
+and the loop make that move.
 
 Exit codes are the loop's own: 0 it moved Claude Code, 1 it failed or could not look (no_look), 3 it wanted to move
 and was held back or had nowhere to go, 4 nothing to do, 5 the loop holds the lease. 2: the command line was wrong.
@@ -43,6 +45,8 @@ FLAGS = (('--five-hour', 'five_hour', 'session_at', 'five_hour_line'), ('--week'
 STATUS_WORDS = {'unreadable': "its saved login can't be read right now",
                 'conflict': 'Anthropic said its saved login belongs to another account'}
 NOT_MOVED = ('upkeep:', 'pass ', 'kept:', 'journal')    # loop lines that never say why a wanted move did not happen
+DRY_RUN_SIGNIN = ("A dry run can't foresee a move that keeps Claude Code signed in (a sign-in lost or about to end); "
+                  "a check and the loop make that move.")
 
 
 class Wrong(Exception):
@@ -94,6 +98,7 @@ def line_words(name):
 
 
 def _order(text):
+    text = engine.order_word(text)          # an older build's word is the order it names, as engine.set_auto takes it
     if text not in engine.STRATEGIES:
         raise Wrong('--order takes %s.' % ORDERS)
     return text
@@ -411,9 +416,12 @@ def _why_not(snap, alone, a, v, av, decision):
             age = usage.span_text(v.age) if v.age is not None else 'some not known'
             return 'numbers_too_old', 'numbers too old: %s (it moves only onto numbers under %s)' % (
                 age, usage.span_text(policy.FORCED_MAX_AGE))
-        worst = v.over[0] if v.over else min(((n, v.pcts[n], v.lines[n]) for n in v.pcts), key=lambda o: o[2] - o[1])
+        # unusable by its 5-hour and weekly windows alone (policy.unusable_by_windows): a model's week never is
+        worst = v.over[0] if policy.view_unusable(v, snap.now)[0] else \
+            min(((n, v.pcts[n], v.lines[n]) for n in v.pcts), key=lambda o: o[2] - o[1])
         return 'at_line', 'at its line: %s' % _against_line(*worst)
-    if in_use_rule == 'out':                    # policy.decide: Claude Code stays on an account kept out, always
+    if in_use_rule == 'out' and policy.stay_why(snap) is None:
+        # policy.decide: Claude Code stays on an account kept out, except to keep it signed in (a check's own pass)
         return 'in_use_kept_out', '%s, in use, is kept out of auto-switch, so nothing moves from it' % av.label
     if decision.target == a.id:
         return None, None
@@ -422,7 +430,8 @@ def _why_not(snap, alone, a, v, av, decision):
                 policy.rule_of(snap.settings, decision.target) != 'last':
             return 'used_last', 'used last: only when no other account has room'
         return None, None
-    if snap.settings.strategy != 'refills-first' or av is None or not av.known or av.over:
+    if snap.settings.strategy != 'refills-first' or av is None or not av.known or \
+            policy.view_unusable(av, snap.now)[0]:
         return None, None
     pair = dataclasses.replace(snap, accounts=tuple(x for x in snap.accounts if x.id in (snap.active, a.id)))
     if policy.decide(pair).target == a.id:
@@ -432,6 +441,10 @@ def _why_not(snap, alone, a, v, av, decision):
     if in_use_rule != 'last' and policy._rank_key(v) > policy._rank_key(av):     # policy._optional: never later
         return 'ranked_after', '%s, after %s (%s): a move that can wait never goes to a later rank' % (
             _rank_words(v), av.label, _rank_words(av))
+    short = [f for f in policy.deciding_families(snap) if not policy._fits(snap, av, (f,))(v)]
+    if short and v.room is not None and v.room >= policy.OPTIONAL_ROOM:     # policy._optional: room for the models too
+        return 'no_gain', 'no gain: too little room for %s there for a move that can wait' % (
+            policy.family_words(short[0]))
     if v.room is not None and v.room < policy.OPTIONAL_ROOM:
         return 'no_gain', 'no gain: too little room for a move that can wait (%s points; it needs %s)' % (
             _pct(v.room), _pct(policy.OPTIONAL_ROOM))
@@ -545,7 +558,8 @@ def would_change(snap, decision, av, views, said):
     if first:
         return "It would move at %s, when %s's %s limit refills." % (
             usage.clock_text(policy.earliest_refill(snap)[0], now), first['email'], first['limit'])
-    if decision.kind is not None or av is None or not av.known or av.over or not snap.settings.enabled \
+    if decision.kind is not None or av is None or not av.known or policy.view_unusable(av, snap.now)[0] \
+            or not snap.settings.enabled \
             or not snap.live_ok or snap.settling or snap.offline or policy.rule_of(snap.settings, av.id) == 'out':
         return None
     name = min(av.pcts, key=lambda n: av.lines[n] - av.pcts[n])
@@ -647,6 +661,8 @@ def lines_of(doc):
                 or ('week_line' in own and x['week_line'] is not None)]
         if kept:
             out.append('An account with a line of its own keeps it: %s.' % ', '.join(kept))
+    if doc.get('dry_run'):
+        out.append(DRY_RUN_SIGNIN)
     return out
 
 

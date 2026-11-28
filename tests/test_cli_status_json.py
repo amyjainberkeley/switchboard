@@ -253,6 +253,34 @@ class PageOrNot(StatusJson):
         self.assertEqual(self.account(doc, 'maya@ivy.example')['limits']['models'][0]['name'], 'Fable')
         self.assertEqual(self.account(doc, 'maya@northwind.example')['plan'], 'Team')
 
+    def test_another_providers_rows_are_not_accounts_here(self):
+        # The document is the Claude accounts, as before the list had other providers' rows: a running page's state
+        # carries them ('provider_rows'), and none becomes an account or the next one.
+        self.three()
+        from test_one_list import codex_row
+        view = dict(cli.local_view(), provider_rows=[codex_row(email='ana@made-up.example', next=True)])
+        FakePage(self, {('GET', '/api/state'): (200, view)})
+        doc, _ = self.doc()
+        self.assertNotIn('ana@made-up.example', [a['email'] for a in doc['accounts']])
+        self.assertEqual(len(doc['accounts']), len(view['accounts']))
+        self.assertNotEqual(doc['next'], 'ana@made-up.example')
+
+    def test_with_another_providers_row_next_the_next_is_auto_switchs_own(self):
+        # A page that marked another provider's row next sends 'next' None and keeps automatic switching's own next
+        # account in 'claude_next': the document names that account, as scripts read it.
+        self.three()
+        now = time.time()
+        for who, week in ((A, 50), (B, 20), (C, 60)):
+            self.fake.reading(who, five=(10, now + H), week=(week, now + (9 if who == B else 30) * H), at=now - 30)
+        self.auto_running()
+        from test_one_list import codex_row
+        view = dict(cli.local_view(), next=None, claude_next=B,
+                    provider_rows=[codex_row(email='ana@made-up.example', next=True)])
+        FakePage(self, {('GET', '/api/state'): (200, view)})
+        doc, _ = self.doc()
+        self.assertEqual(doc['next'], B)
+        self.assertEqual([a['next'] for a in doc['accounts']], [False, True, False])
+
     def test_a_reading_too_old_to_show_still_knows_the_plan_has_no_five_hour_limit(self):
         self.three()
         now = time.time()

@@ -11,8 +11,10 @@
 - Claude Code's locks are folders made with mkdir (npm proper-lockfile). We wait for a held one (never steal one
   younger than its stale window), take a stale one over through a sibling ".takeover" folder by renaming it aside and
   checking that what moved is what was judged stale, touch ours every 3 s from a thread, and give up after 9 s with
-  nothing changed. Locks are taken in Claude Code's order: .oauth_refresh.lock, then the legacy <folder>.lock.
+  nothing changed. Locks are taken in Claude Code's order: .oauth_refresh.lock, then the legacy <folder>.lock. A
+  process on its way out lets go of every one it still holds (release_all, run at exit and by the stop paths).
 """
+import atexit
 import errno
 import json
 import os
@@ -71,8 +73,9 @@ def resolve_target(path):
     raise CCFileError('loop', 'The path %s is a loop of links; nothing was written there.' % path)
 
 
-def atomic_write(path, data, mode=0o600, follow=True):
-    """Publish data (bytes) at path all at once. Returns the path actually written."""
+def atomic_write(path, data, mode=0o600, follow=True, sync=True):
+    """Publish data (bytes) at path all at once. Returns the path actually written. sync=False leaves out the wait
+    for the disk (for a note that only has to outlive this process, not a power cut)."""
     target = resolve_target(path) if follow else os.path.abspath(path)
     folder, name = os.path.split(target)
     tmp = os.path.join(folder, '.%s.%s.tmp' % (name[:40], secrets.token_hex(6)))
@@ -84,11 +87,12 @@ def atomic_write(path, data, mode=0o600, follow=True):
             n = _write(fd, view)
             view = view[n:]
         os.fchmod(fd, mode)
-        try:
-            os.fsync(fd)
-        except OSError as e:
-            if e.errno not in _FSYNC_OK:
-                raise
+        if sync:
+            try:
+                os.fsync(fd)
+            except OSError as e:
+                if e.errno not in _FSYNC_OK:
+                    raise
         os.close(fd)
         fd = -1
         os.replace(tmp, target)
@@ -201,24 +205,41 @@ def write_identity(env, home, block, expect_uuid=None):
     return path
 
 
-def bump_credentials_file(env, home, text, log=None):
+def bump_credentials_file(env, home, text, log=None, announce=None):
     """When Claude Code's plaintext login file exists, write the same login into it (the rename moves its mtime, which
-    is how a running Claude Code notices a new login at once). Never creates or deletes it. Best effort: True when
-    rewritten."""
+    is how a running Claude Code notices a new login at once). Never creates or deletes it. Best effort: returns the
+    stamp of the file it put there, (device, inode, modification time in ns, size), or None when it wrote nothing. The
+    stamp is taken from the temporary file before the rename (a rename keeps all four): another process may replace
+    the file the moment after, and a stat then would describe that process's file. announce (stamp ->), when given, is
+    called with that stamp before the rename, so whoever watches the file knows this write before it can see it."""
     path = facts.credentials_file(env, home)
     try:
         st = os.stat(path)
     except OSError:
-        return False
+        return None
     if not stat.S_ISREG(st.st_mode):
-        return False
+        return None
+    tmp = None
     try:
-        atomic_write(path, text.encode('utf-8'), mode=0o600)
-        return True
+        target = resolve_target(path)
+        folder, name = os.path.split(target)
+        tmp = os.path.join(folder, '.%s.%s.new' % (name[:40], secrets.token_hex(6)))
+        atomic_write(tmp, text.encode('utf-8'), mode=0o600, follow=False)
+        st = os.stat(tmp)
+        stamp = (st.st_dev, st.st_ino, st.st_mtime_ns, st.st_size)
+        if announce is not None:
+            announce(stamp)
+        os.replace(tmp, target)
+        return stamp
     except OSError as e:
+        if tmp is not None:
+            try:
+                os.unlink(tmp)
+            except OSError:
+                pass
         if log:
             log('Could not refresh Claude Code\'s login file (%s): %s' % (path, e.__class__.__name__))
-        return False
+        return None
 
 
 # ---------- Claude Code's lock folders ----------
@@ -227,8 +248,77 @@ def _ident(st):
     return (st.st_dev, st.st_ino, getattr(st, 'st_birthtime', None))
 
 
+_HELD = set()                       # the DirLocks this process holds right now (every thread)
+_HELD_LOCK = threading.Lock()
+_FIRST = []                         # what release_all runs before it lets go of any lock (before_release)
+_STOPPING = threading.Event()       # set by release_all: from then on this process takes none of Claude Code's locks
+
+
+def _note_held(lock, held):
+    with _HELD_LOCK:
+        if held:
+            _HELD.add(lock)
+        else:
+            _HELD.discard(lock)
+
+
+def before_release(fn):
+    """Have release_all call fn() first, before it lets go of any lock (the Keychain helper ends its children there)."""
+    if fn not in _FIRST:
+        _FIRST.append(fn)
+
+
+def stopping():
+    """True once release_all has run: this process is on its way out."""
+    return _STOPPING.is_set()
+
+
+def release_all():
+    """Let go of everything of Claude Code's this process holds, on its way out. First each function given to
+    before_release (the Keychain helper ends every `security` it started, so no write of the item lands after its lock
+    is let go), then every lock folder this process holds, each only while it is still the very folder this process
+    made (one another process took over meanwhile is never removed). From then on this process takes none of Claude
+    Code's locks, and live.write_live refuses a lock that is no longer held; other Keychain calls still run, so a
+    renewal's answer can still be saved. Registered with atexit, which runs after tokens.py's wait for a renewal
+    under way; a stop path that may leave without the interpreter's exit handlers calls it on its way out. Never
+    raises. Returns how many lock folders it removed."""
+    _STOPPING.set()
+    for fn in list(_FIRST):
+        try:
+            fn()
+        except Exception:  # noqa: BLE001 - letting go never stops half-way
+            pass
+    with _HELD_LOCK:
+        held = list(_HELD)
+    removed = 0
+    for lock in held:
+        try:
+            ours = lock.still_held()
+            lock.release()
+            removed += 1 if ours else 0
+        except Exception:  # noqa: BLE001 - the next lock is let go all the same
+            pass
+    return removed
+
+
+atexit.register(release_all)
+
+
+def held_save_lock():
+    """Claude Code's save lock on its Keychain item (storage_lock) when the calling thread holds it, else None. The
+    Keychain helper shortens every call made while it is held (keychain.UNDER_LOCK_S)."""
+    me = threading.get_ident()
+    with _HELD_LOCK:
+        mine = [lock for lock in _HELD if lock.save and lock.owner == me]
+    return max(mine, key=lambda lock: lock.held_for()) if mine else None
+
+
 class DirLock:
     """One of Claude Code's mkdir locks, held by us. Never re-entrant; acquire() then release() (or `with`)."""
+
+    save = False                    # Claude Code's save lock on its Keychain item (storage_lock)
+    owner = None                    # the thread that took it
+    taken_mono = None               # when it was taken, on this lock's monotonic clock
 
     def __init__(self, path, stale_s, budget_s=facts.LOCK_BUDGET_S, touch_s=3.0, wall=time.time,
                  mono=time.monotonic, sleep=time.sleep, log=None, rand=random.random):
@@ -248,6 +338,8 @@ class DirLock:
         deadline = self._mono() + (self.budget_s if budget_s is None else budget_s)
         made_parent = False
         while True:
+            if _STOPPING.is_set():
+                raise LockBusy(self.path)                   # on its way out (release_all): take nothing new
             try:
                 os.mkdir(self.path)
                 self._took()
@@ -284,10 +376,19 @@ class DirLock:
         st = os.lstat(self.path)
         self._held = _ident(st)
         self._lost = False
-        self.last_touch_mono = self._mono()
+        self.last_touch_mono = self.taken_mono = self._mono()
+        self.owner = threading.get_ident()
         self._stop = threading.Event()
         self._thread = threading.Thread(target=self._toucher, name='lock-toucher', daemon=True)
         self._thread.start()
+        _note_held(self, True)
+        if _STOPPING.is_set():                              # release_all ran while this was being taken
+            self.release()
+            raise LockBusy(self.path)
+
+    def held_for(self):
+        """Seconds since this lock was taken, on its own clock (0 when it is not held)."""
+        return max(0.0, self._mono() - self.taken_mono) if self._held is not None else 0.0
 
     def _take_over(self, judged):
         """Move a stale lock aside, one taker at a time (a sibling .takeover folder). True when it is gone."""
@@ -403,6 +504,7 @@ class DirLock:
             self._stop.set()
         ours = self.still_held()
         self._held = None
+        _note_held(self, False)
         if ours:
             try:
                 os.rmdir(self.path)
@@ -497,6 +599,25 @@ def config_lock(env, home, budget_s=facts.LOCK_BUDGET_S, wall=time.time, mono=ti
     """Claude Code's lock on its global config (<config>.lock, stale after 10 s)."""
     lock = DirLock(facts.config_lock(env, home), stale_s=facts.CONFIG_LOCK_STALE_S, wall=wall, mono=mono,
                    sleep=sleep, log=log, rand=rand)
+    lock.acquire(budget_s=budget_s)
+    try:
+        yield lock
+    finally:
+        lock.release()
+
+
+@contextmanager
+def storage_lock(env, home, budget_s=facts.STORAGE_LOCK_BUDGET_S, wall=time.time, mono=time.monotonic,
+                 sleep=time.sleep, log=None, rand=random.random):
+    """Claude Code's save lock on its Keychain item (<secure-storage folder>/.storage-write.lock, stale after 15 s).
+    Claude Code saves the item only while it holds this lock, so a write made while we hold it never lands beside one
+    of those saves. Take it last (after the credential locks, as Claude Code does) and let go of it first; never wait
+    for another lock or for the network while holding it, and never take it twice (DirLock is not re-entrant).
+    LockBusy when a live holder keeps it past budget_s: nothing was changed. While the calling thread holds it, each
+    Keychain call is short and all of them together are bounded (keychain.UNDER_LOCK_S, UNDER_LOCK_TOTAL_S)."""
+    lock = DirLock(facts.storage_lock(env, home), stale_s=facts.STORAGE_LOCK_STALE_S, wall=wall, mono=mono,
+                   sleep=sleep, log=log, rand=rand)
+    lock.save = True
     lock.acquire(budget_s=budget_s)
     try:
         yield lock

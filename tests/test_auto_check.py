@@ -41,7 +41,8 @@ class CheckCase(Home):
                  keep_pass=self.engine.keep_pass, upkeep_pass=self.engine.upkeep_pass,
                  resolve_journal=self.engine.resolve_journal, access_token=self.tokens, net=self.net,
                  net_ready=lambda: True, load=lambda: 0.5, power=lambda: (True, 100), procs=lambda: 1,
-                 disk_free=lambda: self.disk, history_note=lambda text, kind='info', **f: None)
+                 disk_free=lambda: self.disk, history_note=lambda text, kind='info', **f: None,
+                 notify_move=lambda note: None)
         d.update(kw)
         return autoloop.Deps(**d)
 

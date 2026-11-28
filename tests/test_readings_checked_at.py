@@ -2,7 +2,7 @@ import _isolate  # noqa: F401  (first: it gives switchboard a throwaway data fol
 # "Checked" is the last read that was answered for an account, and under a minute it is "just now". A reading whose
 # 5-hour window's newer answer was refused (a lower number with no reset while the window is still open) keeps that
 # window's own time, two hours old, for every estimate (usage_at); the account was still asked and answered a moment
-# ago (checked_at), and the engine's row, the page's state, the terminal and the menu bar say so.
+# ago (checked_at), and the engine's row and the page's state say so (the menu bar and the terminal's list say no age).
 #
 # The poller reads through a fake network on a fake clock; the store is written in a throwaway data folder. Made-up
 # *.example accounts only.
@@ -61,7 +61,7 @@ class CheckedIsTheLastAnsweredRead(unittest.TestCase):
         view = server.render(st, dict(test_app.Plan.facts(self), now=T0 + 2 * H + 5))
         a = view['accounts'][0]
         self.assertEqual((a['usage_at'], a['checked_at']), (T0, T0 + 2 * H))
-        self.assertEqual(term.age_words(dict(a, active=True), T0 + 2 * H + 5), 'checked just now')
+        self.assertEqual(term.age(term.checked_at(a), T0 + 2 * H + 5), 'just now')
 
     auto = {}
 
@@ -71,12 +71,11 @@ class JustNow(unittest.TestCase):
         now = test_term.NOW
         self.assertEqual([term.age(now - s, now) for s in (0, 5, 59, 60, 89, 150)],
                          ['just now', 'just now', 'just now', '1 min ago', '1 min ago', '3 min ago'])
-        self.assertEqual(term.age_words({'usage_at': now - 5}, now), 'checked just now')
-        self.assertEqual(term.age_words({'usage_at': now - 7200, 'checked_at': now - 5}, now), 'checked just now')
-        self.assertEqual(term.age_words({'usage_at': now - 5, 'live': True, 'active': True}, now), 'now')
+        self.assertEqual(term.age(term.checked_at({'usage_at': now - 5}), now), 'just now')
+        self.assertEqual(term.age(term.checked_at({'usage_at': now - 7200, 'checked_at': now - 5}), now), 'just now')
 
     def test_not_in_the_menu_bar(self):
-        # The menu bar's row is its email, one word and its bars: when it was checked is the page's and the terminal's.
+        # The menu bar's row is its email, one word and its bars: when it was checked is the page's to say.
         s = test_menubar.view()
         a = test_menubar.find(s, 'ana@lab.example')
         a.update(usage_at=test_menubar.NOW - 7200, checked_at=test_menubar.NOW - 10)
@@ -89,7 +88,8 @@ class JustNow(unittest.TestCase):
         mail = next(a for a in view['accounts'] if a['email'] == 'ana@mail.example')
         mail.update(usage_at=test_term.NOW - 7200, checked_at=test_term.NOW - 10)
         rows = [x for x in test_term.lines(view) if x[:1].isdigit()]
-        self.assertEqual(rows[-1], '5  ana@mail.example       Max 20x · Personal  in use · checked just now')
+        # the list does not say how old the numbers are: the page does
+        self.assertEqual(rows[-1], '5  ana@mail.example       Max 20x · Personal  in use')
 
 
 if __name__ == '__main__':

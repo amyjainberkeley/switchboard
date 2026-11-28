@@ -129,15 +129,30 @@ switchboard stay PROVIDER|off
 switchboard order [PROVIDER ...]
                             the order continue picks the next provider in (Claude first unless you change it); your
                             Claude accounts keep their own order; alone, prints it
+switchboard remove PROVIDER
+                            take another provider (codex) off your order and the list; the app itself is not
+                            changed, and switchboard add codex adds it again
+switchboard do [--as KIND] [--on PROVIDER] [--model MODEL] [--effort LEVEL] [--show] [--] TASK
+                            in a terminal, type a task once: Switchboard works out its kind (build, fix, review,
+                            plan, find, write), picks the provider and model your routes name for that kind, says
+                            why, and starts that provider's own app on it in this folder; --show only shows the pick
+switchboard route [--as KIND] [--on PROVIDER] [--json] [--] TASK
+                            the pick do would make for TASK, and why: its kind, the provider, the model and effort,
+                            and each provider passed; it starts no app
+switchboard routes [--json] | set KIND CHOICE [CHOICE ...] | reset [KIND] | preset NAME|off
+                            which providers each kind of job goes to, in turn (a choice is codex, claude:sonnet or
+                            claude:sonnet:high); a kind with no route follows your order; the preset by-the-job is
+                            off until you turn it on
 '''
 
 
 def _help_blocks(text):
+    """Each command's own lines, by its word; a command whose lines name it twice keeps them all, in order."""
     blocks, key = {}, None
     for line in text.splitlines():
         if line.startswith('switchboard '):
             key = line.split()[1]
-            blocks[key] = line
+            blocks[key] = blocks[key] + '\n' + line if key in blocks else line
         else:
             blocks[key] += '\n' + line
     return blocks
@@ -186,6 +201,12 @@ BOARD_ABOVE = 'the accounts above'          # the provider whose seats are the a
 BOARD_CARRY = 'To carry a chat on in the next one with room, type in its folder:'
 BOARD_CARRY_COMMAND = 'switchboard continue'
 BOARD_ADD = '{app} is on this Mac too: switchboard add {pid} adds it.'
+# A provider row's reason it cannot be pressed for the folder it is drawn for (rows.from_board), lower case: each face
+# puts it where the row's last words go.
+ROW_STAYS = 'chats in {basename} stay on {p}'
+ROW_NEVER = 'chats in {basename} never go to {to}'
+# The chat would go from /, the home folder or a folder holding it (cli._too_wide): no provider is started there.
+ROW_TOO_WIDE = 'its folder is too wide to carry on from'
 MENU_PROVIDER = '{name}: {words}'           # a provider's line in the menu bar
 MENU_CARRY = 'To carry a chat on: switchboard continue'
 # switchboard doctor: one line per provider (and the line under it that says what to do, when there is one).
@@ -212,6 +233,14 @@ STATE_OUT_NOT_KNOWN = 'is out; when it refills is not known'
 STATE_UNKNOWN = 'numbers not known'
 STATE_SIGNED_OUT = 'not signed in'
 STATE_NOT_INSTALLED = 'not on this Mac'
+STATE_NO_COPY = 'no copy here can be run'
+STATE_TOO_OLD = 'older than the one that wrote your chats'
+STATE_SIGN_IN_NOT_SEEN = 'sign-in not seen here'
+# The line under the list for a provider whose sign-in is not seen here: the step ({state}: its fit_why; {how}: its
+# adapter's own sign-in words). view.fit_line gives it to every face, and to doctor.
+FIT_LINE_SIGN_IN_NOT_SEEN = '{state}: switchboard providers --ask, or {how}'
+# No copy here can be run: the reason the newest copy is refused, as its adapter says it ({why}).
+FIT_LINE_NO_COPY = '{state}: {why}'
 STATE_NOT_ADDED = 'not added'
 
 # How an ask of an app for its numbers ended (Limits.ask), said before the board.
@@ -236,6 +265,10 @@ ADD_NOT_INSTALLED = ("{name} is not on this Mac. Install {vendor}'s {name} (its 
 ADD_NO_COPY = '{name} is on this Mac, but no copy of it can be used: {why}.'
 ADD_ALREADY = '{name} is already in your order (added {date}).'
 ADD_DONE = 'Added {name}. Your order: {order}.'
+# switchboard remove PROVIDER: off the list; the app itself is not touched.
+REMOVE_DONE = 'Took {name} off your order; {name} itself stays as it is. Your order: {order}.'
+REMOVE_NOT_ADDED = '{name} is not in your order.'
+REMOVE_FIRST = '{name} is always in your order. switchboard remove NAME forgets one of its accounts.'
 ADD_WILL_RUN = ('Switchboard will run {app} {version} ({where}). {name} keeps its own sign-in; Switchboard never reads '
                 'or keeps it.')
 ADD_SIGNED_IN = 'It looks signed in.'
@@ -413,6 +446,7 @@ H_BACK = 'Came back to {frm} from {to} in {basename} (note {size})'
 H_HANDED = 'Handed one job to {to} in {basename}: answered in {took}'
 H_HAND_NONE = 'Handed one job to {to} in {basename}: no answer ({why})'
 H_ADDED = 'Added {name} to the providers you use'
+H_REMOVED = 'Took {name} off the providers you use'
 H_ORDER = 'Providers in order: {names}'
 H_YES = 'Chats in {basename} may go to {to}'
 H_NEVER = 'Chats in {basename} never go to {to}'
@@ -423,7 +457,257 @@ H_ASK_REFUSED = '{name} did not answer for its numbers: {why}'
 HISTORY = ((H_STARTED, 'info'), (H_OPENED, 'info'), (H_PRINTED, 'info'), (H_NOT_STARTED, 'problem'),
            (H_BACK, 'info'), (H_HANDED, 'info'), (H_HAND_NONE, 'info'), (H_ADDED, 'setting'), (H_ORDER, 'setting'),
            (H_YES, 'setting'), (H_NEVER, 'setting'), (H_STAY, 'setting'), (H_STAY_OFF, 'setting'),
-           (H_ASK_REFUSED, 'problem'))
+           (H_ASK_REFUSED, 'problem'), (H_REMOVED, 'setting'))
+
+# ----- the front door (do, route, routes): the list of models each app can be asked for -----
+
+# Where a list is, for the sentences below: Switchboard's own, or the person's file (its path).
+CATALOG_SHIPPED = "Switchboard's own list of models"
+# A list that is refused is not used at all. {where}; {what}: one of the CATALOG_WHAT_* below.
+CATALOG_NO_SOURCE = 'In {where}, {what} names no source or no day it was read, so that list is not used.'
+CATALOG_BAD = 'In {where}, {what} is not in the shape Switchboard reads, so that list is not used.'
+CATALOG_TWICE = 'In {where}, {what} is named twice, so that list is not used.'
+CATALOG_PROVIDER = 'In {where}, "{word}" is not a provider Switchboard knows (it knows {ids}), so that list is not used.'
+CATALOG_NOT_JSON = '{where} cannot be read as JSON, so that list is not used.'
+CATALOG_OWN_START = 'In {where}, "start" for {name} is not used: how an app is started stays as Switchboard ships it.'
+CATALOG_WHAT_FILE = 'the file as a whole'
+CATALOG_WHAT_ENTRY = 'the entry for {name}'
+CATALOG_WHAT_MODEL = 'the model "{model}" of {name}'
+CATALOG_WHAT_EFFORTS = 'the efforts of {name}'
+CATALOG_WHAT_START = 'how {name} is given {what}'
+CATALOG_GIVEN = {'model': 'a model', 'effort': 'an effort'}
+UNKNOWN_MODEL = 'Switchboard does not know a {name} model called "{word}". It knows: {known}.'
+UNKNOWN_EFFORT = '{name} takes no effort called "{word}". It takes: {known}.'
+NO_EFFORTS = 'Switchboard knows no efforts that {name} takes.'
+NONE_KNOWN = 'none yet'
+
+# ----- the front door: the person's routes -----
+
+UNKNOWN_KIND = 'There is no kind of job called "{word}". The kinds are: {kinds}.'
+ROUTE_WORD = ('"{word}" is not a choice Switchboard reads: write a provider, then a model and an effort if you like '
+              '(codex, claude:sonnet, claude:sonnet:high).')
+ROUTE_TWICE = 'A route names each provider once; {name} is named twice.'
+ROUTE_EMPTY = ('Name at least one choice for {kind}: a provider, then a model and an effort if you like '
+               '(claude:sonnet:high).')
+UNKNOWN_PRESET = 'There is no preset called "{word}". There is: {names}.'
+PRESET_NO_SOURCE = ('The preset {name} has a row for {kind} that names no source, no day it was read or what it rests '
+                    'on, so it is not used.')
+PRESET_ROW = 'The preset {name} is not used, because of its row for {kind}: {why}'
+ROUTES_UNREADABLE = ("Switchboard's file of routes ({path}) cannot be read, so nothing was changed: switchboard routes "
+                     'reset clears it.')
+# routes, route and do, when the file cannot be read or names something the list of models or the presets do not know.
+ROUTES_BAD = ('Switchboard could not read its file of routes ({path}), or it names something Switchboard does not know: '
+              'switchboard routes reset clears it.')
+
+# ----- the front door: switchboard route, routes, do -----
+
+# The first message of an app started on a new task (switchboard do): fixed words, the hop id and the task file's path,
+# never a word of the task. {hop}, {path}.
+TASK_WORDS = ('Switchboard task {hop}. Read the file {path} first: it holds a task the person typed for you, in their '
+              'own words, and lists the project rule files to read before you change anything. Do that task in this '
+              'folder. Before any step that cannot be undone (deleting, pushing, sending, paying), look at the '
+              "folder's state and ask the person. If the file is not readable, say so and stop.")
+
+# Each kind of job in words: (one, many). The kind's own word (find, write) is typed in `routes`, where it is shown.
+KIND_NAMES = {'build': ('a build job', 'build jobs'), 'fix': ('a fix', 'fixes'), 'review': ('a review', 'reviews'),
+              'plan': ('a plan', 'plans'), 'find': ('a lookup', 'lookups'), 'write': ('a piece of writing', 'writing'),
+              'other': ('another kind of job', 'other jobs')}
+# How the kind was known. {a_kind}: KIND_NAMES[kind][0]; {word}: the table's word that decided it.
+DO_KIND_WORD = 'This reads as {a_kind}, from the word "{word}".'
+DO_KIND_WORDS = 'This reads as {a_kind}, from the words "{word}".'      # a phrase of the table decided it
+DO_KIND_NAMED = 'You named this {a_kind}.'
+DO_KIND_NONE = 'No word of it says what kind of job it is, so it counts as {a_kind}.'
+# Why the provider was picked, by job.REASONS. {to}; {kinds}: KIND_NAMES[kind][1]; {order}: the order's names.
+DO_WHY = {
+    'route': 'It goes to {to}, the first choice in your routes for {kinds}.',
+    'route_next': 'It goes to {to}, the next choice in your routes for {kinds}.',
+    'order': 'It goes to {to}, the first in your order: no route is set for {kinds}.',
+    'order_next': 'It goes to {to}, the next in your order.',
+    'named': 'It goes to {to}, as you named it.',
+    'stay': 'It goes to {to}: this folder stays on {to}.',
+    'unknown': "It goes to {to}: no provider is known to have room, and {to}'s numbers are not known.",
+}
+# The same, when this folder stays on the provider picked.
+DO_WHY_STAY = {'unknown': "It goes to {to}: this folder stays on {to}, and {to}'s numbers are not known."}
+DO_NAMED_OUT = '{to} is out until {when}; it starts all the same, since you named it.'
+# A provider looked at and passed, by job.PASSED. {name}; {when}; {pid}.
+DO_PASSED = '{name} was passed: {why}.'
+DO_PASSED_WHY = {
+    'out': 'it is out until {when}',
+    'out_all': 'every account is out until {when}',
+    'out_unknown': 'it is out, and when it refills is not known',
+    'unknown': 'its numbers are not known, and another has room',
+    'not_added': 'it is not added (switchboard add {pid} adds it)',
+    'not_installed': 'it is not on this Mac',
+    'signed_out': 'it is not signed in',
+    'never': "this folder's chats never go to it",
+}
+# Nobody can take it: the first line, then one sentence per provider, then when the first is back.
+DO_NOBODY = 'Nobody can take this task now. Nothing was started.'
+DO_NOBODY_EACH = '{name}: {why}.'
+DO_BACK_AT = 'The first one is back at {when}.'
+# The model and effort the app is asked for.
+DO_MODEL = 'It asks {to} for {what}.'
+DO_MODEL_BOTH = '{model} at {effort} effort'
+DO_MODEL_ONLY = '{model}'
+DO_EFFORT_ONLY = '{effort} effort'
+DO_MODEL_OWN = '{to} starts on its own default model.'
+# What is not passed to the app's version picked, said with the pick (route, do --show, and do before the yes).
+DO_NO_MODEL_PASSED = 'Switchboard does not pass a model to {app} {version}: it starts on its own default.'
+DO_NO_EFFORT_PASSED = 'Switchboard does not pass an effort to {app} {version}: it starts at its own.'
+DO_VERSION_UNKNOWN = 'Switchboard passes no model or effort to {app}: its version could not be read.'
+# The one line in the task file for an effort that could not be given as the app starts. {effort}.
+ASKED_FOR = 'Asked for: {effort}'
+# A task refused before anything is looked at (do, do --show, route, and the line printed away from a terminal).
+TASK_NOT_TEXT = ('The task holds characters Switchboard cannot write down as text (a byte that is not UTF-8), so nothing '
+                 'was started.')
+TASK_TOO_LONG = ('A task may be up to {cap}, and this one is {size}: put the detail in a file in this folder and name '
+                 'that file in the task.')
+# do in /, the home folder or a folder holding it (continue's own check of a folder too wide to carry on in).
+DO_TOO_WIDE = ('{folder} is a folder too wide to start an app in, since the app could read everything under it: run '
+               'this in a project folder.')
+# Not at a terminal: nothing starts; the line to run is printed.
+DO_NOT_TTY = 'To start this task, run this in a terminal:'
+DO_LINE = '  switchboard do {options}-- {task}'
+# The yes for this folder and provider, before a task leaves for that provider. {work} only for a work plan; {jobs}
+# only for a provider that takes jobs.
+DO_QUESTION = ("Start {to} on this task? Your words, and the files {to} reads, go to {vendor}. {to} will work in this "
+               'folder and can\nread and change its files, as when you start it yourself. What {vendor} does with '
+               "them follows {vendor}'s terms\nand the settings in your {to} account. The same yes lets switchboard "
+               "continue carry this folder's chats on in {to}{jobs}.\n"
+               '{work}You are asked once for this folder ({basename}).\n'
+               '  y      yes, for this folder from now on\n'
+               '  n      not now\n'
+               '  never  never from this folder\n')
+DO_QUESTION_JOBS = ', and switchboard hand give it jobs here'
+NO_START_TASK = '{name} cannot be started on a new task in this version of Switchboard.'
+# What the person sees just before the app takes the screen.
+DO_STARTING = 'Starting {app} {version} ({where}) in this folder.'
+DO_TASK_LINE = 'The task file: {path} ({size}; {places} taken out of your words, best effort).'
+DO_CANNOT_START = '{to} could not be started from here ({error}). To start it on the task, run this in a terminal:'
+# The table of routes.
+ROUTES_HEAD = 'Routes, kind by kind (the preset {name} is on):'
+ROUTES_HEAD_NONE = 'Routes, kind by kind (no preset is on):'
+ROUTES_ROW = '  {kind:<7} {what}'
+ROUTES_FOLLOWS = 'follows your order ({order})'
+ROUTES_THEN = ', then '
+ROUTES_PRESETS = ('Presets: {names}. switchboard routes preset NAME turns one on, and switchboard routes preset off '
+                  'turns it off.')
+ROUTE_NOW = 'The route for {kind} is now {what}.'
+ROUTE_GONE = 'No route for {kind} now: it follows your order ({order}).'
+ROUTES_ALL_GONE = 'No routes now: every kind follows your order ({order}).'
+# A preset fills only kinds with no route of the person's, and its rows are tried in the person's order. {kinds}: the
+# kinds it filled (or kept), joined by listed().
+PRESET_ON = 'The preset {name} is on: it fills {kinds}, tried in your order ({order}).'
+PRESET_ON_NONE = 'The preset {name} is on, and fills no kind.'
+PRESET_KEPT = 'Your own route for {kinds} stays.'
+PRESET_KEPT_MANY = 'Your own routes for {kinds} stay.'
+ROUTES_FROM_PRESET = '{what} (from the preset, in your order)'
+PRESET_OFF = 'No preset is on now: each route it set is back to what it was before, unless you changed it since.'
+PRESET_NONE = 'No preset was on, so nothing changed.'
+ROUTES_SET_USAGE = 'Name a kind and at least one choice: switchboard routes set review codex claude:sonnet:high.'
+
+# History of the front door (info and problem; the task's words are never in it).
+H_DO = 'Started {to} on a new task in {basename} ({why})'
+H_DO_NOT_STARTED = 'Could not start {to} on a new task in {basename}'
+HISTORY = HISTORY + ((H_DO, 'info'), (H_DO_NOT_STARTED, 'problem'))
+
+# ----- the one list: a key press on another provider's row (its number at the prompt, switchboard N, switch) -----
+
+# The one line a key press prints. {chat}: CHAT_NAMED or CHAT_UNNAMED; {folder}: where the app starts, when it is not
+# this folder (the chat's work moved below the folder it was started in).
+MOVED = '{to} is opening here, with {chat} carried over.'
+MOVED_THERE = '{to} is opening in {folder}, with {chat} carried over.'
+MOVED_APP = '{to} is open here with {chat} in its message box. Press send to carry on.'
+MOVED_APP_THERE = '{to} is open on {folder} with {chat} in its message box. Press send to carry on.'
+MOVED_PLAIN = '{to} is opening here.'
+# The same, when only part of the chat could be read (MOVE_PART_READ, or the reader's own sentence, said first).
+MOVED_PART = '{to} is opening here, with part of {chat} carried over.'
+MOVED_PART_THERE = '{to} is opening in {folder}, with part of {chat} carried over.'
+MOVED_APP_PART = '{to} is open here with part of {chat} in its message box. Press send to carry on.'
+MOVED_APP_PART_THERE = '{to} is open on {folder} with part of {chat} in its message box. Press send to carry on.'
+# Said before the one line when the reader stopped early (a cap of size or time) and gave no sentence of its own.
+MOVE_PART_READ = 'Only part of that chat could be read, so the note holds less of it.'
+# Why a start was not made, found by the check just before the one line (said inside CANNOT_START's brackets).
+MOVE_NO_PROGRAM = 'its program is not there any more, or cannot be run'
+MOVE_NO_FOLDER = 'the folder is not there any more'
+CHAT_NAMED = 'your chat "{name}"'
+CHAT_UNNAMED = 'your {app} chat'
+# Not at a terminal, with no chat to carry over: nothing starts; the line to run is printed.
+MOVED_PLAIN_RUN = 'To open {to} here, run this in a terminal:'
+# Said before the one line when the provider pressed has no room by its numbers: it starts all the same.
+MOVE_OUT = '{to} is out until {when}; it opens all the same, since you picked it.'
+MOVE_OUT_NOT_KNOWN = '{to} is out, and when it refills is not known; it opens all the same, since you picked it.'
+MOVE_NOT_INSTALLED = ("{name} is not on this Mac. Install {vendor}'s {name} (its app or its command line), then try "
+                      'again.')
+# A provider whose adapter has no plain start, pressed with no chat to carry over.
+MOVE_NO_PLAIN = '{name} cannot be opened without a chat to carry over in this version of Switchboard.'
+# What a key press leaves in Switchboard's log: fixed words, provider names, Switchboard's own hop id, sizes, counts and
+# the program's version. Never a chat's name, a folder or a path. {what}: from LOG_MOVED_WHAT or LOG_PLAIN_WHAT.
+LOG_MOVED = ('key press: {to} {what} on a note of a chat from {frm} (hop {hop}, note {size}, {places} taken out); '
+             '{app} {version}')
+LOG_MOVED_WHAT = {'started': 'started', 'in_app': 'opened in its app', 'printed': 'given as a line to run',
+                  'failed': 'could not be started'}
+LOG_PLAIN = 'key press: {to} {what} with no chat to carry over; {app} {version}'
+LOG_PLAIN_WHAT = {'started': 'opened', 'printed': 'given as a line to run', 'failed': 'could not be opened'}
+LOG_NOTHING = 'key press: nothing was started for {to} ({why})'
+LOG_WHY = {'refused': 'it was refused', 'problem': 'the app reported a problem', 'stopped': 'stopped with Ctrl-C',
+           'not_now': 'not now'}
+
+# ----- switchboard add, with no other word: each provider here, signed in and not yet added, is offered -----
+
+# The notice: what pressing its row will do, said once per provider, before it is ever pressed, on every way of adding
+# it (cli._notice keeps that it was said). It is also the one thing to know about moving a chat to another maker.
+# {plan}: the adapter's plan_phrase ('plan' without one).
+NOTICE = ("Pressing the {name} row asks no more: it sends your folder's newest chat,\n"
+          "your words and files, to {vendor} under your {plan} and {vendor}'s terms.")
+# Bare add and a first run (cli.offer): after the notice, one question. y adds it; Enter or anything else adds nothing.
+ADD_OFFER = 'Add {name} too? [y/N] '
+# A press at a terminal on a provider whose notice was never said (added on an older build), in a folder with no yes of
+# its own: the notice as one question, before any chat is read into a note. Enter or anything but y is no.
+PRESS_NOTICE = ("Pressing the {name} row sends your folder's newest chat, your words and files,\n"
+                "to {vendor} under your {plan} and {vendor}'s terms. It asks this once.")
+PRESS_NOTICE_ASK = 'Go on? [y/N] '
+# Continue here on such a provider: no note is made; the list says the notice first.
+PRESS_NOTICE_FIRST = 'Type switchboard and press the {name} row once first: it says what goes to {vendor}.'
+# Right after, at a terminal, one question: the same yes as `switchboard providers --ask` (ASK_QUESTION), kept as
+# ask_ok. y is yes; Enter or anything else is no, and nothing more is said.
+ADD_ASK = "Show its account now? {name}'s helper runs once and may renew its sign-in. [y/N] "
+# After a yes, when the ask did not end with an answer. {why}: the app's own reason, or nothing.
+ADD_ASK_NOT_DONE = '{name} did not answer now{why}. switchboard providers --ask asks it again.'
+ADD_ASK_WHY = ' ({why})'
+
+# ----- Continue here: a press where a person looks (the menu bar's menu and the page) -----
+
+# The one sentence a press answers with, where it was made: the provider's own app is open with the note of the chat
+# in its message box, and nothing was sent. {chat}: CHAT_NAMED or CHAT_UNNAMED. Real problems (STILL_WORKING,
+# MAY_CARRY_ON, MOVE_PART_READ or the reader's own sentence, MOVE_OUT) come before it, one line each.
+PRESS_OPEN = '{to} is open with {chat} in its message box. Press send to carry on.'
+PRESS_OPEN_PART = '{to} is open with part of {chat} in its message box. Press send to carry on.'
+# The provider's desktop app is not on this Mac, or did not take its link: the one line to run (the list's key
+# press, in the chat's folder) follows, and nothing else was done.
+PRESS_NO_APP = "{name}'s app is not on this Mac. To carry on, run this in a terminal:"
+PRESS_NOT_OPENED = "{name}'s app did not open. To carry on, run this in a terminal:"
+# Refusals, one line each. {basename}: the last part of the chat's folder.
+PRESS_STAYS = 'Chats in {basename} stay on {p}. switchboard stay off, run there, lifts that.'
+PRESS_NEVER = 'You said chats in {basename} never go to {to}. switchboard allow {to_id}, run there, lifts that.'
+PRESS_NO_CHAT = 'There is no chat to carry over yet.'
+PRESS_CHAT_GONE = 'That chat is not there any more. Look again in a moment.'
+PRESS_NO_FOLDER = "That chat's folder is not there any more."
+# A key press or Continue here on a chat started in a folder too wide to start another app in (cli._too_wide).
+PRESS_TOO_WIDE = ('That chat was started in {folder}, a folder too wide to start {name} in: it could read everything '
+                  'under it.')
+# The face showed one chat and a newer one is there now: the press carries only the chat the person saw.
+PRESS_NEWER = 'A newer chat is there now. Look again.'
+# A press within a few seconds of the last one (POST /api/continue takes one at a time, a few seconds apart).
+PRESS_SOON = 'Continue was pressed a moment ago. Try again in a few seconds.'
+# What a press leaves in Switchboard's log, as a key press does (LOG_MOVED): fixed words, provider names,
+# Switchboard's own hop id, sizes, counts and the program's version, never a chat's name, a folder or a path.
+LOG_PRESS_MOVED = ('press: {to} {what} on a note of a chat from {frm} (hop {hop}, note {size}, {places} taken out); '
+                   '{app} {version}')
+LOG_PRESS_LINE = "press: {to}'s app {why}, so the line to run was shown and nothing was started"
+LOG_PRESS_LINE_WHY = {'missing': 'is not on this Mac', 'failed': 'did not open'}
+LOG_PRESS_NOTHING = 'press: nothing was opened for {to} ({why})'
 
 # ---------- time, size and count words ----------
 
@@ -493,3 +777,9 @@ def places(k) -> str:
 def names(items) -> str:
     """'Claude, then Codex'."""
     return ', then '.join(items)
+
+
+def listed(items) -> str:
+    """'find', 'find and write', 'find, write and review'."""
+    items = list(items)
+    return items[0] if len(items) == 1 else ', '.join(items[:-1]) + ' and ' + items[-1]

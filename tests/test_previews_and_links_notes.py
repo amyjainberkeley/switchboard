@@ -63,6 +63,7 @@ class SlowDrawsOnABusyMac(PreviewCase):
     count (a quiet Mac) wait a day after the third, not until the page is published again."""
 
     def test_draws_cut_off_on_a_busy_mac_come_once_it_is_quiet(self):
+        own = previews.DEADLINE                                         # the product's own deadline, for the last draw
         self.patch(previews, 'DEADLINE', 1.0)
         self.chrome.mode('hang')
         self.listed((ID1, self.page(), self.now - 30))
@@ -74,6 +75,9 @@ class SlowDrawsOnABusyMac(PreviewCase):
             t += previews.RETRY_AFTER + 1
         self.chrome.mode('jpeg')
         self.patch(browser, 'LOAD', lambda: 0.3)                        # the afternoon is over
+        # The last draw must come. On a Mac busy with other work the stand-in itself can take over a second to start,
+        # past the short deadline that cut the draws above off on purpose, so it gets the product's own deadline back.
+        self.patch(previews, 'DEADLINE', own)
         self.assertEqual(previews.run_once(now=t)['made'], 1)
         self.assertEqual(previews.known(), {ID1})
 
@@ -441,10 +445,10 @@ def two_models(now, pct=96):
 
 
 class ModelWeeksInTheTerminalAndTheMenuBar(unittest.TestCase):
-    """A model's own week has no line; the model automatic switching counts (the engine counts one: Fable here, or
-    Fable 5.2 by the same name), at or over its line, is the weekly line's red note. Another model's week is never
-    said there. A state with no `models` at all (from before they were named) counts every model: the first of the
-    highest is said. (Each model week was a line, red only when counted.)"""
+    """The terminal's list draws no model week at all: no line, no note (the page shows it). In the menu bar's limits
+    the model automatic switching counts (the engine counts one: Fable here, or Fable 5.2 by the same name), at or
+    over its line, is the weekly line's red note; another model's week is never said there. A state with no `models`
+    at all (from before they were named) counts every model: the first of the highest is said."""
 
     def setUp(self):
         self.now = time.time()
@@ -455,13 +459,13 @@ class ModelWeeksInTheTerminalAndTheMenuBar(unittest.TestCase):
         a = two_models(self.now)
         term_rows = term.read({'now': self.now, 'auto': auto, 'accounts': [a]})['accounts'][0]['limits']
         bar_rows = menubar.limits(a, auto)
-        return ([x['label'] for x in term_rows], term_rows[-1]['note'],
+        return ([x['label'] for x in term_rows], term_rows[-1].get('note'),
                 [(x['label'], x['over']) for x in bar_rows if x['kind'] == 'model'])
 
     def test_only_the_counted_model_is_said(self):
-        self.assertEqual(self.notes(self.auto), (['5-hour', 'weekly'], {'label': 'Fable', 'pct': 96}, [('Fable', True)]))
+        self.assertEqual(self.notes(self.auto), (['5-hour', 'weekly'], None, [('Fable', True)]))
         self.assertEqual(self.notes(dict(self.auto, models=['Fable 5.2'])),
-                         (['5-hour', 'weekly'], {'label': 'Fable', 'pct': 96}, [('Fable', True)]))
+                         (['5-hour', 'weekly'], None, [('Fable', True)]))
 
     def test_no_model_counted_none_is_said(self):
         self.assertEqual(self.notes(dict(self.auto, model=None, models=[])), (['5-hour', 'weekly'], None, []))
@@ -469,7 +473,7 @@ class ModelWeeksInTheTerminalAndTheMenuBar(unittest.TestCase):
     def test_a_state_with_no_models_counts_every_model(self):
         auto = dict(self.auto)
         del auto['models'], auto['model']
-        self.assertEqual(self.notes(auto), (['5-hour', 'weekly'], {'label': 'Fable', 'pct': 96}, [('Fable', True)]))
+        self.assertEqual(self.notes(auto), (['5-hour', 'weekly'], None, [('Fable', True)]))
 
 
 MODEL_NOTES = r"""

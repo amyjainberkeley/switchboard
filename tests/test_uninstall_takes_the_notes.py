@@ -25,8 +25,8 @@ from switchboard.providers import contract
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SCRIPT = os.path.join(ROOT, 'uninstall.sh')
 KEYCHAIN_LINE = 'SECURITY=/usr/bin/security'
-SERVICES = ('Switchboard login', 'Switchboard login (previous)', 'Switchboard recovery', 'switchboard-gateway',
-            'Switchboard token', 'Switchboard API key')
+SERVICES = ('Switchboard login', 'Switchboard login (previous)', 'Switchboard recovery',
+            'Switchboard login (Mac-wide parts)', 'switchboard-gateway', 'Switchboard token', 'Switchboard API key')
 UNTOUCHED = 'The login Claude Code is using was not touched.'
 NOTHING_LEFT = 'Nothing of Switchboard is left.'
 

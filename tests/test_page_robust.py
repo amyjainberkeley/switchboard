@@ -33,7 +33,7 @@ class TheWords(unittest.TestCase):
         self.assertIn('goodAt = Date.now() - age * 1000', self.html)              # the server's own answer age
 
     def test_one_look_at_a_time_never_longer_than_8_s_and_backing_off(self):
-        self.assertIn("fetch('/api/state', {signal: timed(8000)})", self.html)
+        self.assertIn("api('/api/state', {signal: timed(8000)})", self.html)     # through api(), the one sender
         self.assertIn('return [2000, 5000, 10000, 20000][Math.min(misses, 4) - 1];', self.html)
         self.assertIn('if (!loading && (Date.now() >= nextLoad || asking))', self.html)   # each second while checking
         self.assertNotIn("setInterval(() => { if (!document.hidden) { load(); loadExtras(); } }, 5000);", self.html)

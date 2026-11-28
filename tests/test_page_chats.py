@@ -309,27 +309,19 @@ class TheActionAndItsMenu(ChromePage):
 
 @unittest.skipUnless(os.path.exists(CHROME), 'needs Google Chrome')
 class TheChatsUnderTheEmail(ChromePage):
-    def test_chats_after_the_plan_in_words_and_a_click_opens_chats_at_that_account(self):
-        v = view_now()
+    def test_the_plan_line_is_the_plan_alone_with_no_chat_count(self):
+        # (it said "Team · 2 chats" under the email, and a click opened Chats at that account: the left side of a row
+        # is now the email and the plan under it, and nothing else. The Chats section keeps its own numbers.)
+        view_now()
         got = self.run_page("""
       await wait(900);
-      const cells = all('#acc .arow').map((r) => { const a = r.querySelector('.sub .chn');
-        return [r.dataset.email, a ? a.textContent : '', a ? a.title : null, r.querySelector('.sub').textContent]; });
-      all('#acc .arow')[2].querySelector('.sub .chn').click(); await wait(800);
-      const g = $('#ch-list [data-group="maya@fernhill.example"]');
-      done({cells, column: all('#acc .c-chats').length, hash: location.hash, shown: !$('#sec-chats').hidden, top: Math.round(g.getBoundingClientRect().top), lit: g.classList.contains('flash')});
+      done(all('#acc .arow').map((r) => [r.dataset.email, r.querySelector('.sub').textContent, r.querySelector('.sub').title,
+        r.querySelectorAll('.sub .chn, .sub a').length]));
 """)
-        self.assertEqual(got['column'], 0)                                      # no column of bare numbers: the words say what they count
-        want = dict((e, sum(1 for c in recent(v) if (c['started'] or {}).get('email') == e)) for e in (NORTHWIND, MAIL, FERNHILL, HARBOR, IVY))
-        said = dict((e, int(n.split(' ')[0]) if n else 0) for e, n, _, _ in got['cells'])
-        self.assertEqual(said, want)                                            # chats at home there, last 24 h
-        self.assertEqual(want[FERNHILL], 2)
-        fern = dict((e, (n, t, line)) for e, n, t, line in got['cells'])[FERNHILL]
-        self.assertEqual(fern, ('2 chats', '2 chats that started on this account, written in the last day', 'Team · 2 chats'))
-        self.assertEqual(got['hash'], '#chats/' + FERNHILL.replace('@', '%40'))
-        self.assertTrue(got['shown'])
-        self.assertLess(got['top'], 200)                                        # scrolled to that account's chats
-        self.assertTrue(got['lit'])
+        fern = dict((e, (line, tip, n)) for e, line, tip, n in got)[FERNHILL]
+        self.assertEqual((fern[0], fern[2]), ('Team', 0))                      # the plan, alone
+        self.assertNotIn('chat', fern[1])                                      # nor on hover
+        self.assertEqual([e for e, line, _, n in got if n or 'chat' in line], [])
 
     def test_no_count_before_the_first_look_has_read_every_chat(self):
         v = dict(view_now(), state='reading', reading={'done': False, 'read': 4, 'of': 9})

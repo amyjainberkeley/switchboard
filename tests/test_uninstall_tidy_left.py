@@ -117,6 +117,7 @@ class EverythingTurnedOnAndOffAgain(Conditions, Fresh):
             server.act('/api/notify', {'on': on})
             server.act('/api/statusline', {'on': on})
             server.act('/api/models', {'enabled': on})
+            server.act('/api/models', {'enabled': on, 'part': 'helpers'})
             self.act({'pack': 'house', 'on': on})
             self.act({'pack': 'claudemem', 'on': on})
             if on:                      # the code map's switch would offer codegraph first: its own plan, then apply
@@ -126,6 +127,24 @@ class EverythingTurnedOnAndOffAgain(Conditions, Fresh):
         for path in (NH.record_path(), SL.record_path(), models.default_state_path(), C.default_state_path()):
             self.assertTrue(os.path.exists(path), path)
         self.assertEqual(self.get(self.md), b'# mine\n')
+
+
+class BothModelsSwitchesComeOut(Fresh):
+    """Models by the job and Sonnet for helpers both on: the uninstaller takes out the helper files, the note and the
+    setting, says so once, and leaves Claude Code's files as they were."""
+
+    def test_both_on_then_tidy(self):
+        before = self.get()
+        server.act('/api/models', {'enabled': True, 'part': 'helpers'})
+        server.act('/api/models', {'enabled': True})
+        self.assertNotEqual(self.get(), before)
+        rc, said = self.tidy()
+        self.assertEqual(rc, 0, said)
+        self.assertEqual(said.count('Models setting: taken out.'), 1, said)
+        self.assertEqual(self.get(), before)
+        for folder in ('agents', 'rules'):
+            self.assertFalse(os.path.exists(os.path.join(self.claude, folder)), folder)
+        self.assertFalse(server.models_recorded())
 
 
 # ---------------------------------------------------------------- guards: what the record names stays left

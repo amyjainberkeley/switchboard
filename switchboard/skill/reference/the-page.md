@@ -3,7 +3,7 @@
 ## Opening it
 
 - `switchboard page` opens it in the browser.
-- Or open http://127.0.0.1:7799 (the default port; `switchboard update --port N` moves it, and `switchboard doctor` names the address in use).
+- Or open http://127.0.0.1:7799 in a browser that has opened it from Switchboard before (the default port; `switchboard update --port N` moves it, and `switchboard doctor` names the address in use). Anywhere else the page shows one line: open it with Open Switchboard in the menu bar, or `switchboard page`. It opens only for the person.
 - Or Open Switchboard in the menu bar item's menu, or open Switchboard.app (Spotlight finds it): when the menu bar item is already running, or was turned off with `switchboard menubar off`, that opens the page.
 
 It listens on this Mac only and refuses requests from other websites. A background job keeps it running and starts it at login.

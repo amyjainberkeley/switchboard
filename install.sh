@@ -33,10 +33,14 @@
 #      password), where Spotlight and Launchpad find it: opening it starts the menu bar item, or opens the page when
 #      the item is running. An app of that name that is not this install's is left alone, and the other folder is
 #      used. Not with --no-menu-app.
-#   6. adds two background jobs, so the page and the menu bar item are there after every login (skip both with
-#      --no-agent, which also leaves Launch Services, macOS's list of apps, alone). With the menu bar's app in place,
+#   6. adds three background jobs, so the page, the sign-in watch and the menu bar item are there after every login
+#      (skip all of them with --no-agent, which also leaves Launch Services, macOS's list of apps, alone). The sign-in
+#      watch notices at once when Claude Code's sign-in changes, and the page and the watch each start the other again
+#      when it stops; a copy of Switchboard without the watch adds no job for it. With the menu bar's app in place,
 #      the page runs on that app's own Python (~/.switchboard/bin/switchboard-page), so when macOS asks something on
-#      its behalf it names Switchboard; without it, on the program's Python.
+#      its behalf it names Switchboard; without it, on the program's Python. An older install's jobs and menu bar app,
+#      under the names Switchboard had before (io.github.claude-switchboard), are stopped and removed first, once; its
+#      link app stays as long as it is the default browser.
 #   7. at a terminal, runs `switchboard setup`, the first run: it adds the account Claude Code is on, and macOS asks
 #      once whether Switchboard Links may be the default browser (skip with --no-setup). Without a terminal (an agent's
 #      shell, a log file) it asks nothing, and the last line says what to type next; the page then offers the link app
@@ -65,6 +69,8 @@ REPO="${SWITCHBOARD_REPO:-amyjainberkeley/switchboard}"
 INSTALL_URL="https://raw.githubusercontent.com/$REPO/main/install.sh"
 ARCHIVE_URL="${SWITCHBOARD_ARCHIVE:-https://github.com/$REPO/archive/refs/heads/main.tar.gz}"
 LABEL="io.github.amyjainberkeley.switchboard"
+# The names an older install used (before Nov 26 2026) for its jobs and apps: moved away from once, below.
+OLD_LABEL="io.github.claude-switchboard"
 PORT=""
 AGENT=1
 LINKAPP=1          # the link app is built unless --no-link-app says otherwise (now or at the last install)
@@ -608,6 +614,57 @@ if [ "$LINKAPP" = 1 ] && [ -d "$LINKS_APP" ] && [ "$(plist_value "$LINKS_APP" CF
    && half_made "$LINKS_APP"; then
   rm -rf "$LINKS_APP"
 fi
+# An older install's link app has the bundle identifier Switchboard had before (io.github.claude-switchboard.links)
+# and the same path. While it is the default browser, or when that can't be told, it is never taken away: it goes on
+# working (it sends links to the page's /api/go, as the new one does) until the new one holds the seat, which only the
+# person gives it (the page offers it, and macOS asks; this installer never does). So before the new one is built in
+# its place it moves aside, to Switchboard Links (old).app, and keeps the seat there: macOS keeps the default browser
+# by bundle identifier. A later install takes it out once another app holds the seat. One that is not the default
+# browser is replaced by the new one like any older copy. With --no-link-app none of this is touched either.
+OLD_LINKS_ID="$OLD_LABEL.links"
+OLD_LINKS="$HOME/Applications/Switchboard Links (old).app"
+OLD_LINKS_LEFT=0     # 1 while the older link app is aside and still the default browser
+seat_of() {          # seat_of APP: the default browser's app, as the link app at APP says it ("" when it can't)
+  exe="$(plist_value "$1" CFBundleExecutable)"
+  case "$exe" in ''|*/*|.*) return 0 ;; esac
+  { [ -x "$1/Contents/MacOS/$exe" ] && "$1/Contents/MacOS/$exe" --status 2>/dev/null | head -n 1; } || true
+}
+old_links_seated() { # old_links_seated APP: the older link app at APP holds the seat, or no other app is known to
+  now="$(seat_of "$1")"
+  [ -z "$now" ] || [ "$(plist_value "$now" CFBundleIdentifier)" = "$OLD_LINKS_ID" ]
+}
+if [ "$LINKAPP" = 1 ] && [ "$(plist_value "$OLD_LINKS" CFBundleIdentifier)" = "$OLD_LINKS_ID" ]; then
+  if old_links_seated "$OLD_LINKS"; then
+    OLD_LINKS_LEFT=1
+  else
+    [ "$LS" = 0 ] || "$LSREGISTER" -u "$OLD_LINKS" >/dev/null 2>&1 || true
+    rm -rf "$OLD_LINKS"
+    note "Removed the older Switchboard Links: another app is the default browser now."
+  fi
+fi
+# Before a new link app goes in its place, from the release or built here, an older one there that is the default
+# browser moves aside (old_links_aside; KEEP_OLD=1 when it can't, and then no new one goes in this time), and it goes
+# back, still the default browser, when the new one could not be put in place (old_links_back).
+ASIDE=0            # 1: the older link app was moved aside just now, so it goes back if the new one fails
+KEEP_OLD=0         # 1: it is the default browser and could not be moved aside, so no new one goes in this time
+old_links_aside() {
+  if [ "$(plist_value "$LINKS_APP" CFBundleIdentifier)" = "$OLD_LINKS_ID" ] && [ "$OLD_LINKS_LEFT" = 0 ] \
+     && old_links_seated "$LINKS_APP"; then
+    if [ ! -e "$OLD_LINKS" ] && mv "$LINKS_APP" "$OLD_LINKS" 2>/dev/null; then
+      [ "$LS" = 0 ] || { "$LSREGISTER" -u "$LINKS_APP" >/dev/null 2>&1; "$LSREGISTER" -f "$OLD_LINKS" >/dev/null 2>&1; } || true
+      ASIDE=1; OLD_LINKS_LEFT=1
+    else
+      KEEP_OLD=1
+    fi
+  fi
+}
+old_links_back() {
+  if [ "$ASIDE" = 1 ] && [ ! -e "$LINKS_APP" ] && mv "$OLD_LINKS" "$LINKS_APP" 2>/dev/null; then
+    [ "$LS" = 0 ] || { "$LSREGISTER" -u "$OLD_LINKS" >/dev/null 2>&1; "$LSREGISTER" -f "$LINKS_APP" >/dev/null 2>&1; } || true
+    ASIDE=0; OLD_LINKS_LEFT=0
+  fi
+}
+kept_old() { say "Left the older Switchboard Links as it is: it is your default browser, and it could not be moved aside for the new one."; }
 # Launch Services only for the account's own install (LS above): otherwise the app is put in place, and macOS is not
 # told.
 if [ "$LS" = 1 ]; then REGISTER=""; else REGISTER="--no-register"; fi
@@ -671,9 +728,11 @@ print("\n".join(v))' "$PREBUILT/links.json" 2>/dev/null)" \
   printf '%s\n' "$shown" | grep -qx 'Notarization Ticket=stapled' \
     || { LINKS_WHY="its signature carries no notarization ticket"; return 1; }
   LINKS_SIGNER="$(printf '%s\n' "$shown" | sed -n 's/^Authority=//p' | head -n 1)"
+  old_links_aside
+  [ "$KEEP_OLD" = 0 ] || { LINKS_WHY="the older Switchboard Links is your default browser and could not be moved aside"; return 1; }
   sh "$DATA/app/router/build.sh" --from "$LINKS_TMP/Switchboard Links.app" $REGISTER "$HOME/Applications" \
     >/dev/null 2>"$DATA/build.log" \
-    || { LINKS_WHY="it could not be put in ~/Applications (details in $(short "$DATA/build.log"))"; return 1; }
+    || { LINKS_WHY="it could not be put in ~/Applications (details in $(short "$DATA/build.log"))"; old_links_back; return 1; }
 }
 if [ "$LINKAPP" = 1 ] && [ -f "$PREBUILT/SwitchboardLinks.zip" ] && [ "${SWITCHBOARD_BUILD_LINKS:-}" != 1 ]; then
   LINKS_TMP=""
@@ -682,26 +741,34 @@ if [ "$LINKAPP" = 1 ] && [ -f "$PREBUILT/SwitchboardLinks.zip" ] && [ "${SWITCHB
     if older_links_gone; then OLDER_SAID=" (it was ~/Applications/Switchboard.app before)"; else OLDER_SAID=""; fi
     note "Installed the link app from the release: signed by $LINKS_SIGNER, checksum and signature checked, with a stapled notarization ticket.$OLDER_SAID"
   else
-    say "Not using the release's link app: $LINKS_WHY."
+    [ "$KEEP_OLD" = 1 ] || say "Not using the release's link app: $LINKS_WHY."
   fi
   [ -z "$LINKS_TMP" ] || rm -rf "$LINKS_TMP"
 fi
 if [ "$LINKAPP" = 0 ] || [ "$LINKS_PLACED" = 1 ]; then
   :                                                   # left out (--no-link-app, now or from before), or in place
+elif [ "$KEEP_OLD" = 1 ]; then
+  kept_old                                            # the release's copy found the older one seated in its place
 # Apple's /usr/bin/swiftc is a stand-in too (see apple_tool_real): real only while the developer folder holds swiftc,
 # the command line tools' own or Xcode's toolchain's; else running it shows the dialog that offers to install them.
 elif SWIFTC="$(command -v swiftc 2>/dev/null)" && xcode-select -p >/dev/null 2>&1 && { [ "$SWIFTC" != /usr/bin/swiftc ] \
      || apple_tool_real swiftc || [ -x "$(xcode-select -p)/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc" ]; }; then
-  t="$(date +%s)"
-  begin "Building the link app"
-  if sh "$DATA/app/router/build.sh" $REGISTER "$HOME/Applications" >/dev/null 2>"$DATA/build.log"; then
-    if older_links_gone; then
-      done_in "$t" " (it was ~/Applications/Switchboard.app before)"
-    else
-      done_in "$t"
-    fi
+  old_links_aside
+  if [ "$KEEP_OLD" = 1 ]; then
+    kept_old
   else
-    result "could not (details in $(short "$DATA/build.log")). Everything else works without it."
+    t="$(date +%s)"
+    begin "Building the link app"
+    if sh "$DATA/app/router/build.sh" $REGISTER "$HOME/Applications" >/dev/null 2>"$DATA/build.log"; then
+      if older_links_gone; then
+        done_in "$t" " (it was ~/Applications/Switchboard.app before)"
+      else
+        done_in "$t"
+      fi
+    else
+      result "could not (details in $(short "$DATA/build.log")). Everything else works without it."
+      old_links_back
+    fi
   fi
 elif [ "$(plist_value "$OLDER_LINKS" CFBundleIdentifier)" = "$LINKS_ID" ] && [ ! -e "$LINKS_APP" ]; then
   # Without the command line tools it can't be built again: the older one goes on working under the new name, so
@@ -715,6 +782,64 @@ elif [ "$(plist_value "$OLDER_LINKS" CFBundleIdentifier)" = "$LINKS_ID" ] && [ !
   fi
 else
   say "Skipped the link app: it needs Apple's command line tools (xcode-select --install). Everything else works without it."
+fi
+if [ "$OLD_LINKS_LEFT" = 1 ] && [ -e "$LINKS_APP" ]; then
+  say "Your default browser is still the older Switchboard Links, and it works as before. To finish the move, make the new one the default browser on the page (macOS asks you)."
+fi
+
+# ---- an older install under the names Switchboard had before (io.github.claude-switchboard...), moved once ----
+# launchd knows a job by its label alone, so an older install's jobs would go on running beside the new ones (two pages
+# for one port), and its menu bar app in Applications is not this install's, so the new one would go elsewhere. So,
+# with the background jobs and only for what is there: its sign-in watch stops first (it starts the page again), then
+# its menu bar item, then its page (a switch under way finishes first: up to 60 s), each waited for until launchd has
+# let go of it, and each job's file goes as soon as its job has stopped, so nothing starts it again; then its menu bar
+# app goes from Applications, only when it names this data folder (another account's or another try's stays), before
+# the new one is put there. On a Mac that never had them launchd is only asked whether it has them, and nothing is
+# said. Its link app is the link app's business, above. Not with --no-agent, as nothing else of launchd's is.
+if [ "$AGENT" = 1 ]; then
+  ME="gui/$(id -u)"
+  OLD_JOBS=0
+  for old in "$OLD_LABEL.watch" "$OLD_LABEL.menubar" "$OLD_LABEL"; do
+    if launchctl print "$ME/$old" >/dev/null 2>&1; then
+      OLD_JOBS=1
+      launchctl bootout "$ME/$old" >/dev/null 2>&1 || true
+      case "$old" in *.watch) n=60 ;; *.menubar) n=20 ;; *) n=240 ;; esac     # 15 s, 5 s, the page's 60 s
+      i=0
+      while [ $i -lt $n ] && launchctl print "$ME/$old" >/dev/null 2>&1; do i=$((i + 1)); sleep 0.25; done
+    fi
+    if [ -f "$HOME/Library/LaunchAgents/$old.plist" ]; then
+      rm -f "$HOME/Library/LaunchAgents/$old.plist"
+      OLD_JOBS=1
+    fi
+  done
+  [ "$OLD_JOBS" = 0 ] || say "Moved the background jobs to Switchboard's new names: the older install's are stopped, and their files removed."
+  old_menu_app() {   # old_menu_app APP: an older install's menu bar app, made for this data folder
+    [ -d "$1" ] && [ "$(plist_value "$1" CFBundleIdentifier)" = "$OLD_LABEL.menubar" ] || return 1
+    made_for="$(plist_value "$1" SwitchboardData)"
+    [ -n "$made_for" ] && [ "$(cd "$made_for" 2>/dev/null && pwd -P)" = "$(cd "$DATA" && pwd -P)" ]
+  }
+  for app in "${SWITCHBOARD_APPLICATIONS:-/Applications}/Switchboard.app" "$HOME/Applications/Switchboard.app"; do
+    old_menu_app "$app" || continue
+    # A menu bar opened from the app itself, not by its job, is asked to quit first, and told after 5 s.
+    exe="$(plist_value "$app" CFBundleExecutable)"
+    if [ -n "$exe" ]; then
+      exe="$app/Contents/MacOS/$exe"
+      app_pids() { ps -axo pid=,command= 2>/dev/null | while read -r pid cmd; do case "$cmd" in "$exe"|"$exe "*) echo "$pid" ;; esac; done; }
+      pids="$(app_pids || true)"
+      if [ -n "$pids" ]; then
+        kill -TERM $pids 2>/dev/null || true
+        i=0; while [ $i -lt 20 ] && [ -n "$(app_pids || true)" ]; do i=$((i + 1)); sleep 0.25; done
+        pids="$(app_pids || true)"
+        [ -z "$pids" ] || kill -KILL $pids 2>/dev/null || true
+      fi
+    fi
+    [ "$LS" = 0 ] || "$LSREGISTER" -u "$app" >/dev/null 2>&1 || true
+    if rm -rf "$app" 2>/dev/null && [ ! -e "$app" ]; then
+      say "Removed the older install's Switchboard.app from $(short "$(dirname "$app")"): the new one takes its place."
+    else
+      say "Could not remove the older install's Switchboard.app ($(short "$app")): move it to the Trash yourself."
+    fi
+  done
 fi
 
 # ---- the menu bar item's app, in Applications ----
@@ -765,8 +890,47 @@ chmod +x "$PAGE_CMD.new"
 mv -f "$PAGE_CMD.new" "$PAGE_CMD"
 write_record "${APP_PY:-$PY}"
 
+# ---- the sign-in watch's launcher: on the page's Python, the same way as the page's ----
+# The watch (switchboard/accounts/signin_watch.py) notices within a second when Claude Code's sign-in changes, and has
+# the account engine look. A copy of Switchboard without it has no launcher (and below, no job).
+WATCH_LABEL="$LABEL.watch"
+WATCH_PLIST="$HOME/Library/LaunchAgents/$WATCH_LABEL.plist"
+WATCH_CMD="$DATA/bin/switchboard-watch"
+WATCH_MODULE="$DATA/app/switchboard/accounts/signin_watch.py"
+WATCH_RUNPY='import runpy, sys; sys.path.insert(0, sys.argv.pop(1)); runpy.run_module("switchboard.accounts.signin_watch", run_name="__main__", alter_sys=True)'
+if [ -f "$WATCH_MODULE" ]; then
+  # Without its module (a later copy that has none, its job left by --no-agent) it waits before it exits, so
+  # launchd does not start it again every few seconds. The job's output file is never rotated, so a start that fails
+  # at once, again and again, could fill the disk: past 1 MB it is emptied first (launchd holds it open for appending,
+  # so writes after that land at its new end).
+  cat > "$WATCH_CMD.new" <<EOF
+#!/bin/sh
+# Switchboard's sign-in watch, for its background job (made by install.sh): on the page's Python.
+OUT="$DATA/signin-watch.out"
+[ ! -f "\$OUT" ] || [ "\$(wc -c < "\$OUT" | tr -d ' ')" -le 1048576 ] || : > "\$OUT"
+if [ ! -f "$WATCH_MODULE" ]; then
+  echo "Switchboard: this copy has no sign-in watch. Install Switchboard again." >&2
+  # Run by launchd as the watch's own job (launchd names the job in XPC_SERVICE_NAME) and still without its module a
+  # minute later (an install under way puts it back within seconds; an older build put back over this one never
+  # does): the job takes itself out, its file first, so it is not started again now or at the next login.
+  [ "\${XPC_SERVICE_NAME:-}" != "$WATCH_LABEL" ] || { sleep 60; [ -f "$WATCH_MODULE" ] || { rm -f "$WATCH_PLIST"; echo "Switchboard: took the sign-in watch's background job out." >&2; launchctl bootout "gui/\$(id -u)/$WATCH_LABEL" >/dev/null 2>&1; }; }
+  sleep 300
+  exit 1
+fi
+APP_PY="$APP_PY"
+if [ -n "\$APP_PY" ] && [ -x "\$APP_PY" ]; then
+  exec "\$APP_PY" -I -B -c '$WATCH_RUNPY' "$DATA/app"
+fi
+PY="$PY"
+$PAGE_CHECK
+exec "\$PY" -I -B -c '$WATCH_RUNPY' "$DATA/app"
+EOF
+  chmod +x "$WATCH_CMD.new"
+  mv -f "$WATCH_CMD.new" "$WATCH_CMD"
+fi
+
 # ---- the background jobs: the page, then the menu bar item ----
-URL="http://localhost:$("$PY" -I -B -c 'import sys; sys.path.insert(0, sys.argv[1])
+URL="http://127.0.0.1:$("$PY" -I -B -c 'import sys; sys.path.insert(0, sys.argv[1])
 from switchboard.core import port; print(port())' "$DATA/app")"
 ME="gui/$(id -u)"
 JOB_PATH="$HOME/.local/bin:$HOME/.npm-global/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
@@ -813,6 +977,54 @@ EOF
 else
   [ "$ELSEWHERE" = 0 ] || say "This is not your account's own home folder, so no background job was added: it would take the place of your account's own."
   say "Without the background job, start the page with: $CMD serve"
+fi
+# The sign-in watch's job, right after the page's and in the same way. launchd starts it again whenever it exits,
+# also after a clean exit (KeepAlive true): while Switchboard is installed, a watch that is not running is never
+# right. No ProcessType: macOS gives a Background job low CPU priority and coalesced timers, and the watch is there to
+# react within a fraction of a second on a busy Mac. Its output goes to signin-watch.out (the watch's own log,
+# signin-watch.log, is rotated by renaming, which a file launchd holds open must never be). The watch starts a page
+# that has stopped, and the page starts a watch that has stopped. None with
+# --no-agent. A copy without the watch adds no job, and one an earlier install added goes (with --no-agent launchd is
+# not asked, but its file goes: a job left pointing at a launcher that is gone would fail every few seconds).
+if [ "$AGENT" = 1 ] && [ -f "$WATCH_MODULE" ]; then
+  cat > "$WATCH_PLIST" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>$WATCH_LABEL</string>
+  <key>ProgramArguments</key>
+  <array><string>$(xml "$WATCH_CMD")</string></array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key><string>$(xml "$JOB_PATH")</string>
+  </dict>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>ThrottleInterval</key><integer>10</integer>
+  <key>StandardOutPath</key><string>$(xml "$DATA/signin-watch.out")</string>
+  <key>StandardErrorPath</key><string>$(xml "$DATA/signin-watch.out")</string>
+</dict>
+</plist>
+EOF
+  # Stop the old copy and wait until macOS has really let go of it, or starting the new one fails: up to 15 s, as
+  # the watch gives a look under way up to 10 s to finish when it is stopped.
+  launchctl bootout "$ME/$WATCH_LABEL" >/dev/null 2>&1 || true
+  i=0
+  while [ $i -lt 60 ] && launchctl print "$ME/$WATCH_LABEL" >/dev/null 2>&1; do i=$((i + 1)); sleep 0.25; done
+  i=0
+  until launchctl bootstrap "$ME" "$WATCH_PLIST" 2>/dev/null || [ $i -ge 4 ]; do i=$((i + 1)); sleep 1; done
+  if launchctl print "$ME/$WATCH_LABEL" >/dev/null 2>&1; then note "The sign-in watch is running, and starts at every login."
+  else say "Added the sign-in watch's background job, but macOS would not start it. The page starts it again."; fi
+elif [ ! -f "$WATCH_MODULE" ]; then
+  rm -f "$WATCH_CMD"
+  if [ -f "$WATCH_PLIST" ]; then
+    [ "$AGENT" = 0 ] || launchctl bootout "$ME/$WATCH_LABEL" >/dev/null 2>&1 || true
+    rm -f "$WATCH_PLIST"
+    say "Removed the sign-in watch: this copy of Switchboard does not have it."
+  elif [ "$AGENT" = 1 ]; then
+    note "No sign-in watch: this copy of Switchboard does not have it."
+  fi
 fi
 # The menu bar item's job runs its launcher at every login, under the same rule (none with --no-agent). Its menu has
 # no Quit: launchd starts it again whenever it exits (KeepAlive), and only `switchboard menubar off` turns it off, by

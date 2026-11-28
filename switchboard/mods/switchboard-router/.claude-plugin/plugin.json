@@ -1,0 +1,5 @@
+{
+  "name": "switchboard-router",
+  "version": "0.1.0",
+  "description": "Applies Switchboard's routes inside Claude Code: the model a helper starts on and the effort of a step, as your plan says. With no plan, or an old one, it does nothing."
+}

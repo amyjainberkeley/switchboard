@@ -65,6 +65,12 @@ class NothingLeavesThisMac(unittest.TestCase):
             for url in re.findall(r'https?://[^\s\'"<>)]+', line):
                 if url.startswith('http://www.w3.org/2000/svg'):
                     continue                    # the SVG namespace of the tab icon, never fetched
+                # the page's own address, said in a comment or where the page moves itself there (its key is kept
+                # for one address): it opens nothing else
+                if url == 'http://127.0.0.1:':
+                    self.assertTrue(line.lstrip().startswith('//') or
+                                    "location.replace('http://127.0.0.1:' + location.port + " in line, line)
+                    continue
                 self.assertTrue(url.startswith('https://claude.ai/'), url)
                 self.assertIn("post('/api/open'", line, 'a claude.ai link must only be handed to /api/open: ' + url)
 
@@ -131,17 +137,29 @@ class EveryActionHasAControl(unittest.TestCase):
         self.assertIn("'session_at'", self.html)
         self.assertIn("'weekly_at'", self.html)
 
+    # Server actions only the terminal asks for: `switchboard setup` and `add` follow the sign-in they started
+    # (firstrun.py).
+    TERMINAL_ONLY = ('/api/connect-look',)
+
     def test_every_action_the_server_takes_is_asked_for_somewhere(self):
-        paths = set(re.findall(r"path == '(/api/[a-z]+)'", read(SERVER)))
+        paths = set(re.findall(r"path == '(/api/[a-z-]+)'", read(SERVER)))
         self.assertGreaterEqual(len(paths), 14)
-        for path in sorted(paths):
+        for path in sorted(paths - set(self.TERMINAL_ONLY)):
             with self.subTest(path=path):
                 self.assertIn("post('%s'" % path, self.html)
-        self.assertIn("fetch('/api/state', {signal: timed(8000)})", self.html)
+        for path in self.TERMINAL_ONLY:
+            self.assertIn(path, paths)
+            self.assertNotIn(path, self.html)
+        self.assertIn("api('/api/state', {signal: timed(8000)})", self.html)     # through api(), the one sender
 
     def test_changes_carry_the_x_switchboard_header(self):
         self.assertIn("headers: {'Content-Type': 'application/json', 'X-Switchboard': '1'}", self.html)
-        self.assertEqual(self.html.count("method: 'POST'"), 1)       # one place sends changes, with the header
+        # two places send a POST, each with the header: post() for every change, and the one trade of a ticket for
+        # the page key (pagekey.py), made before the key is held
+        self.assertEqual(self.html.count("method: 'POST'"), 2)
+        self.assertEqual(self.html.count("method: 'POST', headers: {'Content-Type': 'application/json', "
+                                         "'X-Switchboard': '1'}"), 2)
+        self.assertIn("fetch('/api/ticket', {method: 'POST', headers:", self.html)
 
 
 def style(html):
@@ -201,6 +219,17 @@ class TheLook(unittest.TestCase):
         # (The page draws shadcn's shadows: popovers, inputs, the focus ring, so 'box-shadow: 0' is not refused)
         for word in ('yellow', 'gradient', 'text-transform: uppercase', 'letter-spacing: .1'):
             self.assertNotIn(word, self.html)
+
+    def test_another_assistant_is_drawn_once_as_a_row_and_settings_keeps_its_look(self):
+        # The row after the accounts is the one drawing: no section of its own, no styles of its own, and no rule
+        # that reaches Settings' profile cells (.pairs .pv) from outside their list.
+        for gone in ('id="providers"', 'drawProviders', 'providersHTML', 'PV_WINDOWS', 'pv-'):
+            self.assertNotIn(gone, self.html)
+        rules = [u.strip() for u in re.findall(r'([^{}]+)\{[^{}]*\}', self.css)]
+        reach = [r for r in rules for sel in r.split(',')
+                 if re.search(r'\.pv\b', sel) and not sel.strip().startswith('.pairs .pv')]
+        self.assertEqual(reach, [])
+        self.assertIn('<div id="acc-mk"></div><div id="acc"></div><div id="acc-other"></div>', self.html)
 
     def test_the_sections_are_labelled(self):
         for needle in ('<h1 id="h-live">', 'role="table" aria-label="Accounts"', '<h1 id="h-set">Settings', '<h1 id="h-art">Artifacts</h1>',

@@ -19,6 +19,7 @@ TMP = tempfile.mkdtemp(prefix='switchboard-test-')
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
 
 from switchboard import artifacts, browser, connect, core, demo, engine, server
+import pagekey_help  # noqa: E402  (the page key, as Switchboard's own programs send it)
 from switchboard.accounts import api
 from fakes_accounts_api import install
 
@@ -399,9 +400,9 @@ class Server(unittest.TestCase):
         self.assertIn(b'const auto = true;', self.ask('/go?k=' + core.key())[1])
 
     def test_bad_input_is_refused_politely(self):
-        ok = {'Content-Type': 'application/json', 'X-Switchboard': '1'}
         core.DEMO = False                       # the real checks, which run before anything is touched
         try:
+            ok = pagekey_help.with_key({'Content-Type': 'application/json', 'X-Switchboard': '1'})   # the real key
             self.assertEqual(self.ask('/api/go', {'url': 5}, **ok)[0], 400)
             self.assertEqual(self.ask('/api/go', {'url': 'https://example.com/artifact/' + ID1}, **ok)[0], 400)
             self.assertEqual(self.ask('/api/switch', {'email': ['x']}, **ok)[0], 400)

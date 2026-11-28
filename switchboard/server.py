@@ -1,4 +1,4 @@
-"""The page at http://localhost:7799 and the loop that keeps it current.
+"""The page at http://127.0.0.1:7799 and the loop that keeps it current.
 
 The server listens on this Mac only (127.0.0.1) and answers only its own page:
 requests from other websites are refused.
@@ -15,6 +15,7 @@ import queue
 import re
 import signal
 import socket
+import subprocess
 import sys
 import threading
 import time
@@ -32,8 +33,11 @@ from . import (artifacts, awake, browser, chats, claudecode, connect, core, engi
                memorypage, models, more, notify, plan, resume, statusline, term, usage)
 from . import signins
 from . import previews
+from . import chatfile
 from . import bearers
 from . import insights
+from . import optimize
+from . import keeprun
 from .accounts import api
 from . import notify_hooks
 from . import watch
@@ -42,6 +46,7 @@ from . import newer
 from . import pace
 from . import spend
 from . import names
+from . import pagekey
 from .core import (VERSION, data_path, WEB, SwitchError, ensure_account, event, load, locked, log, name_of,
                    port, set_active, set_setting, settings)
 
@@ -841,7 +846,9 @@ def tell(before, after, lines, now):
         if note.key.startswith('near:') and (note.key not in known or same_window(note.key, note.instance)):
             continue
         if note.key.startswith('switch:'):
-            note = with_switch_lines(note, after)
+            move = move_words(before.get('active'), after.get('active'), now)
+            note = note._replace(body=move[0], instance=move[1], every=None) if move else \
+                with_switch_lines(note, after)
         try:
             notify.send(note, run=NOTIFY_RUN, now=now)
         except Exception as e:  # noqa: BLE001 - one note that fails must not stop the others
@@ -940,6 +947,22 @@ def signins_together(notes, said, after):
 NOTE_ROOM = 240             # notify.py cuts a body past this many characters
 
 
+def move_words(frm, to, now):
+    """(body, instance) of the loop's notification for a move that keeps Claude Code signed in (autoloop.move_body),
+    for the switch from frm to to, unless the history says someone else made a switch to it since; else None. So the
+    one notification of that move says why, whichever of the page and the loop sends it first."""
+    try:
+        from .accounts import autoloop
+        move = autoloop.move_body(frm, to, now)
+        if move is None:
+            return None
+        rec = history.recorded_switch(to, since=move[2], now=now)
+        return move[:2] if rec is None or rec.get('by') == 'auto' else None
+    except Exception as e:  # noqa: BLE001 - the page's own words then
+        log('the note of a move that keeps Claude Code signed in (%s)' % type(e).__name__)
+        return None
+
+
 def with_switch_lines(note, after):
     """A switch's notification with what the person should know about the account it went to (no profile signed in
     as it, or Claude in Chrome without its extension there; artifacts.switch_note, naming it as the notification does,
@@ -1036,8 +1059,8 @@ def read_usage():
 def load_week(now=None):
     """The last week read, kept on disk: a restart shows it at once, with its own dates, and usage_view reads it again
     when it is old. A week read more than a day ago, or in a shape this page does not draw, waits for the first read
-    instead. One whose hours do not say where they went (an earlier build kept it) counts as old. True when one was
-    taken."""
+    instead. One whose hours do not say where they went, or whose cache reads were not weighed by model (an earlier
+    build kept it), counts as old. True when one was taken."""
     now = time.time() if now is None else now
     try:
         with open(data_path(WEEK_FILE), encoding='utf-8') as f:
@@ -1049,7 +1072,7 @@ def load_week(now=None):
             or not isinstance(page.get('series'), dict) or not isinstance(at, (int, float)) or isinstance(at, bool) \
             or not -WEEK_AHEAD <= now - at < WEEK_KEPT_FOR:           # NaN fails this too
         return False
-    if not _says_where(page):
+    if not _says_where(page) or not _reads_by_model(page):
         at = min(at, now - USAGE_STALE)         # kept by an earlier build: shown now, read again at the first chance
     with USAGE_LOCK:
         if USAGE['page'] is not None:
@@ -1064,6 +1087,13 @@ def _says_where(page):
     hours = (page.get('series') or {}).get('hours')
     used = [h for h in hours if isinstance(h, dict) and h.get('weight')] if isinstance(hours, list) else []
     return not used or any('projects' in h for h in used)
+
+
+def _reads_by_model(page):
+    """Whether a kept week's cache reads were weighed at each request's own model's price: one kept by a build from
+    before has cache reads in its tokens but no cache_read_low, so its weighted numbers used one weight for all."""
+    t = page.get('tokens')
+    return not isinstance(t, dict) or not t.get('cache_read') or 'cache_read_low' in t
 
 
 # ---------- Chats: what is going on in each account (chats.py), read in the background ----------
@@ -1144,22 +1174,25 @@ def chats_counts():
 # ---------- every assistant on one board (providers/view.py), built in the background ----------
 #
 # The board is built from files only (it starts no program and asks no app), on a thread of its own started from the
-# loop: the first time, every PROVIDERS_EVERY seconds, and at once when one of its files changes. A request never
-# waits for it: the state carries the last board (facts' `providers`), from its next build on. After each build, the
-# one notification the board gives (view.out_note) goes through notify.send, which never shows the same out spell
-# twice.
+# loop: the first time, every PROVIDERS_EVERY seconds, at once when one of the providers' own files changes, and at
+# most every PROVIDERS_ACCOUNTS_EVERY seconds when only the account engine's files changed (it rewrites its readings
+# about once a minute while Claude Code is in use, and only the first provider's line is worked out from them). A
+# request never waits for it: the state carries the last board (facts' `providers`), from its next build on. After
+# each build, the one notification (comeup.note) goes through notify.send, which never shows the same out spell twice.
 
 PROVIDERS_EVERY = 300.0     # seconds (monotonic) between two builds when nothing changed
+PROVIDERS_ACCOUNTS_EVERY = 120.0    # seconds (monotonic): the least between two builds for the accounts' files alone
+ACCOUNTS_FILES = ('accounts.json', 'usage.json')    # the account engine's, last in providers_files
 PROVIDERS = {'view': None, 'at': None, 'sig': None, 'running': False}
 PROVIDERS_LOCK = threading.Lock()
 
 
 def providers_files():
-    """The files the board is built from: the providers' settings, readings and programs, and the account engine's
-    accounts and readings (the first provider's line is worked out from them)."""
+    """The files the board is built from: the providers' settings, readings and programs, then the account engine's
+    accounts and readings (ACCOUNTS_FILES: the first provider's line is worked out from them)."""
     from .providers import contract as pc
-    return [data_path(pc.SETTINGS_FILE), data_path(pc.READINGS_FILE), data_path(pc.PROGRAMS_FILE),
-            data_path('accounts.json'), data_path('usage.json')]
+    return [data_path(pc.SETTINGS_FILE), data_path(pc.READINGS_FILE), data_path(pc.PROGRAMS_FILE)] + \
+        [data_path(name) for name in ACCOUNTS_FILES]
 
 
 def _stat_sig(paths):
@@ -1184,10 +1217,12 @@ def providers_tick(now=None, start=None):
         return False
     now = monotonic() if now is None else now
     sig = _stat_sig(providers_files())
+    own = len(sig) - len(ACCOUNTS_FILES)        # the providers' own files come first
     with PROVIDERS_LOCK:
-        at = PROVIDERS['at']
-        due = not PROVIDERS['running'] and (at is None or sig != PROVIDERS['sig'] or
-                                            not 0 <= now - at < PROVIDERS_EVERY)
+        at, last = PROVIDERS['at'], PROVIDERS['sig']
+        due = not PROVIDERS['running'] and (
+            at is None or last is None or not 0 <= now - at < PROVIDERS_EVERY or sig[:own] != last[:own] or
+            (sig[own:] != last[own:] and not 0 <= now - at < PROVIDERS_ACCOUNTS_EVERY))
         if not due:
             return False
         PROVIDERS['running'] = True
@@ -1210,10 +1245,16 @@ def providers_look(sig=None, now=None):
     except Exception as e:  # noqa: BLE001 - the last board stays; the next pass tries again
         log('building the board of assistants failed: %r' % e)
     with PROVIDERS_LOCK:
-        PROVIDERS.update(view=v if v is not None else PROVIDERS['view'], running=False,
-                         at=monotonic() if now is None else now, sig=sig)
-    if v is not None:
-        providers_note(v)
+        PROVIDERS.update(view=v if v is not None else PROVIDERS['view'], at=monotonic() if now is None else now,
+                         sig=sig)
+    try:
+        if v is not None:
+            with PROVIDER_ROWS_LOCK:            # the rows follow a new board at the loop's next pass (rows_tick)
+                PROVIDER_ROWS['at'] = None
+            providers_note(v)
+    finally:
+        with PROVIDERS_LOCK:                    # only after the note: a file that changed meanwhile waits for the
+            PROVIDERS['running'] = False        # next pass, never a second build and note beside this one
     # No SNAPSHOT.invalidate() here: the state is built again at the next look past its age (Snapshot.MAX_AGE), and
     # a forced build from a background look lands in the middle of whatever the page is asking for.
 
@@ -1224,19 +1265,38 @@ def providers_view():
         return PROVIDERS['view']
 
 
-def providers_note(board, now=None):
-    """The board's one notification (view.out_note): the first provider in the person's order is out and another
-    added one has room. Once per out spell (notify.send keeps the provider and its refill time). Never in the demo or
-    with notifications off. True when it was shown."""
+NOTE_SPELL = {'since': None}    # when this page first saw every Claude account at its lines, this spell (in memory)
+
+
+def providers_note(board, now=None, state=None):
+    """The one notification, after a build of the board (comeup.note): when the first provider in the person's order
+    is the one whose seats are the account list, every usable Claude account at the person's lines and another
+    provider's row holding, with where to press in the terminal's list; when another provider is first, the board's
+    own (view.out_note). Its rows are derived from this board. Once per out spell: notify.send keeps the key and the
+    spell (its end when known, else NOTE_SPELL's start). Never in the demo or with notifications off. state: the
+    page's state (view() when not given, built only when the note may speak). True when it was shown."""
     if core.DEMO or not helper_settings()['notify']:
+        NOTE_SPELL['since'] = None              # no spell is followed while nothing may speak: its start goes too
         return False
-    from .providers import view as provider_view, words as provider_words
+    from . import comeup
+    from .providers import rows as provider_rows_of, words as provider_words
     now = time.time() if now is None else now
-    got = provider_view.out_note(board, now)
-    if got is None:
-        return False
-    key, body, instance = got
     try:
+        st = {'now': now}
+        top = comeup.first(board)
+        if top is None or not top.get('account_list'):
+            NOTE_SPELL['since'] = None          # no spell of the account list's here: the next one starts afresh
+        else:
+            derived = provider_rows_of.from_board(board, now=now)
+            if not derived:
+                NOTE_SPELL['since'] = None
+                return False
+            st = dict(view() if state is None else state, provider_rows=derived)
+            NOTE_SPELL['since'] = (NOTE_SPELL['since'] or now) if comeup.at_lines(st) else None
+        got = comeup.note(st, board, since=NOTE_SPELL['since'])
+        if got is None:
+            return False
+        key, body, instance = got
         return notify.send(notify.Note(key, provider_words.NOTE_OUT_TITLE, body, instance, None), run=NOTIFY_RUN,
                            now=now)
     except Exception as e:  # noqa: BLE001 - a note that fails never stops the board
@@ -1244,24 +1304,186 @@ def providers_note(board, now=None):
         return False
 
 
-# ---------- models by the job: one setting in Claude Code's user settings ----------
+# ---------- the other providers' rows for the page and the menu bar (providers.rows, providers.press) ----------
 #
-# The one change offered: CLAUDE_CODE_SUBAGENT_MODEL=sonnet in the `env` of Claude Code's user settings, so
-# helpers and workflow steps that name no model run on Sonnet (models.py, preset "by-the-job" without its
-# Explore file). Off puts the file back as it was (models.undo), or, when Claude Code or you changed the file
-# since, takes out only that one key (preset "off"). It never waits for chats to finish: a change reaches only
-# helpers started afterwards (docs, env_running: "A running session applies new and changed values to its
-# environment when you save the file ... Removing a variable from the file doesn't unset it in a running
-# session; the removal takes effect the next time you launch `claude`.").
+# Each provider added besides Claude is a row after the Claude accounts, derived from the last board above
+# (rows.from_board: the board is the one reading of the world), with the chat that would go: the newest chat Claude
+# Code wrote on this Mac, by its name only. The chat is looked for on a thread of its own every PROVIDER_ROWS_EVERY
+# seconds (the chats view and one file's head), and the rows derived again then and right after a new board, never
+# for a request: the state carries the last rows. The chat's id and folder stay here, for a press.
+
+# (Its names are PROVIDER_ROWS*, rows_tick and rows_look; the board above keeps PROVIDERS*, providers_tick and
+# providers_look; ROWS is the accounts' tick's own. The state carries the board as 'providers' and these rows as
+# 'provider_rows'.)
+
+PROVIDER_ROWS_EVERY = 30.0  # seconds (monotonic) between two looks for the newest chat
+PROVIDER_ROWS = {'rows': [], 'chat': None, 'at': None, 'running': False}
+PROVIDER_ROWS_LOCK = threading.Lock()
+NEWEST = {'last': None}     # newest_chats' last answer, with the chats.json signature and the chat ids it came from
+
+
+def newest_chats(view=None, folder=None, most=None):
+    """[(chat id, its file, the folder it last named)] of the chats the last look saw, newest first. chats.json is
+    parsed only when it or the newest chats changed since the last answer (the same answer otherwise)."""
+    if view is None:
+        with CHATS_LOCK:
+            view = CHATS['view']
+    listed = [c for c in (view or {}).get('chats') or []
+              if isinstance(c, dict) and isinstance(c.get('last'), (int, float))]
+    if not listed:
+        return []
+    from .providers import press
+    listed.sort(key=lambda c: -c['last'])
+    listed = listed[:most or press.CANDIDATES]
+    path = chatfile.index_path(folder or core.data_dir())
+    key = (path, _stat_sig([path]), tuple(c.get('id') for c in listed))
+    last = NEWEST['last']
+    if last is not None and last[0] == key:
+        return list(last[1])
+    index = chatfile.load_index(path) or {'chats': {}}
+    out = []
+    for c in listed:
+        e = index['chats'].get(c.get('id'))
+        cwd = chatfile.resume_from(e).cwd if isinstance(e, dict) else None
+        if cwd:
+            out.append((c['id'], e.get('file'), cwd))
+    NEWEST['last'] = (key, tuple(out))
+    return out
+
+
+def rows_tick(now=None):
+    """Start a look at the other providers when one is due (rows_look, on a thread of its own). True when it
+    started one. Not while the first board is being built: the rows follow it (providers_look makes them due)."""
+    if core.DEMO:
+        return False
+    now = monotonic() if now is None else now
+    with PROVIDERS_LOCK:
+        if PROVIDERS['view'] is None and PROVIDERS['running']:
+            return False
+    with PROVIDER_ROWS_LOCK:
+        at = PROVIDER_ROWS['at']
+        if PROVIDER_ROWS['running'] or (at is not None and 0 <= now - at < PROVIDER_ROWS_EVERY):
+            return False
+        PROVIDER_ROWS['running'] = True
+    try:
+        threading.Thread(target=rows_look, kwargs={'folder': core.data_dir()}, name='switchboard-provider-rows',
+                         daemon=True).start()
+    except RuntimeError:
+        with PROVIDER_ROWS_LOCK:
+            PROVIDER_ROWS['running'] = False
+        return False
+    return True
+
+
+def rows_look(folder=None, kit=None):
+    """The chat that would go, and the rows derived for it from the last board (none before the first board), kept
+    for the state and for a press. When the last board has no provider that can have a row, no chat is listed at
+    all: no rows and no chat (a press then has no chat to carry). A failure keeps the last ones."""
+    rows, chat = None, None
+    try:
+        from .providers import press, rows as provider_rows_of
+        board = providers_view()
+        if board is not None and not provider_rows_of.from_board(board):
+            rows = []
+        else:
+            found = press.chat_from(newest_chats(folder=folder), kit)
+            rows = press.face_rows(found, kit, board) if board is not None else []
+            if found:
+                chat = dict(press.chat_words(found[0]), id=found[0].id, folder=found[1])
+    except Exception as e:  # noqa: BLE001 - the last rows stay; the next look tries again
+        log('looking at the other providers failed: %r' % e)
+    with PROVIDER_ROWS_LOCK:
+        if rows is not None:
+            PROVIDER_ROWS.update(rows=rows, chat=chat)
+        PROVIDER_ROWS.update(at=monotonic(), running=False)
+    # No SNAPSHOT.invalidate() here, as for the board's look (providers_look): a forced build from a background look
+    # lands in the middle of whatever the page is asking for; the state takes the rows at its next build
+    # (Snapshot.MAX_AGE).
+
+
+def provider_rows():
+    """The other providers' rows for the state, as the last look left them ([] before it, and with none added)."""
+    with PROVIDER_ROWS_LOCK:
+        return copy.deepcopy(PROVIDER_ROWS['rows'])
+
+
+PROVIDER_RE = re.compile(r'^[a-z][a-z0-9_-]{0,31}$')
+PRESS_GAP = 3.0             # seconds (monotonic): one press of Continue at most this often, whoever sends it
+PRESS = {'at': None}
+PRESS_LOCK = threading.Lock()
+
+
+def provider_number(pid, rows=None, st=None):
+    """pid's number in the terminal's list (its first row's), by the list's own rule (term.provider_numbers) over the
+    accounts the page's state lists (render keeps the connected ones), or None."""
+    rows = provider_rows() if rows is None else rows
+    if not any(isinstance(r, dict) and r.get('provider') == pid for r in rows):
+        return None
+    st = load() if st is None else st
+    numbers = term.provider_numbers([a for a in st['accounts'].values() if a.get('connected')], rows)
+    return next((n for r, n in zip(rows, numbers) if n is not None and r.get('provider') == pid), None)
+
+
+def continue_in(pid, mark=None, kit=None):
+    """POST /api/continue: Continue here on another provider's row (the menu bar's menu, the page).
+    providers.press: the provider's own desktop app opens on the note of the chat the faces show, kept here
+    (a request names only the provider and the chat's mark, never a chat or a folder), and the person presses send
+    there; without that app, the line to run in a terminal and nothing else. Never a start in a terminal, never a
+    chat sent. The rows are looked at again first: when the newest chat is no longer the one whose mark the face
+    sent, the press is refused (the person sees the chat that would go before it goes). A refusal is one line
+    (SwitchError)."""
+    if not isinstance(pid, str) or not PROVIDER_RE.match(pid):
+        raise SwitchError('Say which provider.')
+    from .providers import cli as provider_cli, press, words as provider_words
+    with PRESS_LOCK:                            # one press every few seconds: a second one sooner is refused
+        now = monotonic()
+        if PRESS['at'] is not None and 0 <= now - PRESS['at'] < PRESS_GAP:
+            raise SwitchError(provider_words.PRESS_SOON)
+        PRESS['at'] = now
+    rows_look(folder=core.data_dir(), kit=kit)
+    with PROVIDER_ROWS_LOCK:
+        chat, rows = copy.deepcopy(PROVIDER_ROWS['chat']), copy.deepcopy(PROVIDER_ROWS['rows'])
+    if chat is not None and chat.get('mark') != mark:
+        raise SwitchError(provider_words.PRESS_NEWER)
+    try:
+        said = press.press(pid, chat, number=provider_number(pid, rows), kit=kit)
+    except provider_cli.Refused as e:
+        raise SwitchError(str(e))
+    finally:
+        with PROVIDER_ROWS_LOCK:                # the row may have changed: the next pass looks again
+            PROVIDER_ROWS['at'] = monotonic() - PROVIDER_ROWS_EVERY
+    return said
+
+
+# ---------- models by the job: two switches in Claude Code's user folder ----------
+#
+# Two switches, each on or off by itself (models.py, PARTS). Models by the job ('helpers'): four helper files in
+# Claude Code's user agents folder and one short note in its user rules folder, no setting. Sonnet for helpers
+# ('sonnet'): CLAUDE_CODE_SUBAGENT_MODEL=sonnet in the `env` of Claude Code's user settings, so helpers and workflow
+# steps that name no model run on Sonnet, and CLAUDE_CODE_SUBAGENT_EFFORT=high where Claude Code reads it. Turning one
+# moves only its own part (models.plan(..., only=part)); the other stays as it is. Off puts the files back as they
+# were (models.undo) when the last change was exactly that switch going on, or else takes out only that switch's own
+# keys and files. It never waits for chats to finish: a change reaches only helpers started afterwards (docs,
+# env_running: "A running session applies new and changed values to its environment when you save the file ...
+# Removing a variable from the file doesn't unset it in a running session; the removal takes effect the next time
+# you launch `claude`.").
 
 MODELS_KW = {}                  # tests point these at made-up folders: environ, managed_dir, versions
+MODELS_LOCK = threading.Lock()  # with core.file_lock('models.json.lock'): one change to the switches at a time
+MODELS_READ_ONLY = "Claude Code's settings file is set read-only, so Switchboard leaves it alone."
+MODELS_LINK_ON = "Claude Code's settings file is a link, and Switchboard doesn't write through links."
+MODELS_LINK_OFF = ("Claude Code's settings file is a link now, and Switchboard doesn't write through links. Take its "
+                   'lines out of that file yourself.')
+HELPERS_WRITE_FAILED = "Switchboard could not write in Claude Code's agents or rules folder. Nothing was changed."
+OWN_FOLDER_FAILED = 'Switchboard could not write in its own folder (%s). Nothing was changed.'
+MODELS_COULD_NOT = 'Switchboard could not make that change. Nothing was written.'
 HELPER_NAMES = {'workflow agents': 'Workflow steps', 'general-purpose': 'Helpers', 'forks': 'Forks',
-                'claude': 'Claude', '(unknown)': 'Unknown'}
+                'claude': 'Claude', '(unknown)': 'Unknown'}     # Models by the job's four keep their own names
 
 
 def models_from_history(summary):
     """From the week's history: the share "Sonnet for helpers" would have moved, and what each kind of
-    helper ran on (whole percents)."""
+    helper ran on (whole percents). Models by the job has no such share: see models.would_have_moved."""
     moved = models.would_have_moved(summary, lookups=False)
     log_rows = []
     for h in models.seen(summary).get('helpers') or []:
@@ -1275,10 +1497,9 @@ def models_from_history(summary):
 
 
 def _models_state():
-    """(the picture models.py reads, whether Switchboard's setting is in place, what else decides it)."""
+    """(the picture models.py reads, whether Sonnet for helpers' model line is in place, what else decides it)."""
     pic = models.current(check_busy=False, **MODELS_KW)
-    key = 'env.' + models.SUBAGENT_VAR
-    on = any(o['what'] == 'setting' and o['key'] == key for o in pic['ours'])
+    on = 'env.' + models.SUBAGENT_VAR in pic['parts']['sonnet']
     decided = None
     if pic['force']:
         decided = {'what': 'force', 'where': pic['force']}
@@ -1292,96 +1513,282 @@ def _models_state():
     return pic, on, decided
 
 
-def _refusal(text):
-    """A refusal from models.py as one short line for the page (its own text explains more, for the log)."""
+def _models_on(pic):
+    """The switches that have something of Switchboard's in place: what the other switch's change leaves as it is."""
+    return set(p for p in models.PARTS if pic['parts'][p])
+
+
+def _settings_left(pl, off):
+    """The short line when a plan leaves Switchboard's own lines in a settings file that is a link or set read-only
+    (On: they can't go in; Off: they can't come out, and the row stays on), or None."""
+    whys = [s['why'] for s in pl['skipped'] if s['what'].startswith('env.')]
+    if any('is a link' in w for w in whys):
+        return MODELS_LINK_OFF if off else MODELS_LINK_ON
+    if any('read-only' in w for w in whys):
+        return MODELS_READ_ONLY
+    return None
+
+
+def _refusal(text, off=False):
+    """A refusal from models.py as one short line for the page (its own text explains more, for the log). A file that
+    became a link, or was set read-only, between the plan and the write: the settings file's own line only when it
+    is the settings file, and "take its lines out" only on Off (`off`)."""
     log('models: %s' % text)
+    for words in (' is a link now', ' is set read-only'):
+        if words in text:
+            if _where(text.split(words)[0]) != _where(_models_settings()):
+                return MODELS_COULD_NOT             # a helper file or the note: Switchboard's own, not your settings
+            if words == ' is set read-only':
+                return MODELS_READ_ONLY
+            return MODELS_LINK_OFF if off else MODELS_LINK_ON
     if 'changed since' in text or 'changed after' in text:
         return "Claude Code's settings changed just now. Nothing was written; try again."
     if 'could not make this edit' in text:
-        return 'Switchboard could not make that change. Nothing was written.'
-    if any(k in text for k in ('read-only', 'is older than', 'no Claude Code folder', 'record')):
-        return _blocked_why(text)
-    return 'Switchboard could not make that change. Nothing was written.'
+        return MODELS_COULD_NOT
+    if any(k in text for k in ('is older than', 'no Claude Code folder', 'record')):
+        return _press_why(text)
+    return MODELS_COULD_NOT
+
+
+def _press_why(text):
+    """A plan's refusal, as the one short line a press that was refused for it says."""
+    why = _blocked_why(text)
+    return models.HELPERS_UNREADABLE if why == models.HELPERS_UNREADABLE_WHY else why
 
 
 def _blocked_why(text):
-    """A plan's refusal, as one short line."""
+    """A plan's refusal, as one short line (the row's, and `switchboard models`': nothing was tried yet)."""
     t = text or ''
+    if t in (models.HELPERS_UNREADABLE_WHY, models.HELPERS_UNREADABLE):
+        return models.HELPERS_UNREADABLE_WHY
     if 'read-only' in t:
-        return "Claude Code's settings file is set read-only, so Switchboard leaves it alone."
-    if 'is older than' in t:
-        return 'Needs Claude Code %s or newer.' % models._vs(models.NEEDS_ORDER)
+        return MODELS_READ_ONLY
+    if 'is a link' in t:
+        return MODELS_LINK_ON
+    if 'is older than' in t:                    # each switch's own version: 2.1.251, or 2.1.271 for the helpers
+        m = re.search(r'older than (\d+\.\d+\.\d+)', t)
+        return 'Needs Claude Code %s or newer.' % (m.group(1) if m else models._vs(models.NEEDS_ORDER))
     if 'no Claude Code folder' in t:
         return 'Claude Code is not set up here yet.'
     if "can't be read" in t and 'record' in t:
         return "Switchboard's record of this setting can't be read."
+    if 'ignores the `model` field' in t:
+        return 'One model for every helper is set, so their own model lines would be ignored.'
     return "Claude Code's settings file can't be read." if t else None
 
 
+def _left_out(pl):
+    """The helpers a plan leaves out, by name: [(name, short why)]."""
+    out = []
+    for s in pl['skipped']:
+        h = models.HELPER_BY_FILE.get(os.path.basename(s['what']))
+        if h:
+            w = s['why']
+            out.append((h['name'], 'you have your own' if 'your own' in w or 'not Switchboard' in w or
+                        'You edited' in w else 'your organization has one' if 'managed settings' in w
+                        else 'your settings deny it' if 'deny' in w else 'left out'))
+    return out
+
+
+def _helpers_none(pl):
+    """Why a plan for Models by the job puts no helper in: each of the four is left out, and why."""
+    left = _left_out(pl)
+    if left and all(w == 'you have your own' for _, w in left):
+        return 'You have your own helpers with these names.'
+    return 'Every helper is left out here: %s.' % ', '.join('%s (%s)' % x for x in left) if left else 'Nothing to add.'
+
+
+def _helpers_left(pic):
+    """Why Switchboard's helper files or note may still be in place with no way to take them out now, or None: its
+    record can't be read while a file with one of their names is there (Switchboard can't tell its own from yours)."""
+    if not pic['state_problem']:
+        return None
+    cd = pic['claude_dir']
+    names = [os.path.join(cd, models.AGENTS_DIR, h['file']) for h in models.HELPERS]
+    names.append(os.path.join(cd, models.RULES_DIR, models.NOTE_FILE))
+    return _models_record_line() if any(os.path.lexists(p) for p in names) else None
+
+
+def _helpers_view(pic, on_parts):
+    """Models by the job, for GET /api/models: on or off, and the helpers it leaves out (and why), by name."""
+    if pic['state_problem']:
+        why = _helpers_left(pic)
+        return {'enabled': None if why else False, 'why': why, 'left_out': [],
+                'blocked': None if why else "Switchboard's record of this setting can't be read."}
+    on = 'helpers' in on_parts
+    if on:
+        ours = set(pic['parts']['helpers'])
+        mine = set(n for a in pic['agents'] if a['set_by'] == 'you' for n in a['takes'])   # models._names_taken
+        return {'enabled': True, 'blocked': None,
+                'left_out': [{'name': h['name'], 'why': 'you have your own' if h['name'] in mine else 'left out'}
+                             for h in models.HELPERS if h['file'] not in ours]}
+    pl = models.plan(models.preset_with(on_parts | {'helpers'}), only='helpers', **MODELS_KW)
+    blocked = _blocked_why(pl['blocked']) if pl['blocked'] else None
+    if not blocked and not any(e['what'] == 'file' for e in pl['edits']):
+        blocked = _helpers_none(pl)
+    return {'enabled': False, 'blocked': blocked,
+            'left_out': [{'name': n, 'why': w} for n, w in _left_out(pl)]}
+
+
 def models_view():
-    """GET /api/models: on or off, what else decides it (by name), what it would have moved last week, and
-    what each kind of helper ran on. Never waits for the history read."""
+    """GET /api/models: Sonnet for helpers on or off (with its effort), what else decides it (by name), what it would
+    have moved last week and what each kind of helper ran on; and Models by the job under 'helpers'. Never waits for
+    the history read."""
     if core.DEMO:
         from . import demo
         return demo.models()
     with USAGE_LOCK:
         extras = USAGE.get('extras')
+    effort_key = 'env.' + models.SUBAGENT_EFFORT_VAR
+    level = None
     try:
         pic, on, decided = _models_state()
+        level = pic['effort_level']                 # CLAUDE_CODE_EFFORT_LEVEL set somewhere: it comes first
         why = None if on else _models_left(pic)
         unknown = why is not None                                # its key may be there: never shown as off
-        blocked = None
-        if not on and not decided and not unknown:
-            blocked = _blocked_why(models.plan('by-the-job', lookups=False, **MODELS_KW)['blocked'])
+        blocked = effort = None
+        helpers = _helpers_view(pic, _models_on(pic))
+        if on:
+            effort = models.SONNET_EFFORT if effort_key in pic['parts']['sonnet'] else None
+        elif not decided and not unknown:
+            pl = models.plan(models.preset_with(_models_on(pic) | {'sonnet'}), only='sonnet', **MODELS_KW)
+            blocked = _blocked_why(pl['blocked']) or _settings_left(pl, False)
+            effort = models.SONNET_EFFORT if any(e['key'] == effort_key for e in pl['edits']) else None
     except OSError as e:
         unknown = True
+        helpers = {'enabled': None, 'blocked': None, 'left_out': []}
         why = _models_record_line() if e.filename and os.path.abspath(e.filename) == os.path.abspath(_models_record()) \
             else "Claude Code's settings file can't be read."
     if unknown:
         out = {'enabled': None, 'unreadable': True, 'decided_by': None, 'blocked': None, 'model': 'Sonnet',
-               'why': why}                                       # the one line `switchboard models` says
+               'effort': None, 'why': why, 'helpers': helpers, 'effort_level': level}  # what `switchboard models` says
         out.update(extras or {'moved': None, 'exact': None, 'log': []})
         return out
-    out = {'enabled': on, 'decided_by': decided, 'blocked': blocked, 'model': 'Sonnet'}
+    out = {'enabled': on, 'decided_by': decided, 'blocked': blocked, 'model': 'Sonnet', 'effort': effort,
+           'helpers': helpers, 'effort_level': level}
     out.update(extras or {'moved': None, 'exact': None, 'log': []})
     return out
 
 
-def models_turn(on):
-    """POST /api/models: put Switchboard's one setting in place, or take it back. Returns {'changed', 'note'}:
-    note 'next' when open chats will use it for their next helpers, 'restart' when they keep the old value
-    until they restart, None when no chat is open (or nothing changed)."""
+def models_turn(on, part='sonnet'):
+    """POST /api/models: turn one switch, 'sonnet' (Sonnet for helpers) or 'helpers' (Models by the job), on or off;
+    the other stays as it is. Returns {'changed', 'note'}: note 'next' when open chats will use Sonnet for their next
+    helpers, 'restart' when they keep the old value until they restart, None when no chat is open (or nothing changed,
+    or the switch is Models by the job)."""
+    if part not in models.PARTS:
+        raise SwitchError('That needs helpers or sonnet.')
     try:
-        return _models_turn(on)
+        # One change at a time, whoever asks (the page, `switchboard models`, the uninstaller): models.apply() reads
+        # the record at its start and saves it at its end, so two at once would lose one switch's part of it.
+        with MODELS_LOCK, core.file_lock('models.json.lock'):
+            return _models_turn(on, part)
     except OSError as e:
-        if e.filename and os.path.abspath(e.filename) == os.path.abspath(_models_record()):
-            raise SwitchError(_models_record_line())
-        raise SwitchError("Claude Code's settings file can't be read.")
+        raise SwitchError(_models_failed(e, part))
+
+
+def _models_failed(e, part):
+    """An OSError on a press, as one short line that names where it happened: Switchboard's record (it can't be read),
+    Switchboard's own folder (the lock, the record's temp file, a copy in models-backups/), Claude Code's agents or
+    rules folder, or its settings file (the file, its temp file or the copy beside it). Anything else is said
+    plainly."""
+    name = e.filename
+    if not name:
+        return MODELS_COULD_NOT
+    if _where(name) == _where(_models_record()):
+        return _models_record_line()
+    for folder in (os.path.dirname(os.path.abspath(_models_record())), core.data_dir()):
+        if _within(name, folder):
+            return OWN_FOLDER_FAILED % _short(folder)
+    cd = models._cd(MODELS_KW.get('claude_dir'))
+    if any(_within(name, os.path.join(cd, d)) for d in (models.AGENTS_DIR, models.RULES_DIR)):
+        return HELPERS_WRITE_FAILED
+    base, settings = os.path.basename(name), models.SETTINGS_NAME
+    if os.path.dirname(_where(name)) == os.path.realpath(cd) and (
+            base in (settings, settings + '.switchboard-backup') or base.startswith('.%s.' % settings)):
+        return models.HELPERS_UNREADABLE if part == 'helpers' else "Claude Code's settings file can't be read."
+    return MODELS_COULD_NOT
+
+
+def _where(path):
+    """A path with its folder's links resolved, to compare two paths (the file itself may be a link)."""
+    p = os.path.abspath(path)
+    return os.path.join(os.path.realpath(os.path.dirname(p)), os.path.basename(p))
+
+
+def _within(path, folder):
+    """Is `path` the folder `folder`, or anywhere in it?"""
+    f = os.path.realpath(folder)
+    p = _where(path)
+    return p == f or p.startswith(f + os.sep) or os.path.realpath(path) == f
+
+
+def _short(path):
+    """A path with the home folder said as ~."""
+    h, p = os.path.normpath(core.home()), os.path.normpath(path)
+    return '~' + p[len(h):] if p.startswith(h + os.sep) else p
+
+
+def optimize_view():
+    """GET /api/optimize: the week's takeaways (optimize.py) from the week already read, none in the demo."""
+    if core.DEMO:
+        return {'takeaways': []}
+    with USAGE_LOCK:
+        page = USAGE['page']
+    return {'takeaways': optimize.takeaways(page, optimize.router_state(count=CACHE_COUNT['got']))}
+
+
+CACHE_COUNT_EVERY = 600     # the router's count of helpers' cache: at most every ten minutes, from the loop only
+CACHE_COUNT_LIMIT = 2       # seconds one count may take (a first count stops there; the next one goes on)
+CACHE_COUNT = {'got': None, 'at': None, 'running': False}     # its last answer, in memory only
+
+
+def cache_count_tick(now=None):
+    """Start the router's count (optimize.count_now) on a thread of its own when one is due. Never for a request."""
+    now = monotonic() if now is None else now
+    at = CACHE_COUNT['at']
+    if core.DEMO or CACHE_COUNT['running'] or (at is not None and 0 <= now - at < CACHE_COUNT_EVERY):
+        return False
+    CACHE_COUNT.update(running=True, at=now)
+    if not _started("the helpers' cache count", _cache_count_run):
+        CACHE_COUNT['running'] = False
+        return False
+    return True
+
+
+def _cache_count_run():
+    try:
+        got = optimize.count_now(CACHE_COUNT_LIMIT)
+        if got is not None:
+            CACHE_COUNT['got'] = got
+    finally:
+        CACHE_COUNT['running'] = False
 
 
 def _models_record():
     return MODELS_KW.get('state_path') or models.default_state_path()
 
 
+def _models_settings():
+    return os.path.join(models._cd(MODELS_KW.get('claude_dir')), models.SETTINGS_NAME)
+
+
 def _models_record_line():
-    h, p = os.path.normpath(core.home()), os.path.normpath(_models_record())
-    return "Switchboard's record of this setting (%s) can't be read." % (
-        '~' + p[len(h):] if p.startswith(h + os.sep) else p)
+    return "Switchboard's record of this setting (%s) can't be read." % _short(_models_record())
 
 
 def _models_owned():
-    """What Switchboard's record says its Models setting owns in this Claude Code folder ({'settings', 'agents'}).
-    Raises models.Refused, or OSError, when the record can't be read or understood."""
+    """What Switchboard's record says its Models switches own in this Claude Code folder ({'settings', 'agents',
+    'rules'}). Raises models.Refused, or OSError, when the record can't be read or understood."""
     st, _ = models._load_state(_models_record())
     return models._dir_state(st, models._cd(MODELS_KW.get('claude_dir')))['owned']
 
 
 def models_recorded():
-    """For the uninstaller: does Switchboard's record say its Models setting (or a helper file of its own) is in this
-    Claude Code folder? A record that can't be read counts as yes, the cautious answer."""
+    """For the uninstaller: does Switchboard's record say a Models switch left a setting, a helper file or the note in
+    this Claude Code folder? A record that can't be read counts as yes, the cautious answer."""
     try:
         owned = _models_owned()
-        return bool(owned.get('settings') or owned.get('agents'))
+        return bool(owned.get('settings') or owned.get('agents') or owned.get('rules'))
     except Exception:  # noqa: BLE001 - Refused, or the file can't be opened
         return True
 
@@ -1407,41 +1814,76 @@ def _models_left(pic):
             else "Claude Code's settings file can't be read.")
 
 
-def _models_turn(on):
-    pic, now_on, decided = _models_state()
-    if not on and not now_on:
-        why = _models_left(pic)
-        if why:                                 # never "off" while its key may still be there
-            raise SwitchError(why)
-    if on == now_on:
-        return {'changed': False, 'note': None}
+def _models_undo_is_exact(target):
+    """True when the record's last change is exactly this switch going on, so undoing it gives every file back byte
+    for byte (and leaves the other switch as it is)."""
+    try:
+        st, _ = models._load_state(_models_record())
+    except models.Refused:
+        return False
+    ds = models._dir_state(st, models._cd(MODELS_KW.get('claude_dir')))
+    if not ds['history']:
+        return False
+    last = ds['history'][-1]
+
+    def parts(pid):
+        try:
+            return set(models.preset(pid)['parts']) & set(models.PARTS) if pid else set()
+        except models.Refused:
+            return None
+    return last.get('preset') == ds['preset'] and parts(last.get('preset_before')) == parts(target)
+
+
+def _models_turn(on, part):
+    pic, sonnet_on, decided = _models_state()
+    on_parts = _models_on(pic)
+    if part == 'sonnet':
+        if not on and not pic['parts']['sonnet']:
+            why = _models_left(pic)
+            if why:                             # never "off" while its key may still be there
+                raise SwitchError(why)
+        if (on and sonnet_on) or (not on and not pic['parts']['sonnet']):
+            return {'changed': False, 'note': None}
+    else:
+        if not on and _helpers_left(pic):       # never "off" while its files may still be there
+            raise SwitchError(_helpers_left(pic))
+        if on == ('helpers' in on_parts):
+            return {'changed': False, 'note': None}
+    target = models.preset_with((on_parts | {part}) if on else (on_parts - {part}))
     try:
         if on:
-            if decided:
+            if part == 'sonnet' and decided:
                 raise SwitchError('Already set in %s.' % decided['where'])
-            pl = models.plan('by-the-job', lookups=False, **MODELS_KW)
+            pl = models.plan(target, only=part, **MODELS_KW)
             if pl['blocked']:
-                raise SwitchError(_blocked_why(pl['blocked']))
-            if not any(e['key'] == 'env.' + models.SUBAGENT_VAR for e in pl['edits']):
-                raise SwitchError((pl['skipped'][0]['why'] if pl['skipped'] else 'Nothing to change.'))
+                raise SwitchError(_press_why(pl['blocked']))
+            if part == 'sonnet' and not any(e['key'] == 'env.' + models.SUBAGENT_VAR for e in pl['edits']):
+                raise SwitchError(_settings_left(pl, False) or
+                                  (pl['skipped'][0]['why'] if pl['skipped'] else 'Nothing to change.'))
+            if part == 'helpers' and not any(e['what'] == 'file' for e in pl['edits']):
+                raise SwitchError(_helpers_none(pl))
             r = models.apply(pl, busy_ok=True)
         else:
             r = None
-            if pic['preset'] == 'by-the-job':
+            if _models_undo_is_exact(target):
                 try:
-                    r = models.undo(busy_ok=True, **dict((k, v) for k, v in MODELS_KW.items() if k == 'state_path'))
+                    r = models.undo(busy_ok=True, **dict((k, v) for k, v in MODELS_KW.items()
+                                                         if k in ('state_path', 'claude_dir')))
                     r = {'changed': r['restored']}
                 except models.Refused:
-                    r = None                    # the file changed since: take out only Switchboard's key
+                    r = None                    # a file changed since: take out only this switch's own part
             if r is None:
-                pl = models.plan('off', **MODELS_KW)
+                pl = models.plan(target, only=part, **MODELS_KW)
                 if pl['blocked']:
-                    raise SwitchError(_blocked_why(pl['blocked']))
+                    raise SwitchError(_press_why(pl['blocked']))
+                if part == 'sonnet' and not any(e['what'] == 'setting' for e in pl['edits']) \
+                        and _settings_left(pl, True):
+                    raise SwitchError(_settings_left(pl, True))     # its lines are still there: never "off"
                 r = models.apply(pl, busy_ok=True)
     except models.Refused as e:
-        raise SwitchError(_refusal(str(e)))
+        raise SwitchError(_refusal(str(e), off=not on))
     changed = bool(r.get('changed'))
-    open_chats = changed and models.busy(MODELS_KW.get('claude_dir')) > 0
+    open_chats = part == 'sonnet' and changed and models.busy(MODELS_KW.get('claude_dir')) > 0
     return {'changed': changed, 'note': ('next' if on else 'restart') if open_chats else None}
 
 
@@ -1518,6 +1960,96 @@ def segments(st, now, days=7):
 
 
 HISTORY_SHOWN = 12          # the newest lines of the log in every state; the page shows about ten
+# ---------- Keep running: what stopped the work, and the step for each (keeprun.build) ----------
+#
+# GET /api/keep answers at once with the last answer made, and makes a new one on its own thread when that one is
+# older than KEEP_EVERY (KEEP_ASKED when the page asks for fresh numbers), as the week does. A pass reads chat records
+# for keeprun.PASS_SECONDS at most; what it did not reach is read at the next.
+
+KEEP_EVERY = 300
+KEEP_ASKED = 30
+KEEP = {'page': None, 'at': 0, 'running': False, 'retry': False}
+KEEP_LOCK = threading.Lock()
+# A pass that failed as a whole: the section keeps what it had (or shows only this) and is read again at the usual pace.
+KEEP_FAILED = 'Keep running could not be read just now. Switchboard reads it again in 5 minutes.'
+
+
+def keep_follows():
+    """True when switchboard.room (automatic switching by the models the chats ask for) can be imported now."""
+    try:
+        from . import room  # noqa: F401 - another part of the build; without it the picker keeps its own words
+        return True
+    except Exception:  # noqa: BLE001 - not there, or broken: as if not there
+        return False
+
+
+def keep_retry(page):
+    """Read again after KEEP_ASKED (not KEEP_EVERY) when a part of the last pass failed or was not reached yet."""
+    return any(isinstance(p, str) and (p.endswith(' could not be read.') or
+                                       p.startswith('Part of your chat history is still being read'))
+               for p in (page or {}).get('problems') or [])
+
+
+def keep_view(fresh=False, press=False):
+    """GET /api/keep: the last answer made, or {'state': 'reading'} until the first is done. `press`: a press in the
+    section changed something, so a new answer is made now (the page asks again until it has it)."""
+    if core.DEMO:
+        return dict(keeprun.sample(), state='ready', follows=keep_follows())
+    now = time.time()
+    with KEEP_LOCK:
+        page, age = KEEP['page'], now - KEEP['at']
+        if age < 0:
+            age = float('inf')
+        due = age >= KEEP_EVERY or press or (age >= KEEP_ASKED and (fresh or KEEP['retry']))
+        # a disk almost full, or a Mac so busy the page's own loop eases (as the week does): the last answer stays,
+        # unless it is over an hour old or a press asked for a new one
+        if not KEEP['running'] and due and not (page is not None and not press and
+                                                (DISK['low'] or (easing() and age < USAGE_STALE))):
+            KEEP['running'] = True
+            threading.Thread(target=read_keep, daemon=True).start()
+    if page is None:
+        return {'state': 'reading'}
+    return dict(page, state='ready', follows=keep_follows())
+
+
+def read_keep():
+    page = None
+    try:
+        try:
+            auto_on = bool(engine.auto_settings().get('enabled'))
+        except Exception as e:  # noqa: BLE001 - History's last word on it is used instead
+            log('keep running: automatic switching could not be read: %r' % e)
+            auto_on = None
+        page = keeprun.build(auto_on=auto_on, awake_on=helper_settings()['awake'])
+    except Exception as e:  # noqa: BLE001 - the last answer stays, with one line
+        log('keep running was not read: %r' % e)
+    with KEEP_LOCK:
+        if page is None:
+            old = KEEP['page'] or {'v': keeprun.VERSION, 'at': time.time(), 'now': {'on': None, 'switch': False},
+                                   'week': {}, 'causes': [], 'waiting': [], 'cut_off': [], 'runs': [], 'steps': [],
+                                   'switches': [], 'problems': []}
+            page = dict(old, problems=[p for p in old.get('problems') or [] if p != KEEP_FAILED] + [KEEP_FAILED])
+            retry = False
+        else:
+            retry = keep_retry(page)
+        KEEP.update(page=page, at=time.time(), running=False, retry=retry)
+
+
+def running_turn(on):
+    """POST /api/running {on}: Keep running on or off (running.set_on). Its status, or a SwitchError in one sentence."""
+    try:
+        from . import running
+    except ImportError:
+        raise SwitchError('Keep running is not part of this build.')
+    try:
+        st = running.set_on(bool(on))
+    except getattr(running, 'RunningError', SwitchError) as e:
+        raise SwitchError(str(e))
+    with KEEP_LOCK:
+        KEEP['at'] = 0                          # the section is made again at the next look
+    return {'running': st}
+
+
 HISTORY_ALL = 200           # GET /api/history
 
 
@@ -1615,8 +2147,8 @@ def facts():
             'extensions': browser.extensions() if present else {}, 'host': host_ok() if present else None,
             'first_name': first_name(), 'check': check_view(), 'pictures': previews.known(),
             'consent': consent_view(), 'disk': disk_view(), 'notify_check': notify_check(), 'load': load_view(),
-            'providers': providers_view(),
-            'chats': chats_counts(), 'now': time.time(), 'demo': False}
+            'providers': providers_view(), 'provider_rows': provider_rows(),
+            'chats': chats_counts(), 'watch': watch_view(), 'now': time.time(), 'demo': False}
 
 
 def tab_view():
@@ -2197,6 +2729,7 @@ def render(st, f):
     # (and the native host's state, which is the same for every account).
     in_chrome = any(v is True for v in exts.values())
     links = link_rows(st, names, now, exts, f.get('host') if in_chrome else None)
+    seen = insights.five_seen()             # accounts whose saved readings ever held a 5-hour number
     accounts = []
     for email in sorted(st['order'], key=lambda e: st['accounts'][e].get('slot') or 99):
         a = st['accounts'][email]
@@ -2210,6 +2743,7 @@ def render(st, f):
             'needs_login': bool(a.get('needs_login')), 'disabled': False, 'id': a.get('id'),
             'status': a.get('status') or 'ok', 'frozen': bool(a.get('frozen')),
             'unmanaged': bool(a.get('unmanaged')), 'usage': a.get('usage'), 'usage_at': a.get('usage_at'),
+            'five_seen': email in seen,     # its plan has a 5-hour limit, whatever its last reading holds
             'checked_at': a.get('checked_at'), 'signin_ends_at': a.get('signin_ends_at'), 'note': a.get('note'),
             'elsewhere': bool(a.get('elsewhere')) and not a.get('live'),
             'profile': p,
@@ -2229,7 +2763,7 @@ def render(st, f):
              'profiles': not links_in_use or (bool(accounts) and all(a['profile'] and not a['signed_out']
                                                                       for a in accounts)),
              'links': bool(f['links'].get('on')) or not f['links'].get('installed')}   # no link app: nothing to wait for
-    return {'version': VERSION, 'page': page_id(), 'demo': f['demo'], 'accounts': accounts, 'active': st['active'],
+    out = {'version': VERSION, 'page': page_id(), 'demo': f['demo'], 'accounts': accounts, 'active': st['active'],
             'newer': newer.line(),          # one quiet line when a newer version is out (only while its look is on)
             'now': now, 'tick_at': st['tick_at'], 'error': st.get('error'), 'events': st['events'][-30:][::-1],
             'artifacts': [{'id': x.get('id'), 'url': x['url'], 'title': x.get('title') or x.get('name') or '',
@@ -2256,8 +2790,14 @@ def render(st, f):
             'keys': dict(f.get('keys') or {'count': 0, 'on': False, 'command': lanes.COMMAND}),
             'history': list(f.get('history') or []), 'first_name': f.get('first_name') or None,
             'consent': f.get('consent'), 'disk': f.get('disk'), 'notify_check': f.get('notify_check'),
+            # the board of every provider (providers/view.py; None before its first build: the page draws no group)
             'providers': f.get('providers'),
-            'load': f.get('load'), 'check': f.get('check'), 'in_chrome': in_chrome}
+            'load': f.get('load'), 'check': f.get('check'), 'in_chrome': in_chrome, 'watch': f.get('watch'),
+            # each added provider besides Claude, as a row after the accounts, with the chat that would go
+            # (provider_rows; the demo's made-up one); the terminal works out its own for the folder it runs in
+            'provider_rows': list(f.get('provider_rows') or [])}
+    from . import comeup                        # the one Next across providers, for every face
+    return comeup.with_next(out)
 
 
 def link_rows(st, names, now, extensions, host):
@@ -2751,8 +3291,9 @@ def _act(path, body):
                                    model_at=number(body, 'model_at'), strategy=strategy,
                                    model=None if model is None else model.strip() if isinstance(model, str) else model,
                                    rule=None if who is None or rule is None else (who.id, rule),
-                                   **dict((k, (who.id, v)) for k, v in (('line', line), ('rank', rank))
-                                          if v is not unsent))
+                                   **dict(dict((k, (who.id, v)) for k, v in (('line', line), ('rank', rank))
+                                               if v is not unsent),
+                                          **dict((k, body[k]) for k in ('pick_hold', 'sign_lines') if k in body)))
         if enabled is not None:                 # the page's switch, the menu bar's, `switchboard auto on|off`: yours,
             keep.by_you(change)                 # marked before it changes, so the tick never turns it back on
         else:
@@ -2850,15 +3391,30 @@ def _act(path, body):
         with locked() as st:
             event(st, '%s: %s' % ('Keep the Mac awake' if what == 'awake' else 'Notifications', 'on' if on else 'off'))
         return said
-    if path == '/api/models':
-        on = body.get('enabled')
+    if path == '/api/running':
+        on = body.get('on')
         if not isinstance(on, bool):
             raise SwitchError('That needs on or off.')
-        r = models_turn(on)
+        r = running_turn(on)
+        with locked() as st:
+            event(st, 'Keep running: %s' % ('on' if on else 'off'))
+        return r
+    if path == '/api/models':
+        on, part = body.get('enabled'), body.get('part', 'sonnet')
+        if not isinstance(on, bool):
+            raise SwitchError('That needs on or off.')
+        if part not in models.PARTS:
+            raise SwitchError('That needs helpers or sonnet.')
+        r = models_turn(on, part)
         if r['changed']:
             with locked() as st:
-                event(st, 'Sonnet for helpers: %s' % ('on' if on else 'off'))
+                event(st, '%s: %s' % (models.PART_NAMES[part], 'on' if on else 'off'))
         return r
+    if path == '/api/optimize':                 # a takeaway's press, through the router's own functions
+        r = optimize.act(body.get('id'), body.get('do'), shown=optimize_view()['takeaways'])
+        if not r['done']:
+            raise SwitchError(r['says'])
+        return dict(optimize_view(), says=r['says'], more=r.get('more') or [])
     if path == '/api/statusline':
         on = bool(body.get('on'))
         r = keep.statusline_by_you(lambda: statusline_turn(on))     # yours first: it never goes on by itself again
@@ -2868,6 +3424,8 @@ def _act(path, body):
         return {'changed': r['changed']}
     if path == '/api/consent':                  # "Let Switchboard check links": macOS asks, only from this press
         return consent_ask()
+    if path == '/api/continue':                 # Continue here: the provider's own app opens on the chat; you send
+        return continue_in(text(body, 'provider'), text(body, 'mark') or None)
     if path == '/api/notifytest':               # "Send a test", then "did you see it?"
         if isinstance(body.get('seen'), bool):
             set_setting('notify_seen', body['seen'])
@@ -3330,6 +3888,8 @@ class Handler(BaseHTTPRequestHandler):
         if not self._trusted():
             return self._refuse('GET')
         route = self.path.split('?')[0]
+        if pagekey.gate(self, 'GET'):           # the page key: every /api/ route but /api/state
+            return
         if route in ('/', '/index.html'):
             return self._page('index.html')
         if route == '/go':                      # the "Open as its owner" bookmark lands here
@@ -3350,6 +3910,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(code, body, headers=(('Retry-After', str(Snapshot.RETRY)),) if code == 503 else ())
         if route == '/api/models':
             return self._send(200, models_view())
+        if route == '/api/optimize':
+            return self._send(200, optimize_view())
         if route == '/api/more':
             return self._send(200, more_view())
         if route in ('/api/memory', '/api/claudecode', '/api/keys'):
@@ -3364,6 +3926,9 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(200, usage_view(fresh))
         if route == '/api/history':
             return self._send(200, history_view())
+        if route == '/api/keep':
+            fresh = urllib.parse.parse_qs(self.path.partition('?')[2]).get('fresh', [''])[0]
+            return self._send(200, keep_view(fresh in ('1', 'press'), fresh == 'press'))
         if route == '/api/artifacts':
             return self._send(200, artifacts_view())
         if route == '/api/chats':
@@ -3402,6 +3967,8 @@ class Handler(BaseHTTPRequestHandler):
         try:
             if not self._trusted() or not self._from_here():
                 return self._refuse('POST')
+            if pagekey.gate(self, 'POST'):      # and the page key, on every POST but the old Link Router's
+                return
             try:
                 size = int(self.headers.get('Content-Length') or 0)
             except ValueError:
@@ -3433,7 +4000,8 @@ def page_answers(n, timeout=2):
     Switchboard's page and busy (503 with busy and its version). Asked directly, never through a proxy."""
     opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
     try:
-        with opener.open('http://127.0.0.1:%d/api/state' % n, timeout=timeout) as r:
+        req = urllib.request.Request('http://127.0.0.1:%d/api/state' % n, headers=pagekey.headers('/api/state', 'GET'))
+        with opener.open(req, timeout=timeout) as r:
             got = json.loads(r.read(16 << 20).decode('utf-8')) if r.status == 200 else None
     except urllib.error.HTTPError as e:
         try:
@@ -3470,7 +4038,7 @@ def serve(ready=None):
         if e.errno != errno.EADDRINUSE:
             raise
         if not core.DEMO and page_answers(port()):
-            print("Switchboard's page is already running at http://localhost:%d." % port())
+            print("Switchboard's page is already running at http://127.0.0.1:%d." % port())
             return
         if core.DEMO or not watch.background():
             raise SwitchError(port_taken(port()))
@@ -3480,7 +4048,7 @@ def serve(ready=None):
     if ready and server is not None:
         ready()
     if core.DEMO:                               # the demo writes nothing to disk
-        print('Switchboard demo (made-up accounts) at http://localhost:%d  -  Ctrl-C to stop' % port())
+        print('Switchboard demo (made-up accounts) at http://127.0.0.1:%d  -  Ctrl-C to stop' % port())
         while True:
             time.sleep(3600)
     os.makedirs(data_path('logins'), mode=0o700, exist_ok=True)
@@ -3488,6 +4056,7 @@ def serve(ready=None):
     more_files()                                # launchd's 256 open files would be few for a page under load
     core.rotate_own_output()                    # agent.log: launchd's file for this job's output, never unbounded
     core.sweep_temporary()                      # what a write cut off by a kill left behind
+    drop_old_chat_index()                       # chat search's index from an older version may hold keys
     with LINKS_LOCK:
         LINKS['loop'] = True                    # the link app's status comes from the loop from now on
     EASE['aware'] = True                        # under load, this process's loop does less
@@ -3511,8 +4080,20 @@ def serve(ready=None):
     if notify_hooks.status()['in']:
         notify_hooks.precompile()               # the same for the notification hooks
     start_session_hooks()                       # and the session hooks
-    log('Switchboard %s running at http://localhost:%d' % (VERSION, port()))
+    log('Switchboard %s running at http://127.0.0.1:%d' % (VERSION, port()))
     loop()
+
+
+def drop_old_chat_index():
+    """At the page's start: an index of past chats made by an older version is erased, because it may hold key-like
+    text this version keeps out. Search builds it again the next time it is used. Nothing here can stop the page."""
+    try:
+        from .packs import memory
+        if memory.drop_old_index():
+            log('Erased the search index of past chats an older version made: it could hold text this version keeps '
+                'out. Search builds it again the next time it is used.')
+    except Exception as e:  # noqa: BLE001 - a step at the page's start never stops it
+        log('The search index of past chats was not looked at: %r' % e)
 
 
 def start_session_hooks():
@@ -3644,7 +4225,7 @@ def _port_again(n):
             continue
         threading.Thread(target=httpd.serve_forever, daemon=True).start()
         watch.clear_port()
-        log('Port %d is free again: the page is at http://localhost:%d' % (n, n))
+        log('Port %d is free again: the page is at http://127.0.0.1:%d' % (n, n))
         return httpd
 
 
@@ -3752,6 +4333,413 @@ def menubar_tick():
 def _note_event(text):
     with locked() as st:
         event(st, text, 'info')
+
+
+# ---------- the sign-in watch: started again when it stops, and stood in for while it and the loop are quiet ----------
+#
+# Three processes can put a lost Claude Code sign-in back: the sign-in watch (a launchd job of its own, which looks
+# within a second of a change), the loop that reads the accounts (this page's child), and this page, which looks
+# itself only while both of the others have gone quiet. The page also starts the watch again when its heartbeat
+# stops, as the watch starts a page that has stopped. All of it reads the watch's heartbeat file; none of it imports
+# the sign-in watch's module (accounts/signin_watch.py), so a copy of Switchboard without it runs as before. (The
+# module `watch` this file imports is another thing: the menu bar's keeper and the notes when Switchboard is not doing
+# its job, whose step is watch_tick. This one's step is signin_watch_tick; the loop runs both.)
+
+# Its launchd label: install.sh writes the job as "$LABEL.watch". With any other label watch_plist() is never there,
+# so signin_watch_tick does nothing and watch_view never says the watch is down.
+WATCH_JOB = 'io.github.amyjainberkeley.switchboard.watch'
+WATCH_MODULE = 'switchboard.accounts.signin_watch'
+WATCH_BEAT = 'signin-watch.json'    # its heartbeat, rewritten every 10 s
+WATCH_RECORD = 'signin-record.jsonl'
+WATCH_EVERY = 30.0          # seconds (monotonic) between two looks at its heartbeat, on the loop's pass
+WATCH_FRESH = 45.0          # a beat this recent is a running watch: it beats every 10 s
+WATCH_AHEAD = 5.0           # a beat dated further ahead than this is not trusted (the clock was set back)
+WATCH_STALE_LOOKS = 2       # looks in a row without a fresh beat before launchd is asked
+WATCH_HUNG = 60.0           # after a kickstart that worked, this long without a beat before a live watch is restarted
+WATCH_CALLS = 3             # launchctl calls at most in any WATCH_SPAN seconds
+WATCH_SPAN = 600.0
+WATCH_DOWN_SAID = 120.0     # the page says the watch is down only once it has been down this long
+WATCH_NOT_LOADED = 113      # launchctl kickstart's exit status for a job launchd does not have loaded
+WATCH_DOWN = "Switchboard's sign-in watch is not running. Switchboard is starting it again."
+WATCH_GAVE_UP = ("Switchboard could not start its sign-in watch. Claude Code's sign-in is still looked after once a "
+                 "minute. Run the installer again to start it; `switchboard doctor` says more.")
+STANDIN_QUIET = 60.0        # both heartbeats older than this: the page has the engine look itself
+STANDIN_EVERY = 30.0
+STANDIN_DEADLINE = 45.0     # a look of the page's own that runs longer is said once; no other starts until it ends
+STANDIN_ERROR_EVERY = 600.0  # the same error from those looks is said at most this often
+WATCH = {'next': None, 'stale': 0, 'down_since': None, 'calls': [], 'kicked_at': None, 'started_at': None,
+         'gave_up': False}
+STANDIN = {'next': None, 'on': False, 'thread': None, 'started': None, 'late_said': False, 'looked_at': None,
+           'errors': {}}
+_PLAIN = re.compile(r"^[A-Za-z0-9 .,:;'()/%+-]{1,160}$")
+_TOKENISH = re.compile(r'[A-Za-z0-9_-]{24,}')
+_WORD = re.compile(r'^[a-z][a-z0-9_ -]{0,39}$')
+
+
+def watch_launchctl(*args):
+    """launchctl's exit status and what it said (127 when it could not run): the one way the page reaches launchd for
+    the sign-in watch. Tests put a stand-in here."""
+    try:
+        r = subprocess.run(['launchctl'] + list(args), capture_output=True, text=True, timeout=20)
+        return r.returncode, (r.stdout or '') + (r.stderr or '')
+    except (OSError, subprocess.SubprocessError):
+        return 127, ''
+
+
+def watch_plist():
+    return os.path.join(core.home(), 'Library', 'LaunchAgents', WATCH_JOB + '.plist')
+
+
+def watch_there():
+    """This copy of Switchboard has the sign-in watch (its module is found; it is not imported)."""
+    try:
+        import importlib.util
+        return importlib.util.find_spec(WATCH_MODULE) is not None
+    except (ImportError, ValueError, AttributeError):
+        return False
+
+
+def watch_heartbeat():
+    """The watch's heartbeat file as it is ({} when it is missing or damaged)."""
+    return core.read_json(data_path(WATCH_BEAT))
+
+
+def _number(v):
+    return v if isinstance(v, (int, float)) and not isinstance(v, bool) and _finite(v) is not None else None
+
+
+def _plain(text):
+    """Words from a file another process writes, fit to show: short, plain, no email and nothing token-shaped. Else
+    None."""
+    if not isinstance(text, str):
+        return None
+    text = ' '.join(text.split())
+    return text if _PLAIN.match(text) and not _TOKENISH.search(text) else None
+
+
+def watch_beat(wall=None, hb=None):
+    """{'hb', 'age', 'fresh', 'gone'}: the heartbeat, the age of its last beat in seconds (None without one), whether
+    that is a running watch's (fresh: recent and not gone), and whether the beat itself says the watch is not running
+    (gone: it carries `stopped_at`, which a clean stop writes with its last beat, or it names a pid that is no longer
+    alive: a watch that was killed leaves a beat that looks recent for WATCH_FRESH seconds)."""
+    wall = time.time() if wall is None else wall
+    hb = watch_heartbeat() if hb is None else hb
+    at = _number(hb.get('beat_at')) if isinstance(hb, dict) else None
+    age = None if at is None else wall - at
+    gone = at is not None and (_number(hb.get('stopped_at')) is not None or
+                               (hb.get('pid') is not None and not _watch_pid_alive(hb['pid'])))
+    fresh = age is not None and -WATCH_AHEAD <= age <= WATCH_FRESH and not gone
+    return {'hb': hb if isinstance(hb, dict) else {}, 'age': age, 'fresh': fresh, 'gone': gone}
+
+
+def _watch_pid_alive(pid):
+    """A heartbeat's pid is a live process: a whole number above 1 (never 0 or -1, which would ask about a whole
+    group of processes) that answers signal 0. Anything else counts as dead."""
+    return isinstance(pid, int) and not isinstance(pid, bool) and pid > 1 and _alive(pid)
+
+
+def _alive(pid):
+    try:
+        os.kill(pid, 0)
+    except OSError:
+        return False
+    return True
+
+
+def _command_of(pid):
+    """A process's command line, as `ps` says it ('' when it can't be told)."""
+    try:
+        return subprocess.run(['/bin/ps', '-p', str(pid), '-o', 'command='], capture_output=True, text=True,
+                              timeout=5).stdout or ''
+    except (OSError, subprocess.SubprocessError):
+        return ''
+
+
+def _is_watch(pid):
+    """The pid is alive and is really the sign-in watch (its command line runs the watch's module)."""
+    if not isinstance(pid, int) or isinstance(pid, bool) or pid <= 1 or pid == os.getpid():
+        return False
+    return _alive(pid) and WATCH_MODULE in _command_of(pid)
+
+
+def _watch_call(now, *args):
+    """One launchctl call for the watch, counted against WATCH_CALLS. None when there is no room for it."""
+    WATCH['calls'] = [t for t in WATCH['calls'] if 0 <= now - t < WATCH_SPAN]
+    if len(WATCH['calls']) >= WATCH_CALLS:
+        return None
+    WATCH['calls'].append(now)
+    rc, said = watch_launchctl(*args)
+    log('the sign-in watch is not beating: launchctl %s returned %s'
+        % (' '.join(a for a in args if not a.startswith('gui/') and not a.endswith('.plist')), rc))
+    return rc, said
+
+
+def signin_watch_tick(now=None, wall=None):
+    """Every WATCH_EVERY seconds: is the sign-in watch beating? Two looks in a row without a fresh beat, and launchd is
+    asked to start it: `kickstart` (it starts a job that is not running and leaves a running one alone); when launchd
+    does not have the job loaded, `bootstrap` with its plist; and only when a beat is still missing WATCH_HUNG seconds
+    after a kickstart that worked while the heartbeat's pid is alive and really the watch (a watch that hangs),
+    `kickstart -k`. At most WATCH_CALLS calls in any WATCH_SPAN seconds; once they are spent, one History line, and
+    then one more try each time the span has room again. Nothing at all while the job's plist is absent (not
+    installed, or being removed: the uninstaller removes it first) or this copy has no watch. Returns what it did."""
+    now = monotonic() if now is None else now
+    if WATCH['next'] is not None and 0 < WATCH['next'] - now <= WATCH_EVERY:
+        return None
+    WATCH['next'] = now + WATCH_EVERY
+    if core.DEMO or not watch_there() or not os.path.exists(watch_plist()):
+        WATCH.update(stale=0, down_since=None, kicked_at=None, started_at=None, gave_up=False)
+        return None
+    beat = watch_beat(wall)
+    if beat['fresh']:
+        if WATCH['gave_up'] or WATCH['stale'] >= WATCH_STALE_LOOKS:
+            log('the sign-in watch is beating again')
+        WATCH.update(stale=0, down_since=None, kicked_at=None, started_at=None, gave_up=False)
+        return None
+    WATCH['stale'] += 1
+    if WATCH['down_since'] is None:
+        WATCH['down_since'] = now
+    if WATCH['stale'] < WATCH_STALE_LOOKS:
+        return None
+    target = 'gui/%d/%s' % (os.getuid(), WATCH_JOB)
+    kicked, started = WATCH['kicked_at'], WATCH['started_at']
+    if started is not None and 0 <= now - started < WATCH_HUNG:
+        return None                         # launchd said it started it: its first beat may still be on its way
+    WATCH['calls'] = [t for t in WATCH['calls'] if 0 <= now - t < WATCH_SPAN]
+    if WATCH['gave_up'] and WATCH['calls']:
+        return 'waiting'                    # once the calls were spent, one more try only when the span is empty
+    if kicked is not None and _is_watch(beat['hb'].get('pid')):
+        got, what = _watch_call(now, 'kickstart', '-k', target), 'restarted'
+    else:
+        got, what = _watch_call(now, 'kickstart', target), 'started'
+        if got is not None and got[0] != 0 and (got[0] == WATCH_NOT_LOADED or 'could not find' in got[1].lower()) \
+                and os.path.exists(watch_plist()):
+            got, what = _watch_call(now, 'bootstrap', 'gui/%d' % os.getuid(), watch_plist()), 'loaded'
+    if got is None:
+        if not WATCH['gave_up']:
+            WATCH['gave_up'] = True
+            with locked() as st:
+                event(st, WATCH_GAVE_UP, 'warn', h='problem', by='auto')
+        return 'waiting'
+    # `-k` follows only a kickstart that worked: a bootstrap, or any call that failed, starts the count again.
+    WATCH['started_at'] = now if got[0] == 0 else None
+    WATCH['kicked_at'] = now if got[0] == 0 and what in ('started', 'restarted') else None
+    return what if got[0] == 0 else 'failed'
+
+
+def _standin_look():
+    """What the page calls to have the engine look at Claude Code's sign-in: api.watch_look with a regular look's hint
+    when the engine has it, else api.put_back_pass, else None."""
+    look = getattr(api, 'watch_look', None)
+    if callable(look):
+        return lambda: look({'keychain': False, 'login_file': None, 'settings': False, 'tick': True})
+    look = getattr(api, 'put_back_pass', None)
+    return look if callable(look) else None
+
+
+def _loop_beat_age():
+    """Seconds since the loop that reads the accounts last beat (None: no beat, or one that can't be read)."""
+    try:
+        return _number((api.auto_status() or {}).get('beat_age_s'))
+    except Exception:  # noqa: BLE001 - a heartbeat that can't be read is one that does not beat
+        return None
+
+
+def _standin_run(look):
+    try:
+        look()
+        STANDIN['looked_at'] = time.time()
+    except Exception as e:  # noqa: BLE001 - the page goes on; the next look is in STANDIN_EVERY seconds
+        key, now = type(e).__name__, monotonic()       # its class name only: its words can hold an email or a path
+        if not 0 <= now - STANDIN['errors'].get(key, -1e9) < STANDIN_ERROR_EVERY:
+            STANDIN['errors'] = dict((k, t) for k, t in STANDIN['errors'].items() if now - t < STANDIN_ERROR_EVERY)
+            STANDIN['errors'][key] = now
+            log("the page's own look at Claude Code's sign-in failed (%s)" % key)
+
+
+def standin_tick(now=None, wall=None):
+    """Every STANDIN_EVERY seconds: when the sign-in watch's heartbeat and the loop's are both older than
+    STANDIN_QUIET seconds (and the engine keeps an account, or auto-switch is on: else there is nothing saved to put
+    back), the page has the engine look at Claude Code's sign-in itself (_standin_look), in a thread
+    of its own, one look at a time, until one of them beats again. A watch whose last beat says it stopped, or whose
+    process is gone (watch_beat's `gone`), counts as quiet at once, whatever that beat's age. One log line when it
+    takes over, one when it hands back. Returns 'looked' when it started a look."""
+    now = monotonic() if now is None else now
+    if STANDIN['next'] is not None and 0 < STANDIN['next'] - now <= STANDIN_EVERY:
+        return None
+    STANDIN['next'] = now + STANDIN_EVERY
+    if core.DEMO:
+        return None
+    running = STANDIN['thread']
+    if running is not None and running.is_alive():
+        if not STANDIN['late_said'] and now - STANDIN['started'] >= STANDIN_DEADLINE:
+            STANDIN['late_said'] = True
+            log("the page's own look at Claude Code's sign-in has run %d s; no other starts until it ends"
+                % (now - STANDIN['started']))
+        return None
+    look = _standin_look()
+    quiet = stopped = False
+    if look is not None:                    # (an engine with nothing to call: no heartbeat is read)
+        beat = watch_beat(wall)
+        watch_age = beat['age']
+        stopped = beat['gone'] and -WATCH_AHEAD <= watch_age <= STANDIN_QUIET
+        quiet = watch_age is None or beat['gone'] or not -WATCH_AHEAD <= watch_age <= STANDIN_QUIET
+        if quiet:
+            loop_age = _loop_beat_age()
+            quiet = loop_age is None or loop_age > STANDIN_QUIET
+        # With no account kept and auto-switch off there is no saved sign-in to put back (None: can't tell: look).
+        quiet = quiet and engine.loop_wanted(engine.switching_on()) is not False
+    if not quiet:
+        if STANDIN['on']:
+            STANDIN['on'] = False
+            log("the sign-in watch or the loop that reads the accounts is beating again: the page stops looking at "
+                "Claude Code's sign-in itself")
+        return None
+    if not STANDIN['on']:
+        STANDIN['on'] = True
+        if stopped:
+            log("the sign-in watch has stopped and the loop that reads the accounts has been quiet for over %d s: "
+                "the page looks at Claude Code's sign-in itself every %d s" % (STANDIN_QUIET, STANDIN_EVERY))
+        else:
+            log("the sign-in watch and the loop that reads the accounts have both been quiet for over %d s: the page "
+                "looks at Claude Code's sign-in itself every %d s" % (STANDIN_QUIET, STANDIN_EVERY))
+    t = threading.Thread(target=_standin_run, args=(look,), name='switchboard-signin-look', daemon=True)
+    STANDIN.update(thread=t, started=now, late_said=False)
+    t.start()
+    return 'looked'
+
+
+# What doctor and the page say while Claude Code's plain login file is kept as a copy of its Keychain item
+# (putback.mirror_on).
+MIRROR_WORDS = ("Claude Code's sign-in is also kept in its plain login file (readable only by you), so a chat that "
+                "finds the Keychain slow reads it from there")
+
+
+def watch_view(now=None, wall=None):
+    """GET /api/state's 'watch': {'there', 'running', 'beat_age_s', 'mode', 'last_action', 'last_action_at',
+    'problem', 'line', 'page_looking', 'page_looked_at', 'signin_file'}. 'line' is the page's one line, only while the
+    watch has been down for more than WATCH_DOWN_SAID seconds and its job is installed. 'signin_file': MIRROR_WORDS
+    while the watch is there and Claude Code's sign-in is kept in its plain login file too, else None. Numbers and
+    plain words only."""
+    now = monotonic() if now is None else now
+    out = {'there': False, 'running': False, 'beat_age_s': None, 'mode': None, 'last_action': None,
+           'last_action_at': None, 'problem': None, 'line': None, 'page_looking': bool(STANDIN['on']),
+           'page_looked_at': STANDIN['looked_at'], 'signin_file': None}
+    if not watch_there():
+        return out
+    try:
+        out['signin_file'] = MIRROR_WORDS if api.mirror_on() else None
+    except Exception:  # noqa: BLE001 - a setting that can't be read is said as nothing
+        pass
+    beat = watch_beat(wall)
+    hb = beat['hb']
+    action = hb.get('last_action')
+    out.update(there=True, running=beat['fresh'], beat_age_s=None if beat['age'] is None else round(beat['age'], 1),
+               mode=hb.get('mode') if hb.get('mode') in ('events', 'polling') else None,
+               last_action=action if isinstance(action, str) and _WORD.match(action) else None,
+               last_action_at=_number(hb.get('last_action_at')),
+               problem=WATCH_GAVE_UP if WATCH['gave_up'] else _plain(hb.get('problem')))
+    down = WATCH['down_since']
+    if not beat['fresh'] and down is not None and now - down > WATCH_DOWN_SAID and os.path.exists(watch_plist()):
+        out['line'] = WATCH_GAVE_UP if WATCH['gave_up'] else WATCH_DOWN
+    return out
+
+
+HINT_WORDS = (('keychain', True, 'the Keychain changed'),
+              ('login_file', 'appeared', "Claude Code's login file appeared"),
+              ('login_file', 'gone', "Claude Code's login file went away"),
+              ('login_file', 'changed', "Claude Code's login file changed"),
+              ('settings', True, "Claude Code's settings changed"), ('tick', True, 'a regular look'))
+
+
+def _record_time(rec):
+    for key in ('at', 't', 'time', 'wall'):
+        t = _number(rec.get(key))
+        if t is not None:
+            return t
+    return None
+
+
+# What a look did, in a person's words (the record keeps the engine's own word: signin_watch.WORDS). A word not here
+# is left out of the line.
+ACTION_WORDS = {'put_back': 'put the sign-in back',
+                'promote': "put the sign-in back from Claude Code's plain login file",
+                'kept': "saved Claude Code's newer login",
+                'wait': 'saw it missing; looking again',
+                'limit': 'stopped putting it back for now',
+                'failed': 'could not write it; trying again',
+                'error': 'the look failed'}
+
+
+# What the sign-in watch did with Claude Code's plain login file (its record lines of kind 'hold'), in a person's
+# words. A word not here (it only kept a copy for three seconds) is left out. The file it takes away is one it put
+# back itself, one it left in place after the login in it went back into the Keychain, or a copy of the sign-in in
+# the Keychain it left there after putting the sign-in back.
+HOLD_WORDS = {'held': "put Claude Code's plain login file back the moment it went",
+              'removed': 'took away the plain login file it had kept for Claude Code',
+              'stays': "left Claude Code's plain login file in place: Claude Code is using it",
+              'cap': "stopped putting Claude Code's plain login file back for a minute (60 times in the last one)",
+              'spare': "left a copy of the sign-in in Claude Code's plain login file, for the chats that asked while "
+                       "it was missing",
+              'followed': 'brought the plain login file it keeps for Claude Code up to the login in the Keychain',
+              'mirrored': "kept a copy of the sign-in in Claude Code's plain login file, readable only by you"}
+
+
+def record_line(rec, now=None):
+    """One line of the sign-in record in plain words: '10:42:05 PM  the Keychain changed: put the sign-in back',
+    '10:42:05 PM  started the page' when the watch asked launchd for the page (kind 'page'), or what the watch did
+    with Claude Code's plain login file (kind 'hold', HOLD_WORDS). Only its time, the hint's known parts,
+    ACTION_WORDS and HOLD_WORDS are used, so nothing else in it is ever shown. None for a line that has none of
+    them."""
+    if not isinstance(rec, dict):
+        return None
+    if rec.get('kind') == 'page':
+        said, action = ['started the page' if rec.get('ok') is not False else 'could not start the page'], None
+    elif rec.get('kind') == 'hold':
+        words = HOLD_WORDS.get(rec.get('did')) if isinstance(rec.get('did'), str) else None
+        said, action = ([words] if words else []), None
+    else:
+        hint = rec.get('hint') if isinstance(rec.get('hint'), dict) else rec
+        said = [words for key, value, words in HINT_WORDS
+                if (hint.get(key) is True if value is True else hint.get(key) == value)]
+        action = ACTION_WORDS.get(rec.get('action')) if isinstance(rec.get('action'), str) else None
+    t = _record_time(rec)
+    if not said and not action:
+        return None
+    when = '--'
+    if t is not None:
+        now = time.time() if now is None else now
+        day = time.strftime('%Y%m%d', time.localtime(t)) == time.strftime('%Y%m%d', time.localtime(now))
+        fmt = '%-I:%M:%S %p' if day else '%b %-d %-I:%M:%S %p'
+        try:
+            when = time.strftime(fmt, time.localtime(t))
+        except (OverflowError, OSError, ValueError):
+            when = '--'
+    return '%s  %s%s' % (when, ', '.join(dict.fromkeys(said)) or 'a look', ': %s' % action if action else '')
+
+
+def record_lines(n=5, path=None, now=None):
+    """The newest n lines of the sign-in record in plain words, newest first. Damaged lines are left out; only the
+    file's last 64 KB are read."""
+    path = path or data_path(WATCH_RECORD)
+    try:
+        with open(path, 'rb') as f:
+            f.seek(0, os.SEEK_END)
+            size = f.tell()
+            f.seek(max(0, size - 65536))
+            raw = f.read()
+    except OSError:
+        return []
+    out = []
+    for line in reversed(raw.splitlines()):
+        try:
+            said = record_line(json.loads(line.decode('utf-8')), now)
+        except (ValueError, UnicodeDecodeError, RecursionError):
+            continue
+        if said:
+            out.append(said)
+            if len(out) >= n:
+                break
+    return out
 
 
 # ---------- where the loop is: a slow pass is one line; a stage stuck for minutes is said once ----------
@@ -3961,12 +4949,30 @@ def loop(stop=None, ticks=None):
             providers_tick()                    # the board of assistants, on its own thread, when one is due
         except Exception as e:  # noqa: BLE001
             log('looking at the other assistants: %r' % e)
+        stage('looking at the other providers')
+        try:
+            rows_tick()                         # their rows and the chat that would go, on its own thread
+        except Exception as e:  # noqa: BLE001
+            log('looking at the other providers: %r' % e)
+        _safely("the helpers' cache count", cache_count_tick)     # on its own thread, every ten minutes at most
         stage('looking at whether Claude Code works')
         try:
             with MAC_LOCK:
                 mac_tick()
         except Exception as e:  # noqa: BLE001
             log('awake check failed: %r' % e)
+        stage('looking after the sign-in watch')
+        for step in (signin_watch_tick, standin_tick):     # (watch_tick, above, is the notes: another step)
+            try:                                # each on its own: one failing never stops the other
+                step()
+            except Exception as e:  # noqa: BLE001
+                log('%s failed (%s)' % (step.__name__, type(e).__name__))
+        stage('looking at routing')
+        try:                                    # router/loop_step.py: at most once a minute; it says its own failure once
+            from .router import loop_step
+            loop_step.step()
+        except Exception:  # noqa: BLE001 - routing never stops the page's loop
+            pass
         stage('waiting')
         _safely('the pass', _pass_said, started)
         if ticks is None or n < ticks:

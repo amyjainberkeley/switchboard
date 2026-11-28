@@ -168,15 +168,19 @@ class ACutOffSwitchAndALostLogin(RigLoop):
         set_policy(enabled=True)
         switcher._write_journal(self.ctx, {'id': 'made-up', 'step': 'writing', 'from_id': 'uuid-b',
                                            'to_id': 'uuid-a', 'orig_text_fp': 'made-up-fp'})
+        old = self.clock.wall() - autoloop.JOURNAL_STALE_S - 60       # cut off three minutes ago: no settler
+        os.utime(switcher.journal_path(self.ctx), (old, old))          # touches a younger one
         self.lose_login()
         before = self.live_writes()
         self.loop.run_pass()
-        # The put-back (early in the pass) leaves a login while a switch is part-way; the pass's last step settles
-        # the record. Neither wrote Claude Code's login in this pass, so nothing is a mix of the two.
+        # The pass's first step settles the old record (the loop's settler at the start of a pass, which says it in
+        # the loop's History); the put-back then sees the login missing for the first time and waits. Neither wrote
+        # Claude Code's login in this pass, so nothing is a mix of the two.
         self.assertFalse(os.path.exists(switcher.journal_path(self.ctx)))
         self.assertEqual(self.live_writes(), before)
         self.assertFalse(self.has_login())
-        self.assertIn('Put away the record of a switch that was cut off', ' '.join(e[0] for e in self.repairs()))
+        self.assertIn('Put away the record of a switch that was cut off',
+                      ' '.join([e[0] for e in self.repairs()] + self.notes))
         self.loop.sleep(30.0)                       # the next looks: the record is gone, so the login is put back
         self.assertTrue(self.has_login())
         put = [e for e in self.repairs() if e[0].startswith('Claude Code lost its sign-in; Switchboard put')]

@@ -94,6 +94,19 @@ class TheSameAsThePage(ChromePage):
         self.assertTrue(text and text.startswith('# Switchboard settings, as commands\n'), text)
         return [x for x in text.splitlines() if x and not x.startswith('#')]
 
+    @staticmethod
+    def row_of(words):
+        """The row a copied line sets, and how many of its words name it. Most lines are `switchboard KEY VALUE`; a row
+        whose command has more words before its value (its command's words but the last) takes the line when they
+        begin it, the longest such: `switchboard models sonnet off` is Sonnet for helpers, `switchboard models off`
+        Models by the job."""
+        best = (config.BY_KEY.get(words[1]), 2)
+        for r in config.ROWS:
+            fixed = shlex.split(r.command)[:-1] if r.command else []
+            if len(fixed) > best[1] and words[:len(fixed)] == fixed:
+                best = (r, len(fixed))
+        return best
+
     def same_lines(self, page):
         for line in page:
             words = shlex.split(line)
@@ -107,7 +120,8 @@ class TheSameAsThePage(ChromePage):
                     self.assertEqual(mine, line + '\n')
                     continue
                 else:
-                    row, typed = config.BY_KEY[words[1]], words[2]
+                    row, n = self.row_of(words)
+                    typed = words[n]
                 value = config.parse(row, typed)
                 if row.kind == 'text' and value == '':
                     value = None
@@ -116,7 +130,7 @@ class TheSameAsThePage(ChromePage):
         for line in page:
             words = shlex.split(line)
             keys.add(words[3] if words[1:3] == ['config', 'set'] else
-                     'auto_policy.rules' if words[1] == 'auto' and len(words) == 4 else words[1])
+                     'auto_policy.rules' if words[1] == 'auto' and len(words) == 4 else self.row_of(words)[0].key)
         shown = set(r.key for r in config.ROWS if r.page and (r.post or r.as_command)) - {'auto_policy.rules'}
         if 'switchboard config set auto_policy.model none' in page:
             shown.discard('auto_policy.model_at')               # its line counts for a model only

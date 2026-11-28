@@ -171,8 +171,8 @@ class NoPage(Fresh):
 COMMANDS = ['2', 'switch', 'status', 'add', 'signin', 'remove', 'move', 'swap', 'leftovers', 'alias', 'run', 'folder',
             'folders', 'resume', 'auto', 'log', 'setup', 'page', 'menubar', 'use', 'current', 'update', 'open', 'owner',
             'pages', 'check', 'links', 'usage', 'chats', 'providers', 'continue', 'back', 'hand', 'allow', 'stay',
-            'order', 'awake', 'config', 'statusline', 'notify', 'hooks', 'skill', 'models', 'keys', 'claude', 'export',
-            'import', 'readings', 'doctor', 'demo', 'serve', 'version', 'about']
+            'order', 'do', 'route', 'routes', 'routing', 'awake', 'config', 'statusline', 'notify', 'hooks', 'skill', 'models',
+            'keys', 'claude', 'export', 'import', 'readings', 'doctor', 'demo', 'serve', 'version', 'about']
 HELP_LINES = inspect.cleandoc(cli.__doc__).splitlines()    # as Python 3.13 and newer keep it, on every Python
 MAIN_HELP = cli.__doc__.strip() + '\n'
 
@@ -200,7 +200,11 @@ AUTO = ('switchboard auto [on|off]   whether auto-switch is on; on or off change
         '                            switchboard auto line NAME off puts it back on the shared ones\n'
         'switchboard auto rank NAME N|off\n'
         '                            auto-switch lands on rank 1 first, then 2, and on an account with no rank after\n'
-        '                            every ranked one; N is 1 to 99; off takes its rank away\n')
+        '                            every ranked one; N is 1 to 99; off takes its rank away\n'
+        'switchboard auto signed-in [on|off]\n' + ' ' * 28 +
+        "keep Claude Code signed in: when its sign-in is lost and can't be put back, or is\n" + ' ' * 28 +
+        'about to end, move it to another signed-in account, also with auto-switch off (on\n' + ' ' * 28 +
+        'until you turn it off)\n')
 UPDATE = ('switchboard update          install the newest version, the way it was installed, with the same choices\n'
           "switchboard update --link-app    the same, and add the link app (it needs Apple's command line tools)\n"
           'switchboard update --menu-app    the same, and add the menu bar item (--no-menu-app takes it out)\n'
@@ -213,7 +217,8 @@ LOG = ('switchboard log [-n N] [-f] [--json]\n'
 DEMO = 'switchboard demo            the page with made-up accounts, to try it first\n'
 USE = ('switchboard use NAME [--json]\n'
        '                            move Claude Code to an account (the same as switch NAME)\n')
-TWO = 'switchboard 2               move Claude Code to account 2 (or by its email: switchboard you@example.com)\n'
+TWO = ('switchboard 2               move Claude Code to account 2 (or by its email: switchboard you@example.com); on\n'
+       + ' ' * 28 + "Codex's row, this folder's newest chat goes on in Codex (--why says what was done)\n")
 
 
 @contextmanager
@@ -271,6 +276,15 @@ class HelpAfterACommand(Fresh):
                     self.assertTrue(set(lines) <= set(HELP_LINES), out)
                     self.assertNotEqual(out, MAIN_HELP)
 
+    def test_a_number_moves_there_and_switch_alone_with_json_stays_among_the_claude_accounts(self):
+        # A number can be another provider's row, so the list's line says "move there"; switch alone goes to that
+        # row only without --json (docs/commands.md says the same).
+        bare = next(x for x in HELP_LINES if re.split(r'\s{2,}', x, maxsplit=1)[0] == 'switchboard')
+        self.assertIn('press a number to move there', bare)
+        said = ' '.join(self.asked('switch', '--help')[1].split())
+        self.assertIn("alone, to the next one, which is Codex's row when the list marks it next (not with --json: "
+                      "it moves Claude Code only)", said)
+
     def test_a_few_commands_word_for_word(self):
         for args, said in ((('auto', '--help'), AUTO), (('update', '-h'), UPDATE), (('log', '--help'), LOG),
                            (('demo', '--help'), DEMO), (('use', '-h'), USE), (('2', '--help'), TWO),
@@ -311,6 +325,18 @@ class HelpAfterACommand(Fresh):
         code, out, err, ran = self.asked('hand', 'codex', '--help', '--', 'x')
         self.assertTrue(out.startswith('switchboard hand PROVIDER [--chat NAME] [--] JOB\n'), out)
 
+    def test_do_and_route_keep_the_tasks_words_after_the_double_dash(self):    # the task's words are the task's
+        from switchboard.providers import cli as providers_cli
+        seen = []
+        with mock.patch.object(providers_cli, 'main', lambda args: seen.append(args) or 0):
+            self.assertEqual(self.cli('do', '--', 'what does --help say'), (0, '', ''))
+            self.assertEqual(self.cli('route', '--as', 'find', '--', '-h'), (0, '', ''))
+            self.assertEqual(self.cli('routes', 'set', 'review', 'codex'), (0, '', ''))
+        self.assertEqual(seen, [['do', '--', 'what does --help say'], ['route', '--as', 'find', '--', '-h'],
+                                ['routes', 'set', 'review', 'codex']])
+        code, out, err, ran = self.asked('do', '--help', '--', 'x')
+        self.assertTrue(out.startswith('switchboard do [--as KIND]'), out)
+
     def test_the_other_assistants_commands_are_handed_on(self):
         from switchboard.providers import cli as providers_cli
         seen = []
@@ -343,7 +369,9 @@ class HelpAfterACommand(Fresh):
         for args in (('--help',), ('-h',), ('help',)):
             with self.subTest(args=args):
                 self.assertEqual(self.asked(*args), (0, short_help(), '', []))
-        self.assertEqual(self.asked('help', 'all'), (0, MAIN_HELP, '', []))
+        for args in (('help', 'all'), ('--help', 'all'), ('-h', 'all')):
+            with self.subTest(args=args):
+                self.assertEqual(self.asked(*args), (0, MAIN_HELP, '', []))
 
 
 class UnknownCommand(Fresh):

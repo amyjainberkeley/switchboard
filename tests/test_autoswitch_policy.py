@@ -49,16 +49,21 @@ class Forced(unittest.TestCase):
         for c in cases:
             d = policy.decide(snap({'a': reading('a', **c), 'b': reading('b', five=5.0, week=5.0)}))
             self.assertEqual((d.action, d.kind, d.target), ('switch', 'forced', 'b'), c)
+        # a model's own week counts for that model only: a switch of its own kind, never a forced one
         fable = policy.Settings(enabled=True, model='Fable')
         d = policy.decide(snap({'a': reading('a', five=10, week=10, fable=95.0),
                                 'b': reading('b', five=5, week=5, fable=5.0)}, settings=fable))
-        self.assertEqual((d.action, d.kind), ('switch', 'forced'))
-        self.assertIn('Fable weekly at 95%', d.reason)
+        self.assertEqual((d.action, d.kind), ('switch', 'model'))
+        self.assertIn('Fable is at 95% on a@acct.example', d.reason)
 
-    def test_a_model_nobody_chose_never_decides(self):
-        d = policy.decide(snap({'a': reading('a', five=10, week=10, fable=100.0), 'b': reading('b', five=5, week=5)}))
+    def test_a_model_no_chat_asks_for_never_decides(self):
+        r = {'a': reading('a', five=10, week=10, fable=100.0), 'b': reading('b', five=5, week=5)}
+        d = policy.decide(snap(r, asked=frozenset(['opus'])))
         self.assertEqual(d.action, 'stay')
         self.assertIsNone(d.target)
+        # with nothing known about the chats yet, a reported model week moves nothing (only the setting's family can)
+        self.assertNotEqual(policy.decide(snap(r)).kind, 'model')
+        self.assertEqual(policy.decide(snap(r, settings=policy.Settings(enabled=True, model='Fable'))).kind, 'model')
 
     def test_a_refused_login_or_refused_requests_force_it(self):
         accts = (account('a', 1, status='needs_login'), account('b', 2))
@@ -141,8 +146,8 @@ class Forced(unittest.TestCase):
         r = {'a': reading('a', five=91.0, week=10.0), 'b': reading('b', five=10.0, week=10.0)}
         s = snap(r, busy=True, idle_for_s=0.0, since_switch_s=60.0, optional_recent=5, load_per_core=30.0,
                  battery_pct=8.0, on_ac=False, obligations=({'kind': 'doc', 'url': 'u', 'at': NOW - 60},),
-                 no_optional='restarted')
-        self.assertEqual(policy.decide(s).action, 'switch')
+                 no_optional='restarted', waited={'forced': policy.CALM_FORCED_S})
+        self.assertEqual(policy.decide(s).action, 'switch')     # (a busy Mac holds it, for 15 minutes at most)
 
     def test_nothing_moves_when_it_cannot_be_safe(self):
         r = {'a': reading('a', five=99.0, week=10.0), 'b': reading('b', five=10.0, week=10.0)}
@@ -213,7 +218,10 @@ class Optional(unittest.TestCase):
         r['b'] = reading('b', five=10.0, week=85.1, week_reset=NOW + 2 * D)     # 9.9 points of room
         self.assertEqual(policy.decide(snap(r)).action, 'stay')
         r['b'] = reading('b', five=10.0, week=85.0, week_reset=NOW + 2 * D)
-        self.assertEqual(policy.decide(snap(r)).action, 'switch')
+        self.assertEqual(policy.decide(snap(r)).action, 'switch')     # sign lines off (the default): as before
+        # with sign lines on: past its sign line, from one under them
+        self.assertEqual(policy.decide(snap(r, settings=policy.Settings(enabled=True, sign_lines=True))).action,
+                         'stay')
 
     def test_most_room_never_moves_before_a_line_and_an_unknown_refill_never_moves(self):
         d = policy.decide(snap(self.base(), settings=policy.Settings(enabled=True, strategy='most-room')))
@@ -231,7 +239,7 @@ class AFlapNeverHappens(unittest.TestCase):
 
     def test_random_streams(self):
         rng = random.Random(1716)
-        kinds = {'optional': 0, 'forced': 0}
+        kinds = {'optional': 0, 'forced': 0, 'sign': 0, 'model': 0}
         for run in range(40):
             accts = tuple(account(x, i + 1) for i, x in enumerate('abcd'))
             pct = dict((a.id, rng.uniform(0, 60)) for a in accts)
@@ -252,7 +260,8 @@ class AFlapNeverHappens(unittest.TestCase):
                 since = None if not switches else (t - switches[-1][0])
                 recent = sum(1 for s in switches if s[3] == 'optional' and t - s[0] <= 6 * H)
                 s = policy.Snapshot(now=t, accounts=accts, readings=readings,
-                                    settings=policy.Settings(enabled=True), active=active, idle_for_s=3600.0,
+                                    settings=policy.Settings(enabled=True, sign_lines=False), active=active,
+                                    idle_for_s=3600.0,
                                     since_switch_s=since, optional_recent=recent)
                 d = policy.decide(s)
                 if d.action == 'switch':

@@ -27,7 +27,7 @@ import hmac
 import re
 import secrets
 
-from . import live as live_mod, vault
+from . import ccfiles, live as live_mod, vault
 from .api import PRESENT, UNREADABLE, AccountsError
 
 TOKEN, KEY = 'token', 'key'
@@ -57,6 +57,11 @@ IN_USE = 'Claude Code is on the one-year token for %s; switch to another account
 OLDER_COPY = ("macOS didn't answer for Claude Code's login in the Keychain and only an older copy could be read, so "
               "Switchboard can't tell whether Claude Code is on that one-year token. Nothing was %s; try again in a "
               "minute.")
+FORGET_UNWRITTEN = ("The one-year token kept for %s was not removed: the list of accounts couldn't be written (%s). "
+                    "It is still kept, as %s; to remove it: switchboard remove %s")
+FORGET_UNLISTED = ("The one-year token kept for %s is no longer listed, but it stays in your Keychain (item "
+                   "\"Switchboard token\", account %s): the Keychain refused to remove it, and the list of accounts "
+                   "couldn't be written (%s).")
 
 
 def kind_of(text):
@@ -312,21 +317,32 @@ def _drop(ctx, doc, bid, who):
     The caller holds the switch and account locks, and has checked that Claude Code is not on it."""
     recs = records(doc)
     rec = recs.pop(bid)
-    doc['bearers'] = recs
-    vault.save(ctx, doc)
+    _save_bearers(ctx, doc, recs, dict(recs, **{bid: rec}))
     done = ctx.keychain.delete(SERVICES[rec['kind']], bid)
     if not done.ok:
-        doc['bearers'] = dict(recs, **{bid: rec})
-        vault.save(ctx, doc)
+        _save_bearers(ctx, doc, dict(recs, **{bid: rec}), recs)
         from .switcher import keychain_refusal
         raise keychain_refusal(done.why, "Couldn't remove the %s for %s from the Keychain (%s); nothing was "
                                          "removed." % (WHAT[rec['kind']], who, done.why))
 
 
+def _save_bearers(ctx, doc, recs, before):
+    """doc's records set to recs and the list written. When the write fails, doc holds `before` again, as the file
+    still does (an atomic write leaves the file as it was), and the error goes on to the caller."""
+    doc['bearers'] = recs
+    try:
+        vault.save(ctx, doc)
+    except BaseException:
+        doc['bearers'] = before
+        raise
+
+
 def forget_for(ctx, doc, account_id, who):
     """For roster.remove, holding the switch and account locks, once the account `who` names is off the list: every
     token kept for it goes too (roster.remove checked first that Claude Code is on none of them). Returns what History
-    says of each; a token the Keychain won't give up keeps its record, for the next try."""
+    says of each; a token the Keychain won't give up keeps its record, for the next try. The account is already
+    removed, so a list that can't be written is not an error here: History says what stayed (doc holds what the file
+    holds, _save_bearers)."""
     said = []
     for bid, rec in sorted(records(doc).items()):
         if rec.get('for') == account_id:
@@ -335,6 +351,15 @@ def forget_for(ctx, doc, account_id, who):
                 said.append(removed_said(rec, who))
             except AccountsError as e:
                 ctx.log('The token kept for a removed account stays for now: %s' % e.kind)
+            except (OSError, ccfiles.CCFileError, vault.VaultError) as e:
+                why = e.__class__.__name__
+                if bid in records(doc):
+                    ctx.log('The token kept for a removed account stays for now: %s' % why)
+                    name = name_of(doc, rec)
+                    said.append((FORGET_UNWRITTEN % (who, why, name, name), 'warn', {'h': 'problem', 'account': who}))
+                else:
+                    ctx.log('The record of a removed account\'s token went; its Keychain item stays: %s' % why)
+                    said.append((FORGET_UNLISTED % (who, bid, why), 'warn', {'h': 'problem', 'account': who}))
     return said
 
 

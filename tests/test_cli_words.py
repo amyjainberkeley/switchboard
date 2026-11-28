@@ -35,7 +35,8 @@ ROOT = os.path.abspath(os.path.join(HERE, '..'))
 sys.path.insert(0, ROOT)
 
 from switchboard import __main__ as cli
-from switchboard import core, demo, menubar, server, term
+from switchboard import core, demo, menubar, pagekey, server, term
+import pagekey_help  # noqa: E402  (the ticket in the file `open` is handed)
 import test_app  # its ChromePage: the real page in headless Chrome
 import test_keep  # its Sandbox: a fake engine and automatic-switching host, the page down
 import test_menubar  # its made-up state of the page, as the menu bar reads it
@@ -231,23 +232,40 @@ class DoctorStatusLineOff(test_cli_commands.Cli):
 # ---------- `open` refused or failing, for `switchboard page` and `switchboard demo` ----------
 
 class PageOpenRefused(Fresh):
-    URL = 'http://localhost:%s' % PORT
+    URL = 'http://127.0.0.1:%s' % PORT
+    # `open` refused or failing: one line with a fresh link that works once (pagekey.open_page), never the page key
+    ONCE = re.compile(r'^Open (http://127\.0\.0\.1:%s/\?t=[0-9]+\.[A-Za-z0-9_-]{16}\.[0-9a-f]{64}) in your browser\. It works '
+                      r'once, for five minutes\.\n$' % PORT)
 
     def page(self, opener):
         with mock.patch.object(cli, 'page_running', lambda: True), mock.patch.object(cli.subprocess, 'call', opener), \
                 mock.patch.object(cli.subprocess, 'Popen', opener):
             return self.cli('page')
 
+    def said_once(self, got):
+        code, out, err = got
+        m = self.ONCE.match(out)
+        self.assertTrue(m, out)
+        self.assertEqual((code, err), (1, ''))
+        self.assertNotIn(pagekey.key(), out)
+        self.assertTrue(pagekey.redeem(m.group(1).split('?t=', 1)[1]))
+
     def test_open_refused_says_the_address_to_open(self):
-        self.assertEqual(self.page(cli_help.refused), (1, 'Open %s in your browser.\n' % self.URL, ''))
+        self.said_once(self.page(cli_help.refused))
 
     def test_open_failing_says_it_too(self):
-        self.assertEqual(self.page(lambda argv, **kw: 1), (1, 'Open %s in your browser.\n' % self.URL, ''))
+        self.said_once(self.page(lambda argv, **kw: 1))
 
     def test_open_that_works_opens_the_page_and_says_nothing(self):
         seen = []
-        self.assertEqual(self.page(lambda argv, **kw: seen.append(argv) or 0), (0, '', ''))
-        self.assertEqual(seen, [['/usr/bin/open', self.URL]])
+
+        def opener(argv, **kw):                     # the browser takes the file's ticket, as the page would
+            seen.append(argv)
+            pagekey.redeem(pagekey_help.ticket_in(argv[1]))
+            return 0
+        self.assertEqual(self.page(opener), (0, '', ''))
+        self.assertEqual([argv[0] for argv in seen], ['/usr/bin/open'])
+        self.assertEqual(os.path.dirname(seen[0][1]), core.data_path('page-open'))
 
 
 class Stop(Exception):
@@ -290,7 +308,7 @@ class DemoOpenRefused(Fresh):
         return out.getvalue()
 
     def test_open_refused_says_the_address_and_the_demo_serves_on(self):
-        url = 'http://localhost:%d' % self.port
+        url = 'http://127.0.0.1:%d' % self.port
         self.assertEqual(self.demo(cli_help.refused), 'Open %s in your browser.\nSwitchboard demo (made-up accounts) at %s'
                                                  '  -  Ctrl-C to stop\n' % (url, url))
         direct = urllib.request.build_opener(urllib.request.ProxyHandler({}))
@@ -300,8 +318,8 @@ class DemoOpenRefused(Fresh):
     def test_it_says_its_address_and_opens_it_in_a_tab(self):
         seen = []
         self.assertEqual(self.demo(lambda argv, **kw: seen.append(argv)),
-                         'Switchboard demo (made-up accounts) at http://localhost:%d  -  Ctrl-C to stop\n' % self.port)
-        self.assertEqual(seen, [['/usr/bin/open', 'http://localhost:%d' % self.port]])
+                         'Switchboard demo (made-up accounts) at http://127.0.0.1:%d  -  Ctrl-C to stop\n' % self.port)
+        self.assertEqual(seen, [['/usr/bin/open', 'http://127.0.0.1:%d' % self.port]])
 
 
 # ---------- `switchboard version` in the help ----------

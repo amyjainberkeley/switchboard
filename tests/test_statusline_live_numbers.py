@@ -34,9 +34,9 @@ MINE = '{\n  "statusLine": {\n    "type": "command",\n    "command": "~/.claude/
 ON_SAID = 'Status line in Claude Code: on'
 THEIRS_SAID = 'You already have a status line in Claude Code, so Switchboard left it.'
 THEIRS_LINE = THEIRS_SAID + " To use Switchboard's instead: switchboard statusline on --replace"
-# The first run's step 4, with the status line and notifications on (firstrun.where).
-STEP_4_BOTH = ('  Claude Code   a status line with the account and its limits, and a notification when a long turn\n'
-               '                is done or it needs you\n')
+# The first run's step 4, with the status line and notifications on (firstrun.where); "done" after a long turn is
+# its own setting, off on a new install, so the line names "needs you" only.
+STEP_4_BOTH = '  Claude Code   a status line with the account and its limits, and a notification when it needs you\n'
 H, D = 3600, 86400
 
 
@@ -301,11 +301,16 @@ class TerminalFirstRun(test_term.Sandbox):
         self.assertTrue(sl.is_ours(self.settings()['statusLine']))
         self.assertEqual(json.dumps(self.settings()).count(nh.MARK), 3)      # the hooks beside it
         code, again = self.run_cli('setup', tty=test_term.FakeTty(['s']))   # the first run again: done once, still on
-        self.assertEqual(code, 0)
-        lines = out.split('\n')                                            # the first run names what it turned on;
-        i = next(n for n, line in enumerate(lines) if line.startswith("  Changed in Claude Code's settings:"))
-        j = next(n for n in range(i, len(lines)) if lines[n] == '')       # the second turned nothing on, so says
-        self.assertEqual(again, '\n'.join(lines[:i] + lines[j:]))           # the same without that line
+        # It says all the same, except what it changed in Claude Code's settings: this time, nothing. The routing
+        # step says that of its own key in its own words: the change with its undo the first time (its lines run to
+        # the step's end), only the list's own sentence the second.
+        from switchboard.router import wire_words as rw
+        lines = out.split('\n')
+        at = next(i for i, x in enumerate(lines) if x.startswith("  Changed in Claude Code's settings: status line"))
+        lines = lines[:at] + lines[lines.index('', at):]
+        added = next(i for i, x in enumerate(lines) if x.startswith('  ' + rw.BRIEF_PLUGIN.split(' (undo')[0]))
+        del lines[added:lines.index('', added)]
+        self.assertEqual((code, again), (0, '\n'.join(lines)))
 
     def test_without_a_terminal_its_one_line_says_so(self):
         self.assertEqual(self.run_cli('setup'), (0, 'Claude Code is signed in as ana@work.example. Kept.\n'
@@ -317,7 +322,7 @@ class TerminalFirstRun(test_term.Sandbox):
             f.write(MINE)
         code, out = self.run_cli('setup', tty=test_term.FakeTty(['s']))
         self.assertEqual(code, 0)
-        self.assertIn('  Claude Code   a notification when a long turn is done or it needs you\n', out)
+        self.assertIn('  Claude Code   a notification when it needs you\n', out)
         self.assertIn(' '.join(THEIRS_LINE.split()), ' '.join(out.split()))
         self.assertEqual(self.settings()['statusLine'], json.loads(MINE)['statusLine'])
         code, out = self.run_cli('setup')                                    # without a terminal: in its three lines
@@ -659,7 +664,8 @@ class NowForTheAccountInUse(LiveBase):
         marks = dict((r['email'], r['marks']) for r in menubar.rows(state, test_menubar.TZ))
         self.assertEqual(marks['ana@mail.example'], [('In use', 'in-use')])
         row = next(r for r in menubar.rows(state, test_menubar.TZ) if r['email'] == 'ana@mail.example')
-        self.assertEqual(menubar.row_label(row), 'ana@mail.example, in use, weekly 27%')
+        # ana@mail.example has no 5-hour window (Ultra): its row says it has no 5-hour limit
+        self.assertEqual(menubar.row_label(row), 'ana@mail.example, in use, no 5-hour limit, weekly 27%')
         state['accounts'][0]['live'] = False
         self.assertEqual(dict((r['email'], r['marks']) for r in menubar.rows(state, test_menubar.TZ)), marks)
 

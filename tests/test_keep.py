@@ -198,7 +198,10 @@ class Sandbox(unittest.TestCase):
                                     (notify_hooks, 'MANAGED', os.path.join(self.tmp, 'managed')),   # none there
                                     (statusline, 'precompile', lambda *a, **k: None),    # no bytecode in the source
                                     (notify_hooks, 'precompile', lambda *a, **k: None),
-                                    (engine, 'foreign_switcher', lambda folder=None: None)):
+                                    (engine, 'foreign_switcher', lambda folder=None: None),
+                                    # the page's own look at the sign-in goes to the real engine, which the fake
+                                    # engine does not stand in for: it would read the Keychain through `security`
+                                    (server, '_standin_look', lambda: None)):
             p = mock.patch.object(target, name, value)
             p.start()
             self.addCleanup(p.stop)
@@ -689,8 +692,9 @@ class InTheTerminal(Sandbox):
         self.signed_in(A)
         code, out = self.run_cli('setup', tty=FakeTty(['s']))
         self.assertEqual(code, 0, out)
-        self.assertTrue(out.startswith('Switchboard setup.\n\n1 of 4  Your account\n'      # "See it move" is planned:
-                                       # the job may start the page, so a second account may follow
+        self.assertTrue(out.startswith('Switchboard setup.\n\n1 of 5  Your account\n'      # "See it move" is planned:
+                                       # the job may start the page, so a second account may follow; and routing,
+                                       # which this copy has (switchboard.router)
                                        '  Claude Code is signed in as maya@northwind.example. Kept.\n'), out)
         self.assertNotIn('/login', out)                 # the other accounts sign in through the browser
         self.assertEqual(self.fake.emails(), [A])

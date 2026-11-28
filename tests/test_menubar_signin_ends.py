@@ -122,7 +122,7 @@ class TheRows(unittest.TestCase):
     def test_voiceover_reads_the_whole_words(self):
         s = state(**{LAB: (t(16, 9), False), HARBOR: (t(9, 20, 38), True)})
         self.assertEqual(menubar.row_label(row_of(s, LAB)),
-                         'Use ana@lab.example, next, Sign-in ends by Mon 9:00 AM, weekly 65%')
+                         'Use ana@lab.example, next, Sign-in ends by Mon 9:00 AM, no 5-hour limit, weekly 65%')
         self.assertEqual(menubar.row_label(row_of(s, HARBOR)),
                          'Sign in again as ana@harbor.example, Sign-in ended by Mon 8:38 PM, 5-hour 0%, '
                          'weekly 17%')

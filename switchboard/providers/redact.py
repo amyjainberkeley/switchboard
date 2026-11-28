@@ -93,6 +93,20 @@ _PLAIN_VALUES = frozenset(('true', 'false', 'null', 'none', 'nil', 'undefined', 
 # can begin with $ and lower-case letters) or ${name}. Anything more after it goes.
 _SHELL_VAR_RE = re.compile(r'\$(?:[A-Z_][A-Z0-9_]*|\{[A-Za-z_][A-Za-z0-9_]*\})\Z')
 
+# A command's flag that carries a password or a token: --password=VALUE, --password VALUE, --api-key VALUE. With a
+# space, a next word that is a flag (-x) is no value. The flag's name is judged by _FLAG_WORD_RE, and one that says it
+# is not the value itself (--no-password, --password-stdin, --password-file) stays.
+_FLAG_RE = re.compile(r'(?<![\w\-])(?P<k>--?(?P<n>[A-Za-z][\w\-]{0,63})(?:=|[ \t]+(?!-)))'
+                      r'(?:"(?P<dq>[^"\n]*)"|\'(?P<sq>[^\'\n]*)\'|(?P<v>[^\s"\']+))')
+_FLAG_WORD_RE = re.compile(r'(?i)pass(?:word|wd)|token|secret|api[-_]?key|credential')
+_FLAG_NOT_RE = re.compile(r'(?i)^no-|-(?:file|stdin|path|prompt|env)$')
+# A login with its password after -u or --user (curl's -u user:pass): the user stays.
+_USER_RE = re.compile(r'(?<![\w\-])(?P<k>(?:-u|--user)(?:=|[ \t]+)[^\s:"\'@/]{1,64}:)(?!/)(?P<v>[^\s"\'@]{1,256})')
+# mysql's and mariadb's password joined to its flag (-pVALUE), on a line that names one of them: -p takes other values
+# in other commands (gcc -pthread, ssh -p2222).
+_JOINED_P_RE = re.compile(r'(?<![\w\-])(?P<k>-p)(?P<v>[^\s"\'\-][^\s"\']{3,255})')
+_MYSQL_LINE_RE = re.compile(r'(?i)\b(?:mysql|mariadb)\w*')
+
 # A login inside an address, and secret-named query values.
 _URL_LOGIN_RE = re.compile(r'(?P<k>\b[A-Za-z][A-Za-z0-9+.\-]{0,20}://)[^\s/:@\[\]]{1,256}:[^\s/@\[\]]{1,256}@')
 _QUERY_RE = re.compile(r'(?i)(?P<k>[?&](?:token|key|sig|signature|access_token|api_key|password)=)'
@@ -204,6 +218,40 @@ def _pairs(text: str, counts: Dict[str, int]) -> str:
     return _PAIR_RE.sub(pair_sub, text)
 
 
+def _flags(text: str, counts: Dict[str, int]) -> str:
+    """A password or token given to a command as a flag (_FLAG_RE, _USER_RE, _JOINED_P_RE): the value goes, the flag
+    and the user stay. A value _value_goes keeps (a shell variable's name, a short or plain word) stays."""
+    def flag_sub(m):
+        name = m.group('n')
+        for group, quote in (('dq', '"'), ('sq', "'"), ('v', '')):
+            value = m.group(group)
+            if value is not None:
+                break
+        if not (_FLAG_WORD_RE.search(name) and not _FLAG_NOT_RE.search(name) and _value_goes(value)):
+            return m.group(0)
+        _add(counts, 'named_value')
+        return '%s%s%s%s' % (m.group('k'), quote, MARK, quote)
+
+    def value_sub(m):
+        if not _value_goes(m.group('v')):
+            return m.group(0)
+        _add(counts, 'named_value')
+        return m.group('k') + MARK
+
+    low = text.lower()
+    if any(h in low for h in ('pass', 'token', 'secret', 'api', 'credential')):
+        text = _FLAG_RE.sub(flag_sub, text)
+    if '-u' in text:                                # -u and --user
+        text = _USER_RE.sub(value_sub, text)
+    if '-p' in text and ('mysql' in low or 'mariadb' in low):
+        lines = _Lines(text)
+
+        def joined_sub(m):
+            return value_sub(m) if lines.has(m.start(), _MYSQL_LINE_RE) else m.group(0)
+        text = _JOINED_P_RE.sub(joined_sub, text)
+    return text
+
+
 def _has_letters_and_digits(run: str, upper_and_lower: bool) -> bool:
     up, low, digit = (_UPPER_RE.search(run) is not None, _LOWER_RE.search(run) is not None,
                       _DIGIT_RE.search(run) is not None)
@@ -285,6 +333,8 @@ def _line_rules(text: str, counts: Dict[str, int], context_git: bool) -> str:
             text = rx.sub(_keep_and_mark(counts, 'auth_header'), text)
     if ':' in text or '=' in text:
         text = _pairs(text, counts)
+    if '-' in text:
+        text = _flags(text, counts)
     if '://' in text:
         text = _URL_LOGIN_RE.sub(_keep_and_mark(counts, 'url_login'), text)
     if '=' in text:

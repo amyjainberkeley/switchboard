@@ -67,6 +67,45 @@ class Corpus(unittest.TestCase):
         self.assertEqual(redact.scrub(line, context='git rev-parse HEAD~3')[0], line)
 
 
+class PasswordFlags(unittest.TestCase):
+    # A password or token given to a command as a flag: --password=x, --password x, -u user:pass, --user user:pass,
+    # and mysql's -pVALUE. The value goes; the flag, the user and the rest of the line stay. Made-up values only.
+    def gone(self, line, value, keep=()):
+        text, counts = redact.scrub(line)
+        self.assertNotIn(value, text, line)
+        self.assertIn(MARK, text)
+        self.assertEqual(counts, {'named_value': 1}, line)
+        for k in keep:
+            self.assertIn(k, text)
+
+    def test_a_flag_whose_name_says_password_or_token_loses_its_value(self):
+        self.gone('docker login -u me --password=s3cretpw1 registry.example', 's3cretpw1',
+                  ('--password=', 'registry.example', '-u me'))
+        self.gone('mysql --password s3cretpw1 -h db.example shop', 's3cretpw1', ('--password ', '-h db.example'))
+        self.gone("tool --password 'two words pw' --verbose", 'two words pw', ('--verbose',))
+        self.gone('gh run --token=ghq9Wm2xLk deploy', 'ghq9Wm2xLk', ('--token=', 'deploy'))
+        self.gone('svc --api-key k7Hd93jSa', 'k7Hd93jSa')
+        self.gone('svc --client-secret=Zp81kQwe', 'Zp81kQwe')
+
+    def test_a_login_with_its_password_keeps_the_user(self):
+        self.gone('curl -u admin:s3cretpw1 https://api.example/v1', 's3cretpw1',
+                  ('-u admin:', 'https://api.example/v1'))
+        self.gone('curl --user admin:s3cretpw1 https://api.example', 's3cretpw1', ('--user admin:',))
+        self.gone('curl --user=admin:s3cretpw1 https://api.example', 's3cretpw1', ('--user=admin:',))
+
+    def test_mysqls_password_joined_to_its_flag(self):
+        self.gone('mysql -ps3cretpw1 -u root shop', 's3cretpw1', ('mysql -p', '-u root shop'))
+        self.gone('mysqldump -u root -pS3cret99 shop > shop.sql', 'S3cret99', ('-u root -p', 'shop.sql'))
+
+    def test_what_stays(self):
+        for line in ('mysql --password $PW -h db.example', 'mysql --password=$PW shop', 'mysql --no-password shop',
+                     'mysql --password', 'docker login --password-stdin -u me', 'tool --password-file pw.txt',
+                     'tool --password -x', 'docker login -u me registry.example', 'gcc -pthread main.c',
+                     'ssh -p2222 host.example', 'mkdir -p build/out', 'tool --token=no', 'pip install -r reqs.txt'):
+            with self.subTest(line=line):
+                self.assertEqual(redact.scrub(line), (line, {}))
+
+
 class KnownValues(unittest.TestCase):
     ENV = {'MY_SERVICE_TOKEN': 'plainwordsbutsecret', 'DATABASE_URL': 'postgres://db.example/made-up-db',
            'SHORT_KEY': 'abc', 'EDITOR': 'vim-made-up-editor', 'GH_PAT': 'pat-made-up-1234',

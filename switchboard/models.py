@@ -1,12 +1,12 @@
 """Models: the right model for each job, using only Claude Code's own settings.
 
 Switchboard never sits between Claude Code and Anthropic. This module only reads and edits
-two things Claude Code itself documents: the `env` block of the user settings file
-(~/.claude/settings.json) and the user agents folder (~/.claude/agents/). It never changes the
-chat's own model, never overrides a helper that names its model, and never edits a key or a
-file it did not set.
+three things Claude Code itself documents: the `env` block of the user settings file
+(~/.claude/settings.json), the user agents folder (~/.claude/agents/) and the user rules folder
+(~/.claude/rules/). It never changes the chat's own model, never overrides a helper that names its
+model, and never edits a key or a file it did not set.
 
-What decides a helper's model today (code.claude.com/docs, checked 2026-11-13; the sentences
+What decides a helper's model today (code.claude.com/docs, checked against Claude Code 2.1.331; the sentences
 are in DOCS below, each with its URL):
 
   1. the model Claude passes when it starts the helper (aliases only),
@@ -18,20 +18,26 @@ are in DOCS below, each with its URL):
   Explore and Plan helpers ignore CLAUDE_CODE_SUBAGENT_MODEL; a user agent named Explore
   replaces the built-in one and keeps its own model line.
 
-Presets (PRESETS):
+Two switches, each on or off by itself (PARTS), and presets made of them (PRESETS):
 
-  Off         nothing of Switchboard's left behind.
-  By the job  env CLAUDE_CODE_SUBAGENT_MODEL=sonnet in the user settings file, so helpers and
-              workflow agents that name no model run on Sonnet instead of the chat's model;
-              and a user agent file agents/switchboard-explore.md (name: Explore,
-              model: haiku), so lookups run on Haiku. Nothing else changes.
+  Models by the job   four user agent files, agents/switchboard-{lookup,reader,reviewer,verifier}.md
+    ('helpers')       (lookup on Haiku; reader on Sonnet at medium effort; reviewer and verifier on
+                      Sonnet at high effort), and one note, rules/switchboard-models.md, that says
+                      which helper is for what. No setting.
+  Sonnet for helpers  env CLAUDE_CODE_SUBAGENT_MODEL=sonnet in the user settings file, so helpers and
+    ('sonnet')        workflow agents that name no model run on Sonnet instead of the chat's model,
+                      and CLAUDE_CODE_SUBAGENT_EFFORT=high where Claude Code reads it (2.1.316).
+
+  Presets: off, helpers, sonnet, helpers-and-sonnet; and by-the-job, the earlier preset (Sonnet for
+  helpers plus agents/switchboard-explore.md, name: Explore, model: haiku), which records written
+  before the two switches name. plan(preset, only=part) turns one switch and leaves the other as it is.
   Everything small is not offered: the only documented switch is the FORCE pair, which
   overrides helpers that name their own model (see LIMITS).
 
 current() reads; plan() says exactly what would change and changes nothing; apply() writes
-atomically, keeps a backup, and records what it did in Switchboard's own state file so
-undo() can put every file back byte for byte. would_have_moved() and seen() read a usage
-summary (switchboard.usage.summarize).
+atomically, keeps a backup, and records what it did in Switchboard's own state file (one record for
+both switches) so undo() can put every file back byte for byte. would_have_moved() and seen() read a
+usage summary (switchboard.usage.summarize).
 
 What this cannot do (limits() returns the same list with the doc sentence behind each):
 
@@ -48,6 +54,7 @@ What this cannot do (limits() returns the same list with the doc sentence behind
   - Override CLAUDE_CODE_EFFORT_LEVEL for one helper.
   - Use a hook or a mod to choose a helper's model.
   - Say how much of a plan's usage limit a model's tokens use.
+  - Make Claude hand a job to a helper.
 
 Manual check (reads only):  python3 -m switchboard.models
 """
@@ -62,14 +69,17 @@ import time
 STATE_VERSION = 1
 SETTINGS_NAME = 'settings.json'
 AGENTS_DIR = 'agents'
+RULES_DIR = 'rules'
 EXPLORE_FILE = 'switchboard-explore.md'     # identity comes from `name:`, not the file name
+NOTE_FILE = 'switchboard-models.md'         # a user rule: loaded in every project (DOCS user_rules)
 SUBAGENT_VAR = 'CLAUDE_CODE_SUBAGENT_MODEL'
+SUBAGENT_EFFORT_VAR = 'CLAUDE_CODE_SUBAGENT_EFFORT'
 FORCE_VAR = 'CLAUDE_CODE_SUBAGENT_MODEL_FORCE'
 EFFORT_VAR = 'CLAUDE_CODE_EFFORT_LEVEL'
 NO_EXPLORE_PLAN_VAR = 'CLAUDE_CODE_DISABLE_EXPLORE_PLAN_AGENTS'
 # The environment variables that decide models or effort. Only these are ever reported;
 # other `env` entries (keys, tokens) are never read out.
-MODEL_VARS = (SUBAGENT_VAR, FORCE_VAR, EFFORT_VAR, 'ANTHROPIC_MODEL', 'ANTHROPIC_DEFAULT_MODEL',
+MODEL_VARS = (SUBAGENT_VAR, SUBAGENT_EFFORT_VAR, FORCE_VAR, EFFORT_VAR, 'ANTHROPIC_MODEL', 'ANTHROPIC_DEFAULT_MODEL',
               'ANTHROPIC_DEFAULT_FABLE_MODEL', 'ANTHROPIC_DEFAULT_OPUS_MODEL',
               'ANTHROPIC_DEFAULT_SONNET_MODEL', 'ANTHROPIC_DEFAULT_HAIKU_MODEL',
               NO_EXPLORE_PLAN_VAR, 'CLAUDE_AGENT_SDK_DISABLE_BUILTIN_AGENTS')
@@ -77,28 +87,38 @@ MODEL_KEYS = ('model', 'effortLevel', 'modelSettings', 'availableModels', 'advis
 # Versions below these let the change do something other than what the preset says.
 NEEDS_ORDER = (2, 1, 251)       # before it, CLAUDE_CODE_SUBAGENT_MODEL overrode named models
 NEEDS_OMIT = (2, 1, 271)        # omitClaudeMd, which keeps our Explore as lean as the built-in
+# Models by the job: two of its helper files use omitClaudeMd, which needs this version (DOCS omit_claude_md). It sets
+# no CLAUDE_CODE_SUBAGENT_MODEL, so NEEDS_ORDER is not its business.
+NEEDS_HELPERS = NEEDS_OMIT
+# A settings file that can't be understood blocks Models by the job: it may deny one of the helpers. The row, the
+# command and the plan say why; a press that was refused for it says that nothing was written, too.
+HELPERS_UNREADABLE_WHY = ("Claude Code's settings file can't be read, so Switchboard can't tell whether you deny one "
+                          'of these helpers.')
+HELPERS_UNREADABLE = HELPERS_UNREADABLE_WHY + ' Nothing was written.'
+# CLAUDE_CODE_SUBAGENT_EFFORT: the changelog adds it in 2.1.316 (Oct 31 2026); the env page says it needs 2.1.315.
+# The later of the two is used (DOCS subagent_effort_added and subagent_effort).
+NEEDS_EFFORT = (2, 1, 316)
+SONNET_EFFORT = 'high'
 BUSY_SECONDS = 300
 
 DOCS_BASE = 'https://code.claude.com/docs/en/'
-# Each sentence this module relies on, quoted from the live docs (checked 2026-11-13).
+# Each sentence this module relies on, quoted from the live docs (checked against Claude Code 2.1.331).
 DOCS = {
     'order': ('sub-agents#choose-a-model',
-              "Claude Code resolves the subagent's model in this order: 1. The per-invocation `model` parameter "
-              "2. The subagent definition's `model` frontmatter, where `inherit` selects the main conversation's "
-              "model 3. The `CLAUDE_CODE_SUBAGENT_MODEL` environment variable, when you set it to a model alias "
-              "or model ID 4. The main conversation's model"),
-    'order_before': ('sub-agents#choose-a-model',
-                     'Before v2.1.251, `CLAUDE_CODE_SUBAGENT_MODEL` came first in this order and overrode both the '
-                     'per-invocation parameter and the frontmatter, including `model: inherit`.'),
+              'When more than one source sets a model, Claude Code uses the first in this order: 1. The '
+              'per-invocation `model` parameter, which Claude can pass when it starts the subagent. ... 2. The '
+              "`model` field in the subagent's definition, including `inherit` 3. The `CLAUDE_CODE_SUBAGENT_MODEL` "
+              "environment variable 4. The main conversation's model, or the spawning subagent's model for a nested "
+              'subagent'),
+    'order_before': ('env-vars#variables',
+                     "Before v2.1.251, this variable overrode both the per-invocation model and the definition's "
+                     '`model` field'),
     'var': ('env-vars#variables',
             'The default model for subagents, agent team teammates, and workflow agents that aren\'t assigned a '
             'model another way. Accepts an alias such as `haiku` or a full model name. Two sources take '
             'precedence over it: a model Claude passes when it spawns the agent, and a `model` field in the '
             'agent\'s definition, including `inherit`.'),
-    'var_inherit': ('sub-agents#choose-a-model',
-                    'An alias in `CLAUDE_CODE_SUBAGENT_MODEL` always resolves to the version the alias points to, '
-                    'even when it names the main conversation\'s family. Setting the variable to `inherit` is the '
-                    'same as leaving it unset.'),
+    'var_inherit': ('env-vars#variables', 'Setting it to `inherit` is the same as leaving it unset.'),
     'explore_plan': ('sub-agents#choose-a-model',
                      "Setting `CLAUDE_CODE_SUBAGENT_MODEL` by itself doesn't change the model the built-in Explore "
                      'and Plan subagents run on.'),
@@ -106,39 +126,37 @@ DOCS = {
                          'A user or project subagent named `Explore` overrides the built-in and keeps its own '
                          '`model` field, so define one with `model: haiku` to run exploration on a lower-cost model.'),
     'explore_model': ('sub-agents#built-in-subagents',
-                      "**Model**: the main conversation's model. When the main conversation runs Fable, Explore's "
-                      'model depends on how you connect: With a Claude subscription, an Anthropic Console account, '
-                      'or an LLM gateway reached through `ANTHROPIC_BASE_URL`, Explore runs on the Opus model that '
-                      'the `opus` alias resolves to.'),
+                      "**Model**: the parent conversation's model. When the parent conversation runs Fable, Explore "
+                      'runs on Opus or stays on Fable, based on how you connect. ... With a Claude subscription, an '
+                      'Anthropic Console account, or an LLM gateway reached through `ANTHROPIC_BASE_URL`, Explore '
+                      'runs on the Opus model that the `opus` alias resolves to.'),
     'explore_tools': ('sub-agents#built-in-subagents', '**Tools**: read-only tools; Write and Edit are denied'),
     'explore_lean': ('sub-agents#built-in-subagents',
                      'Explore and Plan start without your CLAUDE.md files and the git status snapshot to keep '
                      'research fast and inexpensive.'),
     'git_status': ('sub-agents#what-loads-at-startup',
-                   "You can't change which subagents receive git status. Only Explore and Plan skip it."),
+                   "Explore and Plan skip it regardless. ... You can't change which subagents receive git status."),
     'prompts': ('sub-agents#what-loads-at-startup',
-                'Custom subagents define theirs in the markdown body or `prompt` field. Built-in agents have '
-                'predefined prompts.'),
+                'Custom subagents define theirs in the markdown body or `prompt` field.'),
     'plan_agent': ('sub-agents#built-in-subagents',
-                   '**Model**: inherits from the main conversation, unless you set `CLAUDE_CODE_SUBAGENT_MODEL` and '
+                   '**Model**: inherits from the parent conversation, unless you set `CLAUDE_CODE_SUBAGENT_MODEL` and '
                    'force it onto every subagent'),
     'general_purpose': ('sub-agents#built-in-subagents',
-                        '**Model**: the `CLAUDE_CODE_SUBAGENT_MODEL` model if you set one and nothing assigns a '
-                        "model another way, otherwise the main conversation's model"),
+                        "**Model**: the parent conversation's model by default, following the model order"),
     'claude_agent': ('sub-agents#built-in-subagents',
                      'None of its own; follows the model order when Claude spawns it as a subagent'),
     'own_model_builtins': ('sub-agents#built-in-subagents',
                            '| statusline-setup | Sonnet | ... | claude-code-guide | Haiku |'),
     'fork': ('sub-agents#how-forks-differ-from-other-subagents',
-             '| Model | Same as main session | From the subagent\'s `model` field |'),
+             '| Model | Same as the parent conversation | Follows the subagent model order |'),
     'force': ('sub-agents#run-every-subagent-on-one-model',
               "While `CLAUDE_CODE_SUBAGENT_MODEL_FORCE` is on, Claude Code ignores the `model` field in subagent "
-              "definitions, and Claude can't pass a model when it starts a subagent. These subagents still run on "
-              "the main conversation's model: ... A fork ... A skill that runs in a subagent with `model: inherit`"),
+              "definitions, and Claude can't pass a model when it starts a subagent. The following subagents still "
+              "run on their parent conversation's model: ... A fork ... A skill that runs in a subagent with "
+              '`model: inherit`'),
     'force_two_vars': ('sub-agents#run-every-subagent-on-one-model',
-                       '`CLAUDE_CODE_SUBAGENT_MODEL` is a default, so a subagent\'s definition or a model Claude '
-                       'passes still takes precedence over it. To apply one model to every subagent, teammate, and '
-                       'workflow agent, also set `CLAUDE_CODE_SUBAGENT_MODEL_FORCE` to `1`.'),
+                       'To apply one model to every subagent, teammate, and workflow agent, set '
+                       '`CLAUDE_CODE_SUBAGENT_MODEL` to that model and `CLAUDE_CODE_SUBAGENT_MODEL_FORCE` to `1`.'),
     'workflows': ('workflows#cost',
                   "Claude Code picks each workflow agent's model in the same order it uses for subagents. A model "
                   'the script names for a stage counts as the per-invocation model in that order. When nothing '
@@ -154,8 +172,8 @@ DOCS = {
                   'settings file sets a variable, the highest-precedence one applies.'),
     'env_desktop': ('settings-reference#how-env-values-interact-with-your-shell',
                     'When the Claude Desktop app or a self-hosted environment runner starts the session, the launch '
-                    'environment it builds takes precedence instead: Claude Code ignores an `env` value from any '
-                    'settings file for a variable the launch environment already sets.'),
+                    'environment it builds takes precedence instead. Claude Code ignores an `env` value from a '
+                    'settings file for a variable that environment already sets.'),
     'env_levels': ('env-vars#precedence',
                    'Between settings files, `env` values follow settings precedence, so a managed settings entry '
                    'overrides the same variable in user or project settings.'),
@@ -168,9 +186,6 @@ DOCS = {
                      'When you add or edit a subagent file on disk, or ask Claude to write one for you, Claude Code '
                      'detects the change within a few seconds and the next delegation uses the updated definition, '
                      'with no restart needed.'),
-    'agents_new_dir': ('sub-agents#write-subagent-files',
-                       'The watcher covers only directories that existed when the session started, so after '
-                       "creating a scope's first agent file in a new `agents` directory, restart to load it."),
     'agents_scan': ('sub-agents#choose-the-subagent-scope',
                     'Claude Code scans `.claude/agents/` and `~/.claude/agents/` recursively, so you can organize '
                     'definitions into subfolders such as `agents/review/` or `agents/research/`. The subdirectory '
@@ -209,6 +224,71 @@ DOCS = {
                       "a seat-based usage window on a subscription plan, shared across all models, so the developer "
                       "can't restore access by switching models with `/model`."),
     'managed_path': ('managed-settings', '**macOS**: `/Library/Application Support/ClaudeCode/managed-settings.json`'),
+    # Models by the job and the effort of Sonnet for helpers (checked against the docs of Claude Code 2.1.331).
+    'subagent_effort': ('env-vars#variables',
+                        'The default effort level for subagents and workflow agents: `low`, `medium`, `high`, `xhigh`, '
+                        "or `max`. It doesn't apply to forks, forked skills, or teammates. Requires Claude Code "
+                        'v2.1.315 or later'),
+    'subagent_effort_added': ('changelog',
+                              'Added `CLAUDE_CODE_SUBAGENT_EFFORT` to set the effort level subagents run at when '
+                              "nothing else names one, instead of inheriting the session's"),
+    'effort_order': ('sub-agents#when-a-subagent-has-no-effort-field-or-parameter',
+                     'A subagent other than a fork, forked skill, or teammate runs at the first of these that '
+                     'applies to it: 1. The level in `CLAUDE_CODE_EFFORT_LEVEL`, if you set it 2. The `effort` set '
+                     'for the subagent that spawned it, or a level set only for the current turn, such as a '
+                     "skill's `effort` 3. The level in `CLAUDE_CODE_SUBAGENT_EFFORT`, if you set it"),
+    'agent_required': ('sub-agents#frontmatter-reference', 'Only `name` and `description` are required.'),
+    'agent_rows': ('sub-agents#supported-frontmatter-fields',      # the six fields the helper files use
+                   '| `name` | Yes | Unique identifier of at most 256 characters ... | `description` | Yes | When '
+                   'Claude should delegate to this subagent | ... | `disallowedTools` | No | Tools to deny, removed '
+                   'from inherited or specified list. ... | `model` | No | Model to use: ... | `omitClaudeMd` | No | '
+                   'Set to `true` to start this subagent without the user, project, and local CLAUDE.md files ... | '
+                   '`effort` | No | Effort level when this subagent is active.'),
+    'agent_unknown': ('sub-agents#frontmatter-reference',
+                      'Multi-word field names use camelCase, such as `maxTurns` and `disallowedTools`, and must match '
+                      "the table exactly: Claude Code ignores a field it doesn't recognize without reporting an "
+                      'error.'),
+    'agent_model': ('sub-agents#frontmatter-reference',
+                    'Model to use: `sonnet`, `opus`, `haiku`, `fable`, a full model ID such as `claude-opus-5-5`, or '
+                    '`inherit`.'),
+    'effort_levels': ('sub-agents#frontmatter-reference',
+                      'Options: `low`, `medium`, `high`, `xhigh`, `max`; available levels depend on the model.'),
+    'agent_description': ('sub-agents#frontmatter-reference', 'When Claude should delegate to this subagent'),
+    'delegation': ('sub-agents#understand-automatic-delegation',
+                   'Claude automatically delegates tasks based on the task description in your request, the '
+                   '`description` field in subagent configurations, and current context.'),
+    'disallowed_tools': ('sub-agents#frontmatter-reference',
+                         'Tools to deny, removed from inherited or specified list.'),
+    'omit_use': ('sub-agents#frontmatter-reference',
+                 'Use it for subagents that take everything they need from the delegation prompt.'),
+    'claude_md_main': ('sub-agents#what-loads-at-startup',
+                       "The main conversation still has your full CLAUDE.md when it reads these subagents' results, "
+                       "so most rules don't need to reach the subagent itself."),
+    'managed_agents': ('sub-agents#choose-the-subagent-scope',
+                       'Managed definitions take precedence over project and user subagents with the same name.'),
+    'same_name_one_dir': ('sub-agents#choose-the-subagent-scope',
+                          'If two files under the same `.claude/agents/` directory declare the same name, Claude '
+                          'Code loads only one of them.'),
+    'user_rules': ('memory#user-level-rules',
+                   'Personal rules in `~/.claude/rules/` apply to every project on your machine.'),
+    'rules_launch': ('memory#set-up-rules',
+                     'Rules without `paths` frontmatter are loaded at launch with the same priority as '
+                     '`.claude/CLAUDE.md`.'),
+    'rules_recursive': ('memory#set-up-rules',
+                        'All `.md` files are discovered recursively, so you can organize rules into subdirectories '
+                        'like `frontend/` or `backend/`'),
+    'effort_param': ('sub-agents#choose-an-effort-level',
+                     'When you ask Claude to run a non-fork subagent at a specific effort level, it can also pass an '
+                     '`effort` parameter for that invocation. ... The per-invocation parameter requires Claude Code '
+                     'v2.1.292 or later.'),
+    'haiku_default': ('model-config#adjust-effort-level',
+                      'Fable 5.2, Opus 5.5, Sonnet 5.5, and Haiku 5.5 default to `medium`'),
+    'tools_bash': ('sub-agents#code-reviewer',
+                   'A subagent that reviews code without the Edit and Write tools. It can still change files through '
+                   'Bash.'),
+    'effort_by_model': ('model-config#adjust-effort-level',
+                        '| Opus 5.5, Sonnet 5.5, Haiku 5.5, Opus 5, Sonnet 5, Opus 4.8, and Opus 4.7 | `low`, `medium`, '
+                        '`high`, `xhigh`, `max` |'),
 }
 
 
@@ -266,6 +346,10 @@ LIMITS = (
     ('Say how much of a plan\'s usage limit a model\'s tokens use.',
      'The docs say the weekly and session windows are shared across all models and give no per-model weight, '
      'so would_have_moved() counts weighted tokens, not limit.', ('limits_shared',)),
+    ('Make Claude hand a job to a helper.',
+     'Claude picks a helper by its description and the task; the note says which helper is for what, and it is '
+     'advice. A project\'s own helper with the same name wins in that project.',
+     ('delegation', 'agent_description', 'agents_priority')),
 )
 
 
@@ -508,6 +592,8 @@ def _insert(text, o, end, members, key, render, unit, multiline_if_empty):
             ind = sep[sep.rfind('\n') + 1:]
             piece = ',' + nl + ind + _jdump(key) + colon + render(True, ind)
         else:
+            if not sep and len(members) == 1 and colon.endswith(' '):
+                sep = ' '           # {"a": 1} has no member gap to copy; its spaced colon says "a, b" is its style
             piece = ',' + sep + _jdump(key) + colon + render(False, '')
         return text[:last['v1']] + piece + text[last['v1']:]
     close = end - 1
@@ -580,26 +666,73 @@ def _checked(doc_, new_text, expect):
 
 # ---------------------------------------------------------------- agent files
 
-def _frontmatter(text):
-    """Top-level `key: value` lines of a Markdown file's YAML frontmatter (None when it has none).
-    A small reader: enough for name, model and effort lines; nested blocks are skipped."""
-    lines = text.splitlines()
+def _unquote(v):
+    """A YAML scalar as written on one line: a quoted one up to its closing quote (a # inside it stays), else up to a
+    comment (a # after a space or a tab)."""
+    v = v.strip()
+    if v[:1] in ('"', "'"):
+        end = v.find(v[0], 1)
+        if end > 0:
+            return v[1:end]
+    return re.split(r'[ \t]#', v, maxsplit=1)[0].rstrip()
+
+
+def _front_lines(text):
+    """The lines of a Markdown file's YAML front matter, between its opening and its closing `---` (None without
+    both). A byte-order mark first is skipped."""
+    lines = text.lstrip('\ufeff').splitlines()
     if not lines or lines[0].strip() != '---':
         return None
-    out = {}
-    for line in lines[1:]:
+    for i, line in enumerate(lines[1:], 1):
         if line.strip() == '---':
-            return out
+            return lines[1:i]
+    return None     # no closing ---
+
+
+def _frontmatter(text):
+    """Top-level `key: value` lines of a Markdown file's YAML frontmatter (None when it has none).
+    A small reader: enough for name, model and effort lines; nested blocks are skipped. It reads a quoted key or
+    value, a comment after either, and a byte-order mark first: a helper of yours named another way must still be
+    seen as yours (two with one name in one folder: only one loads). What it can't read: _names_taken."""
+    lines = _front_lines(text)
+    if lines is None:
+        return None
+    out = {}
+    for line in lines:
         if not line or line[0] in ' \t#-' or ':' not in line:
             continue
-        k, v = line.split(':', 1)
-        v = v.strip()
-        if v[:1] in ('"', "'") and v[-1:] == v[:1] and len(v) >= 2:
-            v = v[1:-1]
-        elif ' #' in v:
-            v = v.split(' #', 1)[0].rstrip()
-        out[k.strip()] = v
-    return None     # no closing ---
+        if line[0] in ('"', "'") and line.find(line[0], 1) > 0:
+            end = line.find(line[0], 1)
+            k, rest = line[1:end], line[end + 1:]
+            if not rest.lstrip().startswith(':'):
+                continue
+            v = rest.lstrip()[1:]
+        else:
+            k, v = line.split(':', 1)
+        out[k.strip()] = _unquote(v)
+    return out
+
+
+# A name written in a YAML form _frontmatter does not follow starts with one of these: a block (> |), an anchor (&),
+# a tag (!), an alias (*), a list ([) or a map ({).
+NOT_PLAIN = tuple('>|&!*[{')
+
+
+def _names_taken(text, fm):
+    """The names of Switchboard's four helpers that a helper file of yours takes (lower case). Its own name, when this
+    reader reads a plain one. When it doesn't (no top-level name, an empty one, or one in a YAML form it does not
+    follow: NOT_PLAIN, the value on the next line, an explicit key, a front matter indented as a whole), every one
+    of the four that stands as a whole word anywhere in the front matter, in any letter case. Claude Code reads these
+    files with a YAML reader; two helpers with one name in one folder load only one of them, and leaving one of
+    Switchboard's out costs nothing. A file without front matter takes none."""
+    if fm is None:
+        return []
+    names = [h['name'] for h in HELPERS]
+    name = (fm.get('name') or '').strip()
+    if name and not name.startswith(NOT_PLAIN):
+        return [name.lower()] if name.lower() in names else []
+    words = re.findall(r'\b(%s)\b' % '|'.join(names), '\n'.join(_front_lines(text)), re.IGNORECASE)
+    return sorted(set(w.lower() for w in words))
 
 
 def _agents(claude_dir):
@@ -615,10 +748,11 @@ def _agents(claude_dir):
                 continue
             p = os.path.join(dirpath, fn)
             raw = _read(p) or b''
-            fm = _frontmatter(raw.decode('utf-8', 'replace'))
+            text = raw.decode('utf-8', 'replace')
+            fm = _frontmatter(text)
             out.append({'file': os.path.relpath(p, claude_dir), 'path': p,
                         'name': (fm or {}).get('name'), 'model': (fm or {}).get('model'),
-                        'effort': (fm or {}).get('effort'), 'sha256': _sha(raw)})
+                        'effort': (fm or {}).get('effort'), 'takes': _names_taken(text, fm), 'sha256': _sha(raw)})
     return out
 
 
@@ -642,20 +776,194 @@ You are a read-only search helper. Find what you were asked to find and report i
 '''
 
 
+# ---------------------------------------------------------------- Models by the job: four helpers and a note
+#
+# Four user agent files, each with its job, model and effort, and one short note in the user rules folder that
+# says which helper is for what. Claude picks a helper by its description (DOCS delegation, agent_description), so
+# each description starts with when to use it. Every front matter field is one the docs name (DOCS agent_rows,
+# agent_required): Claude Code ignores a field it does not know without a word (agent_unknown). None of the four has
+# the Write or Edit tool, but each can still run commands and so change files (DOCS tools_bash): it is their
+# instructions that tell them to change nothing (the verifier: nothing under test), and no word calls them read-only.
+#
+# omitClaudeMd, per helper (DOCS omit_use, claude_md_main): lookup and reader take everything they need from the
+# request (a thing to find, a source to read), and the chat that reads their answer still has your CLAUDE.md, so
+# they start without it, as the built-in Explore does. reviewer and verifier need the project's own rules: what
+# counts as wrong here, how this project runs its tests. They load CLAUDE.md as any helper does.
+# effort: lookup and reader medium (for lookup that is Haiku's own default in Claude Code, DOCS haiku_default,
+# written out so that Sonnet for helpers' CLAUDE_CODE_SUBAGENT_EFFORT never reaches it: a helper's own effort line
+# comes first, DOCS effort_order; Haiku 5.5 takes medium, DOCS effort_by_model); reviewer and verifier high.
+# CLAUDE_CODE_EFFORT_LEVEL, when you set it, beats every one of these (DOCS effort_var); plan() says so.
+
+LOOKUP_TEXT = '''---
+name: lookup
+description: Use for lookups - find files, search code, list, count, or fetch one fact from files or code - when the answer is a fact to find, not a judgment to make. On Haiku, with no Write or Edit tool.
+model: haiku
+effort: medium
+disallowedTools: Write, Edit, NotebookEdit
+omitClaudeMd: true
+# Written by Switchboard (Models by the job) so lookups run on Haiku. Switchboard removes it when
+# you turn Models by the job off.
+# If you edit this file it becomes yours, and Switchboard will leave it alone.
+---
+
+You are a read-only lookup helper. Find what you were asked for and report it.
+
+- Use Glob, Grep and Read to find files and code. Use Bash only for commands that read, such as ls, wc, git log or git show. Never create, change, move or delete anything.
+- Report the facts: file paths with line numbers, names, counts, and short excerpts where they help. Say plainly what you looked for and did not find.
+- Do not judge, review or decide. If the question needs judgment, say so and stop.
+- Keep the answer short. The agent that asked sees only your final message.
+'''
+
+READER_TEXT = '''---
+name: reader
+description: Use to read material you point it at - docs, logs, long files or web pages - and report what is in them, with sources. On Sonnet, with no Write or Edit tool.
+model: sonnet
+effort: medium
+disallowedTools: Write, Edit, NotebookEdit
+omitClaudeMd: true
+# Written by Switchboard (Models by the job) so reading runs on Sonnet. Switchboard removes it when
+# you turn Models by the job off.
+# If you edit this file it becomes yours, and Switchboard will leave it alone.
+---
+
+You read the material you were given and report what is in it. You never change anything.
+
+- Read every source you were pointed at: files, logs, docs or web pages. Use Read, Grep and Glob for files, WebFetch for pages, and Bash only for commands that read.
+- Report what the material says, each point with its source: a file path and line, or a URL and its section. Quote exactly where the words matter, and keep quotes short.
+- Keep what the material says apart from your own reading of it. Say what you could not read or find.
+- Keep the answer short and in plain words. The agent that asked sees only your final message.
+'''
+
+REVIEWER_TEXT = '''---
+name: reviewer
+description: Use to review a change or a plan - a diff, a commit, a design - and report findings with file and line, most serious first. On Sonnet at high effort, with no Write or Edit tool. It reports; it does not fix.
+model: sonnet
+effort: high
+disallowedTools: Write, Edit, NotebookEdit
+# Written by Switchboard (Models by the job) so reviews run on Sonnet at high effort. Switchboard
+# removes it when you turn Models by the job off.
+# If you edit this file it becomes yours, and Switchboard will leave it alone.
+---
+
+You review a change or a plan and report what is wrong with it. You never change anything.
+
+- Read the change in full (git diff, git show, or the files you were given) and enough of the code around it to judge it.
+- Look for what would break: wrong behaviour, missed cases, this project's own rules broken, unsafe handling of data, and tests that do not test what they claim.
+- Report each finding with its file and line, what is wrong, why it matters, and how sure you are. Most serious first. Then say what you checked and found sound.
+- Do not fix anything, and do not pad the list: no finding is better than a weak one.
+'''
+
+VERIFIER_TEXT = '''---
+name: verifier
+description: Use to run something and check that it works - tests, a build, a render, a command's output - and report what passed and what failed, with the output that shows it. On Sonnet at high effort, with no Write or Edit tool. It is told never to change the code under test.
+model: sonnet
+effort: high
+disallowedTools: Write, Edit, NotebookEdit
+# Written by Switchboard (Models by the job) so checks run on Sonnet at high effort. Switchboard
+# removes it when you turn Models by the job off.
+# If you edit this file it becomes yours, and Switchboard will leave it alone.
+---
+
+You run things and check that they work. You report evidence, not opinions.
+
+- Run what you were asked to check: tests, a build, a render, a script or a command. Read its output in full.
+- You may run commands, and make scratch files with a command in a temporary folder. Never change the code or files under test; if something needs fixing, say what and where.
+- Report what you ran (the exact command), what passed, what failed, and the lines of output that show it. Say what you could not run, and why.
+- Never say something works without output that shows it.
+'''
+
+# The jobs, as the page, the command and the plan say them.
+HELPERS = (
+    {'file': 'switchboard-lookup.md', 'name': 'lookup', 'text': LOOKUP_TEXT,
+     'says': 'a helper named lookup, on Haiku at medium effort, with no Write or Edit tool, for finding, listing '
+             'and counting'},
+    {'file': 'switchboard-reader.md', 'name': 'reader', 'text': READER_TEXT,
+     'says': 'a helper named reader, on Sonnet at medium effort, with no Write or Edit tool, for reading docs, '
+             'logs, long files and web pages'},
+    {'file': 'switchboard-reviewer.md', 'name': 'reviewer', 'text': REVIEWER_TEXT,
+     'says': 'a helper named reviewer, on Sonnet at high effort, with no Write or Edit tool, for reviewing a '
+             'change or a plan'},
+    {'file': 'switchboard-verifier.md', 'name': 'verifier', 'text': VERIFIER_TEXT,
+     'says': 'a helper named verifier, on Sonnet at high effort, with no Write or Edit tool, that runs tests and '
+             'commands and checks them'},
+)
+HELPER_BY_FILE = dict((h['file'], h) for h in HELPERS)
+
+# One note Claude Code reads at the start of every chat, in every project (DOCS user_rules, rules_launch). Advice:
+# Claude still decides (DOCS delegation). It says nothing about accounts or limits. Only what a page documents: a
+# workflow script names a model per stage (DOCS workflows); an effort can be named when Claude starts a helper
+# (DOCS effort_param), not documented for a workflow stage.
+NOTE_TEXT = '''<!-- Written by Switchboard (Models by the job). Switchboard removes it when you turn
+Models by the job off. If you edit this file it becomes yours, and Switchboard will leave it alone. -->
+# Helpers by the job
+
+Four helpers each run on the model that fits their job. Hand a step to the one that fits:
+
+- `lookup` (Haiku): find, list, count, or look up a fact in files or code.
+- `reader` (Sonnet): read docs, logs, long files or web pages and report what they say, with sources.
+- `reviewer` (Sonnet, high effort): review a change or a plan; findings with file and line.
+- `verifier` (Sonnet, high effort): run tests, a build, a render or a command and report what passed.
+
+Building, fixing and deciding are not jobs for these four. Keep them in this chat, or hand them to a helper that
+names no model.
+A helper with one of these names that a project or the command line defines takes the place of the one above there.
+
+In a workflow script, name a model for each step: `sonnet` for review, check and reading steps, `haiku` for
+lookups, and none for steps that build.
+When you start a helper yourself and name an effort, use `high` for review and checks and `medium` for reading.
+
+When a helper's answer looks wrong, do that step again in this chat.
+'''
+
 # ---------------------------------------------------------------- presets, as data
 
-# Each preset is the set of things Switchboard wants in place. Anything Switchboard owns that a
-# preset does not want is taken out. 'settings' maps (section, variable) to a value;
-# 'agents' maps a file name in the user agents folder to its text.
+# Each preset is the set of things Switchboard wants in place, made of parts. Anything Switchboard owns that a
+# preset does not want is taken out. 'settings' maps (section, variable) to a value; 'agents' maps a file name in
+# the user agents folder to its text, 'rules' a file name in the user rules folder.
+#
+# The two switches are two parts, each on or off by itself: 'helpers' (Models by the job) and 'sonnet' (Sonnet for
+# helpers). plan(..., only=part) moves that one part to what the preset says and leaves everything of the other
+# part as it is, so turning one switch never changes a file or a key of the other. 'by-the-job' is the earlier
+# preset's id: Sonnet for helpers plus an Explore helper on Haiku (lookups=False leaves the Explore out, which is
+# how the page used it); a record written before the two switches names it.
+SONNET_SETTINGS = {('env', SUBAGENT_VAR): 'sonnet', ('env', SUBAGENT_EFFORT_VAR): SONNET_EFFORT}
+HELPER_AGENTS = dict((h['file'], h['text']) for h in HELPERS)
+PARTS = ('helpers', 'sonnet')
+PART_NAMES = {'helpers': 'Models by the job', 'sonnet': 'Sonnet for helpers'}
 PRESETS = (
-    {'id': 'off', 'name': 'Off', 'default': False,
-     'says': "Nothing of Switchboard's left behind: its setting and its agent file are taken out.",
-     'settings': {}, 'agents': {}},
-    {'id': 'by-the-job', 'name': 'By the job', 'default': True,
+    {'id': 'off', 'name': 'Off', 'default': False, 'parts': (),
+     'says': "Nothing of Switchboard's left behind: its settings, its helper files and its note are taken out.",
+     'settings': {}, 'agents': {}, 'rules': {}},
+    {'id': 'helpers', 'name': 'Models by the job', 'default': True, 'parts': ('helpers',),
+     'says': ('Four helpers, each on the model that fits its job: lookups on Haiku; reading, review and checks on '
+              'Sonnet. A short note says which is for what. Your chat keeps its model.'),
+     'settings': {}, 'agents': HELPER_AGENTS, 'rules': {NOTE_FILE: NOTE_TEXT}},
+    {'id': 'sonnet', 'name': 'Sonnet for helpers', 'default': False, 'parts': ('sonnet',),
+     'says': ("Helpers and workflow agents that name no model run on Sonnet at high effort instead of your chat's "
+              'model. Helpers that name a model keep it. Your chat keeps its model.'),
+     'settings': SONNET_SETTINGS, 'agents': {}, 'rules': {}},
+    {'id': 'helpers-and-sonnet', 'name': 'Models by the job and Sonnet for helpers', 'default': False,
+     'parts': ('helpers', 'sonnet'), 'says': 'Both: the four helpers and their note, and Sonnet for the rest.',
+     'settings': SONNET_SETTINGS, 'agents': HELPER_AGENTS, 'rules': {NOTE_FILE: NOTE_TEXT}},
+    {'id': 'by-the-job', 'name': 'By the job', 'default': False, 'parts': ('sonnet', 'explore'),
      'says': ('Helpers and workflow agents that name no model run on Sonnet instead of your chat\'s model; '
               'lookups (Explore) run on Haiku. Helpers that name a model keep it. Your chat keeps its model.'),
-     'settings': {('env', SUBAGENT_VAR): 'sonnet'}, 'agents': {EXPLORE_FILE: EXPLORE_TEXT}},
+     'settings': SONNET_SETTINGS, 'agents': {EXPLORE_FILE: EXPLORE_TEXT}, 'rules': {}},
 )
+# Which part each thing Switchboard can own belongs to: (kind, name) -> part.
+PART_OF = dict([(('settings', 'env.' + k[1]), 'sonnet') for k in SONNET_SETTINGS] +
+               [(('agents', fn), 'helpers') for fn in HELPER_AGENTS] +
+               [(('rules', NOTE_FILE), 'helpers'), (('agents', EXPLORE_FILE), 'explore')])
+FILE_KINDS = (('agents', AGENTS_DIR), ('rules', RULES_DIR))
+
+
+def preset_with(parts):
+    """The id of the preset made of exactly these switches ('helpers', 'sonnet'): 'off' for none."""
+    want = set(parts)
+    for p in PRESETS:
+        if set(p['parts']) == want and p['id'] != 'by-the-job':
+            return p['id']
+    raise Refused('There is no preset made of %s.' % ', '.join(sorted(want)))
 NOT_OFFERED = {
     'everything-small': ('"Everything small" is not offered. The only documented switch that moves every helper '
                          'is CLAUDE_CODE_SUBAGENT_MODEL plus CLAUDE_CODE_SUBAGENT_MODEL_FORCE=1: two variables, and '
@@ -701,7 +1009,8 @@ def _load_state(path):
 def _dir_state(st, cd):
     d = st['dirs'].get(cd)
     if d is None:
-        d = {'preset': None, 'owned': {'settings': {}, 'agents': {}}, 'history': []}
+        d = {'preset': None, 'owned': {'settings': {}, 'agents': {}, 'rules': {}}, 'history': []}
+    d['owned'].setdefault('rules', {})          # a record from before the note has no 'rules'
     return d
 
 
@@ -841,6 +1150,7 @@ def current(claude_dir=None, state_path=None, environ=None, managed_dir=None, ve
     pic = {'claude_dir': cd, 'settings_file': path, 'settings_exists': False, 'settings_problem': None,
            'settings': {}, 'deny_agents': [], 'env': {}, 'agents': [], 'environ': {}, 'managed': {},
            'versions': [], 'ours': [], 'preset': None, 'backups': [], 'state_problem': None, 'busy': 0,
+           'effort_level': None,
            'helpers_with_no_model_run': None, 'warnings': [], 'notes': []}
     warn, note = pic['warnings'].append, pic['notes'].append
 
@@ -881,17 +1191,31 @@ def current(claude_dir=None, state_path=None, environ=None, managed_dir=None, ve
     for a in _agents(cd):
         mine = owned['agents'].get(os.path.basename(a['path'])) if os.path.dirname(a['file']) == AGENTS_DIR \
             else None
-        a['set_by'] = 'switchboard' if mine and mine.get('sha256') == a['sha256'] else 'you'
+        a['set_by'] = ('switchboard' if mine and mine.get('sha256') == a['sha256'] and not os.path.islink(a['path'])
+                       else 'you')                  # a file that became a link is yours (a dotfiles tool, say)
         del a['sha256']
         pic['agents'].append(a)
     for key, info in sorted(owned['settings'].items()):
         sec, var = key.split('.', 1)
         if sec == 'env' and pic['env'].get(var, {}).get('set_by') == 'switchboard':
             pic['ours'].append({'what': 'setting', 'key': key, 'value': info['value'], 'file': path})
-    for fn in sorted(owned['agents']):
-        p = os.path.join(cd, AGENTS_DIR, fn)
-        if _sha(_read(p)) == owned['agents'][fn].get('sha256'):
-            pic['ours'].append({'what': 'file', 'file': p})
+    for kind, folder in FILE_KINDS:
+        for fn in sorted(owned[kind]):
+            p = os.path.join(cd, folder, fn)
+            if not os.path.islink(p) and _sha(_read(p)) == owned[kind][fn].get('sha256'):
+                pic['ours'].append({'what': 'file', 'file': p})
+    # Which of Switchboard's things are in place, by switch (PART_OF): what the page shows as on, and what Off
+    # for that switch takes out.
+    pic['parts'] = dict((p, []) for p in PARTS + ('explore',))
+    for o in pic['ours']:
+        if o['what'] == 'setting':
+            part, name = PART_OF.get(('settings', o['key'])), o['key']
+        else:
+            kind = 'rules' if os.path.dirname(o['file']) == os.path.join(cd, RULES_DIR) else 'agents'
+            part, name = PART_OF.get((kind, os.path.basename(o['file']))), os.path.basename(o['file'])
+        if part:
+            pic['parts'][part].append(name)
+    pic['parts']['sonnet'].sort(key=lambda k: (k != 'env.' + SUBAGENT_VAR, k))     # the model line first
 
     pic['environ'] = dict((k, environ[k]) for k in MODEL_VARS if k in environ)
     pic['managed'] = _managed(md)
@@ -923,9 +1247,18 @@ def current(claude_dir=None, state_path=None, environ=None, managed_dir=None, ve
                      'would only add the Explore helper.' % (SUBAGENT_VAR, v, w, v))
             break
     for w, e in where:
+        if SUBAGENT_EFFORT_VAR in e and not (w == 'your user settings' and
+                                             pic['env'][SUBAGENT_EFFORT_VAR]['set_by'] == 'switchboard'):
+            note('%s=%s in %s: helpers that name no effort run at %s. Switchboard leaves your value; Sonnet for '
+                 'helpers would only add its model line ("%s" %s).'
+                 % ((SUBAGENT_EFFORT_VAR, e[SUBAGENT_EFFORT_VAR], w, e[SUBAGENT_EFFORT_VAR]) + doc('effort_order')))
+            break
+    pic['effort_level'] = None
+    for w, e in where:
         if e.get(EFFORT_VAR):
             note('%s=%s in %s sets the effort of every model and beats any effort line in a helper ("%s" %s).'
                  % ((EFFORT_VAR, e[EFFORT_VAR], w) + doc('effort_var')))
+            pic['effort_level'] = {'value': e[EFFORT_VAR], 'where': w}     # what both switches' rows say
             break
     if pic['environ'].get('ANTHROPIC_MODEL'):
         note('ANTHROPIC_MODEL=%s in the environment Claude Code starts from: sessions started there run it '
@@ -989,13 +1322,14 @@ def current(claude_dir=None, state_path=None, environ=None, managed_dir=None, ve
 # ---------------------------------------------------------------- plan: what would change
 
 def plan(preset_id, claude_dir=None, state_path=None, environ=None, managed_dir=None, versions=None,
-         lookups=True):
+         lookups=True, only=None):
     """The exact edits that preset_id would make, without making them.
 
     Returns {'preset', 'name', 'claude_dir', 'state_path', 'made_at', 'blocked', 'edits', 'forget',
-    'skipped', 'notes', 'fingerprints', 'state_sha'}. Each edit is {'file', 'what' ('setting' or 'file'),
-    'key', 'line', 'old', 'new', 'op', 'says'}; 'old'/'new' are None where nothing is or will be.
-    lookups=False leaves out the Explore helper. Nothing here writes.
+    'skipped', 'notes', 'fingerprints', 'state_sha', 'only'}. Each edit is {'file', 'what' ('setting' or 'file'),
+    'kind' (files: 'agents' or 'rules'), 'key', 'line', 'old', 'new', 'op', 'says'}; 'old'/'new' are None where
+    nothing is or will be. lookups=False leaves out the Explore helper. only='helpers' or 'sonnet' moves that one
+    switch to what the preset says and leaves everything of the other as it is (PART_OF). Nothing here writes.
     """
     p = preset(preset_id)
     cd = _cd(claude_dir)
@@ -1004,8 +1338,15 @@ def plan(preset_id, claude_dir=None, state_path=None, environ=None, managed_dir=
     md = default_managed_dir() if managed_dir is None else managed_dir
     out = {'preset': p['id'], 'name': p['name'], 'claude_dir': cd, 'state_path': sp, 'made_at': time.time(),
            'blocked': None, 'edits': [], 'forget': [], 'skipped': [], 'notes': [], 'fingerprints': {},
-           'state_sha': None}
+           'state_sha': None, 'only': only}
     skip = lambda what, why: out['skipped'].append({'what': what, 'why': why})   # noqa: E731
+    in_scope = lambda kind, name: only is None or PART_OF.get((kind, name)) == only     # noqa: E731
+    # Does this plan put anything in, and for which switch? Off, and Off for one switch, never needs more than
+    # Switchboard's own record. Each switch is blocked for its own reasons, in its own words.
+    adding = set(p['parts']) if only is None else set(p['parts']) & {only}
+    adds = bool(adding)
+    sonnet_adds = bool(adding & {'sonnet', 'explore'})
+    helpers_adds = 'helpers' in adding
 
     if not os.path.isdir(cd):
         out['blocked'] = 'There is no Claude Code folder at %s.' % cd
@@ -1020,18 +1361,24 @@ def plan(preset_id, claude_dir=None, state_path=None, environ=None, managed_dir=
     pic = current(cd, sp, environ, md, versions, check_busy=False)
 
     managed_env = pic['managed']['env']
-    if pic['force'] and p['id'] != 'off':
+    if pic['force'] and adds:
         out['blocked'] = ('%s is on in %s, so every helper runs one model and their own model lines are ignored '
                           '("%s" %s). Turn it off first; Switchboard never overrides a helper that names its model.'
                           % ((FORCE_VAR, pic['force']) + doc('force')))
         return out
     first, others = _old(pic['versions'], NEEDS_ORDER)
-    if first and p['id'] != 'off':
+    if first and sonnet_adds:
         out['blocked'] = ('Claude Code %s (%s, what `claude` starts) is older than %s. There, '
                           'CLAUDE_CODE_SUBAGENT_MODEL overrides helpers that name a model ("%s" %s). Update Claude '
                           'Code first.' % ((first['version'], first['where'], _vs(NEEDS_ORDER)) + doc('order_before')))
         return out
-    if p['id'] != 'off':
+    first_h, others_h = _old(pic['versions'], NEEDS_HELPERS)
+    if first_h and helpers_adds:
+        out['blocked'] = ('Claude Code %s (%s, what `claude` starts) is older than %s, which the helper files\' '
+                          '`omitClaudeMd` field needs ("%s" %s). Update Claude Code first.'
+                          % ((first_h['version'], first_h['where'], _vs(NEEDS_HELPERS)) + doc('omit_claude_md')))
+        return out
+    if sonnet_adds:
         for v in others:
             out['notes'].append('An older Claude Code (%s at %s) is also installed. A session started with it would '
                                 'let this setting override helpers that name a model; update or remove it.'
@@ -1039,11 +1386,20 @@ def plan(preset_id, claude_dir=None, state_path=None, environ=None, managed_dir=
         if not pic['versions']:
             out['notes'].append('Switchboard could not find the installed Claude Code version; this preset needs '
                                 'v%s or later.' % _vs(NEEDS_ORDER))
+    if helpers_adds:
+        for v in others_h:
+            out['notes'].append('An older Claude Code (%s at %s) is also installed. A session started with it may not '
+                                'read every field of the helper files (they need %s).'
+                                % (v['version'], v['where'], _vs(NEEDS_HELPERS)))
+        if not pic['versions']:
+            out['notes'].append('Switchboard could not find the installed Claude Code version; Models by the job needs '
+                                'v%s or later.' % _vs(NEEDS_HELPERS))
 
     # ---- the settings file
     spath = os.path.join(cd, SETTINGS_NAME)
     sraw = None
     sdoc = None
+    sbad = False                # it can't be understood: deny rules and env are not known
     if os.path.islink(spath):
         sproblem = ('%s is a link to %s. Switchboard does not replace linked files; edit the target yourself.'
                     % (spath, os.path.realpath(spath)))
@@ -1056,6 +1412,7 @@ def plan(preset_id, claude_dir=None, state_path=None, environ=None, managed_dir=
             sdoc = _Doc(sraw, spath)
         except Refused as e:
             sproblem = str(e)
+            sbad = True
         if sproblem is None and sraw is not None and not os.access(spath, os.W_OK):
             sproblem = '%s is set read-only, so Switchboard leaves it alone.' % spath
     cur_env = {}
@@ -1068,14 +1425,24 @@ def plan(preset_id, claude_dir=None, state_path=None, environ=None, managed_dir=
         except Refused as e:
             sproblem = str(e)
             sdoc = None
-    if sproblem and sraw is not None and p['id'] != 'off':
+            sbad = True
+    if sproblem and sraw is not None and sonnet_adds:
         # Unreadable settings hide what the user has set (deny rules, env), so nothing is added.
         out['blocked'] = sproblem
         return out
+    if sbad and helpers_adds:
+        # A settings file that can't be understood may deny one of the helpers. One that is read-only or a link is
+        # read all the same (current() reads through a link), and Models by the job writes no setting.
+        out['blocked'] = HELPERS_UNREADABLE_WHY
+        return out
 
     MISSING = object()
+    model_key, effort_key = _skey('env', SUBAGENT_VAR), _skey('env', SUBAGENT_EFFORT_VAR)
     wanted = dict((_skey(*k), v) for k, v in p['settings'].items())
-    for key in sorted(set(wanted) | set(owned['settings'])):
+    ours_after = set()          # keys that are Switchboard's and in place once this plan is applied
+    # The model line first: the effort line goes in only with it (and it reads best in that order).
+    for key in sorted((k for k in set(wanted) | set(owned['settings']) if in_scope('settings', k)),
+                      key=lambda k: (k != model_key, k)):
         sec, var = key.split('.', 1)
         mine = owned['settings'].get(key)
         cur = cur_env.get(var, MISSING) if sdoc is not None else MISSING
@@ -1100,12 +1467,14 @@ def plan(preset_id, claude_dir=None, state_path=None, environ=None, managed_dir=
                 continue
             out['edits'].append({
                 'file': spath, 'what': 'setting', 'key': key, 'line': None, 'old': cur, 'new': None, 'op': 'remove',
-                'says': 'Takes out %s=%s, which Switchboard added. Helpers that name no model go back to your '
-                        "chat's model in sessions you start after this; running sessions keep it until restarted."
-                        % (var, cur),
+                'says': ('Takes out %s=%s, which Switchboard added. Helpers that name no %s go back to %s in sessions '
+                         'you start after this; running sessions keep it until restarted.'
+                         % (var, cur, 'effort' if var == SUBAGENT_EFFORT_VAR else 'model',
+                            "the chat's effort" if var == SUBAGENT_EFFORT_VAR else "your chat's model")),
                 'made_env': bool(mine.get('made_env')), 'made_file': bool(mine.get('made_file'))})
             continue
         if mine is not None and cur == want:
+            ours_after.add(key)
             continue        # already in place
         if mine is None and cur is not MISSING:
             skip(key, 'You already set %s=%s in %s. Yours wins; Switchboard does not change keys it did not set.'
@@ -1119,95 +1488,212 @@ def plan(preset_id, claude_dir=None, state_path=None, environ=None, managed_dir=
             skip(key, '%s=%s is set in the environment Claude Code starts from. A value in settings would replace '
                       'it ("%s" %s), so Switchboard leaves yours.' % ((var, pic['environ'][var]) + doc('env_shell')))
             continue
+        if key == effort_key:
+            if model_key in wanted and model_key not in ours_after:
+                skip(key, 'It goes with Switchboard\'s %s line, which is not going in.' % SUBAGENT_VAR)
+                continue
+            low, _ = _old(pic['versions'], NEEDS_EFFORT)
+            if low:
+                skip(key, 'Claude Code %s (%s) is older than %s, so only the model line goes in. The high effort '
+                          'part needs %s or newer: the changelog adds the setting there ("%s" %s), the settings '
+                          'page says %s ("%s" %s).'
+                     % ((low['version'], low['where'], _vs(NEEDS_EFFORT), _vs(NEEDS_EFFORT))
+                        + doc('subagent_effort_added') + ('2.1.315',) + doc('subagent_effort')))
+                continue
         op = 'change' if mine is not None and cur is not MISSING else 'add'
+        if var == SUBAGENT_VAR:
+            says = ('Adds %s=%s to "env" in your user settings: helpers and workflow agents that name no model run '
+                    'on %s instead of your chat\'s model. Helpers that name a model keep it; forks, Plan and the '
+                    'built-in Explore are not moved by this line.' % (var, want, want.capitalize()))
+        elif var == SUBAGENT_EFFORT_VAR:
+            says = ('Adds %s=%s to "env" in your user settings: helpers and workflow agents that name no effort run '
+                    'at %s effort. A helper\'s own effort line comes first, and CLAUDE_CODE_EFFORT_LEVEL before '
+                    'both; forks, forked skills and teammates are not moved by this line.' % (var, want, want))
+        else:
+            says = 'Sets %s=%s.' % (var, want)
         out['edits'].append({
             'file': spath, 'what': 'setting', 'key': key, 'line': None,
-            'old': None if cur is MISSING else cur, 'new': want, 'op': op,
-            'says': ('Adds %s=%s to "env" in your user settings: helpers and workflow agents that name no model run '
-                     'on %s instead of your chat\'s model. Helpers that name a model keep it; forks, Plan and the '
-                     'built-in Explore are not moved by this line.' % (var, want, want.capitalize()))
-            if var == SUBAGENT_VAR else 'Sets %s=%s.' % (var, want),
+            'old': None if cur is MISSING else cur, 'new': want, 'op': op, 'says': says,
             'made_env': sdoc.member('env') is None, 'made_file': sraw is None})
+        ours_after.add(key)
+    removes = [e for e in out['edits'] if e['op'] == 'remove']
+    for e in removes:           # the env object (or the file) Switchboard made goes once all its lines go
+        e['made_env'] = any(x['made_env'] for x in removes)
+        e['made_file'] = any(x['made_file'] for x in removes)
     if any(e['what'] == 'setting' for e in out['edits']):
         out['fingerprints'][spath] = _sha(sraw)
+    if any(e['key'] == effort_key and e['op'] == 'add' for e in out['edits']):
+        _, older = _old(pic['versions'], NEEDS_EFFORT)
+        for v in older:
+            out['notes'].append('An older Claude Code (%s at %s) is also installed. It does not read %s (that needs '
+                                '%s), so a session started with it runs helpers at the chat\'s effort.'
+                                % (v['version'], v['where'], SUBAGENT_EFFORT_VAR, _vs(NEEDS_EFFORT)))
+        if not pic['versions']:
+            out['notes'].append('Switchboard could not find the installed Claude Code version. %s needs %s or newer '
+                                '("%s" %s); an older Claude Code does not read it.'
+                                % ((SUBAGENT_EFFORT_VAR, _vs(NEEDS_EFFORT)) + doc('subagent_effort_added')))
 
-    # ---- the agents folder
-    adir = os.path.join(cd, AGENTS_DIR)
-    want_files = dict(p['agents']) if lookups else {}
-    if not lookups and p['agents']:
-        skip(os.path.join(adir, EXPLORE_FILE), 'Left out on request (lookups=False).')
-    for fn in sorted(set(want_files) | set(owned['agents'])):
-        fpath = os.path.join(adir, fn)
-        mine = owned['agents'].get(fn)
-        if os.path.islink(fpath) or os.path.isdir(fpath):
-            skip(fpath, '%s is a link or a folder; Switchboard leaves it alone.' % fpath)
-            continue
-        craw = _read(fpath)
-        csha = _sha(craw)
-        want = want_files.get(fn)
-        if mine is not None and craw is not None and csha != mine['sha256']:
-            out['forget'].append({'key': None, 'file': fpath,
-                                  'says': 'You edited %s since Switchboard wrote it; it is yours now and stays.' % fpath})
-            mine = None
-            if want is not None:
-                skip(fpath, 'You edited it; Switchboard leaves your version.')
-            continue
-        if want is None:
-            if mine is None:
+    # ---- the agents and rules folders
+    managed_agents = _agents(os.path.join(md, '.claude')) if md and os.path.isdir(md) else []
+    helpers_after = set()       # Switchboard's helper files that are in place once this plan is applied
+    for kind, folder in FILE_KINDS:
+        fdir = os.path.join(cd, folder)
+        want_files = dict(p[kind])
+        if kind == 'agents' and not lookups and EXPLORE_FILE in want_files:
+            del want_files[EXPLORE_FILE]
+            skip(os.path.join(fdir, EXPLORE_FILE), 'Left out on request (lookups=False).')
+        for fn in sorted(f for f in set(want_files) | set(owned[kind]) if in_scope(kind, f)):
+            fpath = os.path.join(fdir, fn)
+            mine = owned[kind].get(fn)
+            helper = HELPER_BY_FILE.get(fn) if kind == 'agents' else None
+            if os.path.islink(fpath) or os.path.isdir(fpath):
+                if mine is not None:            # it became one since Switchboard wrote it: yours now, as if edited
+                    out['forget'].append({'key': None, 'file': fpath, 'kind': kind,
+                                          'says': '%s is a link or a folder now; it is yours and stays.' % fpath})
+                skip(fpath, '%s is a link or a folder; Switchboard leaves it alone.' % fpath)
                 continue
-            if craw is None:
-                out['forget'].append({'key': None, 'file': fpath, 'says': '%s is already gone.' % fpath})
+            craw = _read(fpath)
+            csha = _sha(craw)
+            want = want_files.get(fn)
+            if mine is not None and craw is not None and csha != mine['sha256']:
+                out['forget'].append({'key': None, 'file': fpath, 'kind': kind,
+                                      'says': 'You edited %s since Switchboard wrote it; it is yours now and stays.'
+                                              % fpath})
+                mine = None
+                if want is not None:
+                    skip(fpath, 'You edited it; Switchboard leaves your version.')
                 continue
-            out['edits'].append({
-                'file': fpath, 'what': 'file', 'key': None, 'line': 'model: haiku', 'old': 'model: haiku',
-                'new': None, 'op': 'delete',
-                'says': "Deletes Switchboard's Explore helper; the built-in Explore (your chat's model) comes back. "
-                        'Sessions pick this up within seconds; one may need a restart.',
-                'made_dir': bool(mine.get('made_dir'))})
+            if want is None:
+                if mine is None:
+                    continue
+                if craw is None:
+                    out['forget'].append({'key': None, 'file': fpath, 'kind': kind,
+                                          'says': '%s is already gone.' % fpath})
+                    continue
+                out['edits'].append(_file_out(kind, fn, fpath, helper, None, mine))
+                out['fingerprints'][fpath] = csha
+                continue
+            wsha = _sha(want.encode('utf-8'))
+            if fn == EXPLORE_FILE:
+                why = _explore_blocked(pic, fdir)
+            elif helper:
+                why = _helper_blocked(pic, helper, fdir, managed_agents)
+            else:
+                why = (None if helpers_after else
+                       "No helper of Switchboard's is in place, so the note that names them stays out.")
+                if why is None and os.path.exists(fdir) and not os.path.isdir(fdir):
+                    why = '%s is not a folder.' % fdir
+            if mine is not None and craw is not None and why:
+                # Ours is in place but no longer should be: the user added one of their own with the same name
+                # (two with one name in one folder: only one loads), or turned it off. Theirs wins.
+                out['edits'].append(_file_out(kind, fn, fpath, helper, why, mine))
+                out['fingerprints'][fpath] = csha
+                continue
+            if mine is not None and csha == wsha:
+                if helper:
+                    helpers_after.add(fn)
+                continue
+            if mine is None and craw is not None:
+                skip(fpath, 'A file with this name is already there and is not Switchboard\'s.')
+                continue
+            if why:
+                skip(fpath, why)
+                continue
+            made_dir = not os.path.isdir(fdir)
+            if fn == EXPLORE_FILE:
+                says = ('Adds %s: a read-only Explore helper of Switchboard\'s that runs on Haiku in place of the '
+                        'built-in Explore. Its instructions are Switchboard\'s (the built-in ones are not published); '
+                        'it reads no CLAUDE.md, like the built-in, but it does get the git status snapshot the '
+                        'built-in skips.' % fpath)
+            elif helper:
+                says = 'Adds %s: %s. Claude picks it by its description.' % (fpath, helper['says'])
+                helpers_after.add(fn)
+            else:
+                says = ('Adds %s: a short note Claude Code reads at the start of each chat, in every project, saying '
+                        'which helper is for what. It is advice; Claude still decides. Chats already open read it '
+                        'when they start again.' % fpath)
+            out['edits'].append({'file': fpath, 'what': 'file', 'kind': kind, 'key': None,
+                                 'line': _model_line(want), 'old': None, 'new': _model_line(want),
+                                 'op': 'replace' if (mine is not None and craw is not None) else 'create',
+                                 'says': says, 'made_dir': made_dir})
             out['fingerprints'][fpath] = csha
-            continue
-        wsha = _sha(want.encode('utf-8'))
-        why = _explore_blocked(pic, adir)
-        if mine is not None and craw is not None and why:
-            # Ours is in place but no longer should be: the user added an Explore of their own (two
-            # with one name load in no fixed order), or turned Explore off. Theirs wins.
-            out['edits'].append({
-                'file': fpath, 'what': 'file', 'key': None, 'line': 'model: haiku', 'old': 'model: haiku',
-                'new': None, 'op': 'delete', 'says': "Takes out Switchboard's Explore helper. " + why,
-                'made_dir': bool(mine.get('made_dir'))})
-            out['fingerprints'][fpath] = csha
-            continue
-        if mine is not None and csha == wsha:
-            continue
-        if mine is None and craw is not None:
-            skip(fpath, 'A file with this name is already there and is not Switchboard\'s.')
-            continue
-        if why:
-            skip(fpath, why)
-            continue
-        made_dir = not os.path.isdir(adir)
-        says = ('Adds %s: a read-only Explore helper of Switchboard\'s that runs on Haiku in place of the built-in '
-                'Explore. Its instructions are Switchboard\'s (the built-in ones are not published); it reads no '
-                'CLAUDE.md, like the built-in, but it does get the git status snapshot the built-in skips.' % fpath)
-        if made_dir:
-            says += ' The agents folder is new, so sessions already running see it only after a restart.'
-        out['edits'].append({'file': fpath, 'what': 'file', 'key': None, 'line': 'model: haiku',
-                             'old': None, 'new': 'model: haiku',
-                             'op': 'replace' if (mine is not None and craw is not None) else 'create',
-                             'says': says, 'made_dir': made_dir})
-        out['fingerprints'][fpath] = csha
 
-    if out['edits'] and p['id'] != 'off':
-        out['notes'].append('Claude Code applies a saved env change and a new agent file to running sessions: '
-                            'helpers they start after this use the new model ("%s" %s). Helpers already running '
-                            'keep theirs.' % doc('env_running'))
+    # The two limits of an effort line, where it goes in: CLAUDE_CODE_EFFORT_LEVEL comes first, and the effort
+    # variable does not reach forks, forked skills or teammates.
+    effort_in = any(e['key'] == effort_key and e['op'] == 'add' for e in out['edits'])
+    if effort_in or any(e.get('kind') == 'agents' and e['op'] != 'delete' and _helper_effort(e)
+                        for e in out['edits']):
+        lvl = pic['effort_level']
+        if lvl:
+            out['notes'].append('%s=%s in %s comes first: every helper runs at %s, whatever its own effort line or '
+                                '%s says ("%s" %s).' % ((EFFORT_VAR, lvl['value'], lvl['where'], lvl['value'],
+                                                         SUBAGENT_EFFORT_VAR) + doc('effort_var')))
+    if effort_in:
+        out['notes'].append('%s does not reach forks, forked skills or teammates ("%s" %s).'
+                            % ((SUBAGENT_EFFORT_VAR,) + doc('subagent_effort')))
+    if any(e['what'] == 'setting' and e['op'] != 'remove' for e in out['edits']):
+        out['notes'].append('Claude Code applies a saved env change to running sessions: helpers they start after '
+                            'this use it ("%s" %s). Helpers already running keep theirs.' % doc('env_running'))
+    if any(e.get('kind') == 'agents' and e['op'] != 'delete' for e in out['edits']):
+        out['notes'].append('Claude Code picks up a new helper file within seconds, with no restart ("%s" %s).'
+                            % doc('agents_watch'))
     if any(e['op'] == 'remove' for e in out['edits']):
-        out['notes'].append('Sessions already running keep CLAUDE_CODE_SUBAGENT_MODEL until they are restarted '
+        out['notes'].append('Sessions already running keep what was taken out of "env" until they are restarted '
                             '("%s" %s).' % doc('env_running'))
-    if p['id'] == 'off' and pic['backups']:
+    if not adds and pic['backups']:
         out['notes'].append('Switchboard keeps its %d backup copies (%s) so this can be undone. Claude Code does not '
                             'read them.' % (len(pic['backups']), ', '.join(pic['backups'])))
     return out
+
+
+def _helper_effort(edit):
+    """The effort line of the helper file an edit puts in, or None."""
+    h = HELPER_BY_FILE.get(os.path.basename(edit['file']))
+    return (_frontmatter(h['text']) or {}).get('effort') if h else None
+
+
+def _model_line(text):
+    """'model: haiku' or 'model: sonnet, effort: high': the lines of a helper file the plan names; None for a note."""
+    fm = _frontmatter(text) or {}
+    if not fm.get('model'):
+        return None
+    return 'model: %s' % fm['model'] + (', effort: %s' % fm['effort'] if fm.get('effort') else '')
+
+
+def _file_out(kind, fn, fpath, helper, why, mine):
+    """The edit that takes one of Switchboard's files out, and why."""
+    if fn == EXPLORE_FILE:
+        says = ("Takes out Switchboard's Explore helper. " + why if why else
+                "Deletes Switchboard's Explore helper; the built-in Explore (your chat's model) comes back. Sessions "
+                'pick this up within seconds.')
+        line = 'model: haiku'
+    elif helper:
+        says = "Takes out Switchboard's helper named %s." % helper['name'] + (' ' + why if why else '')
+        line = _model_line(helper['text'])
+    else:
+        says = "Takes out Switchboard's note on which helper is for what." + (' ' + why if why else '')
+        line = None
+    return {'file': fpath, 'what': 'file', 'kind': kind, 'key': None, 'line': line, 'old': line, 'new': None,
+            'op': 'delete', 'says': says, 'made_dir': bool(mine.get('made_dir'))}
+
+
+def _helper_blocked(pic, h, adir, managed_agents):
+    """Why Switchboard must not add one of its four helpers, or None. A helper of yours with the same name is never
+    replaced: two files with one name in one folder load only one of them."""
+    name = h['name']
+    for a in pic['agents']:
+        if name in a['takes'] and a['set_by'] == 'you' and a['path'] != os.path.join(adir, h['file']):
+            return ('You have your own helper named %s (%s). Yours stays, so Switchboard leaves its own %s out ("%s" '
+                    '%s).' % ((name, a['file'], name) + doc('same_name_one_dir')))
+    for a in managed_agents:
+        if name in a['takes']:
+            return ('Your organization\'s managed settings define a helper named %s (%s), which wins ("%s" %s).'
+                    % ((name, a['path']) + doc('managed_agents')))
+    if 'Agent(%s)' % name in pic['deny_agents']:
+        return 'Your settings deny Agent(%s) ("%s" %s).' % ((name,) + doc('deny_agent'))
+    if os.path.exists(adir) and not os.path.isdir(adir):
+        return '%s is not a folder.' % adir
+    return None
 
 
 def _explore_blocked(pic, adir):
@@ -1283,6 +1769,60 @@ def _settings_after(edits, raw, path):
     return text.encode('utf-8')
 
 
+def _cant_write(path, writes):
+    """Why Switchboard must not write (or, `writes` False, take away) `path` now, or None: it became a link (a dotfiles
+    tool's, say: writing would replace the link with a plain file, and the linked file would keep the lines), or it is
+    set read-only and would be written."""
+    if os.path.islink(path):
+        return "%s is a link now, and Switchboard doesn't write through links. Nothing was changed." % path
+    if writes and os.path.isfile(path) and not os.access(path, os.W_OK):
+        return '%s is set read-only, so Switchboard leaves it alone. Nothing was changed.' % path
+    return None
+
+
+def _last_look(path, before, writes):
+    """Refuses (Refused) when `path` is not what the plan read any more, or became a link, or is set read-only and
+    would be written (`writes`)."""
+    if _sha(_read(path)) != _sha(before):
+        raise Refused('%s changed while Switchboard was writing. Nothing of it was changed; make a new plan.' % path)
+    why = _cant_write(path, writes)
+    if why:
+        raise Refused(why)
+
+
+def _put_copy_back(op):
+    """The copy beside a settings file as it was before apply() replaced it (op['copy']: path, bytes or None, mode)."""
+    if not op.get('copy'):
+        return
+    p, data, mode = op['copy']
+    if data is None:
+        if os.path.lexists(p):
+            os.unlink(p)
+    else:
+        _atomic_write(p, data, mode)
+
+
+def _copy_from_before(path, before, after, history):
+    """The copy of the settings file kept beside it, when Off may put its bytes back instead of `after` (the text with
+    Switchboard's lines taken out): the file is exactly as Switchboard's last write to it left it, the copy is the one
+    from before that write, and both hold the same settings. Then Off gives back the file's own bytes, even after the
+    other switch moved in between (an empty file, a lone newline, an empty "env" over two lines). None otherwise."""
+    for h in reversed(history):
+        for f in h['files']:
+            if f['path'] != path:
+                continue
+            if not f.get('existed') or not f.get('backup') or f.get('sha_after') != _sha(before):
+                return None
+            copy = _read(f['backup'])
+            if copy is None or _sha(copy) != f.get('sha_before'):
+                return None
+            try:
+                return copy if _Doc(copy, path).obj == _Doc(after, path).obj else None
+            except Refused:
+                return None
+    return None
+
+
 def apply(plan_, busy_ok=False, busy_within=BUSY_SECONDS):
     """Make a plan's edits. Atomic per file; a failure part way puts back what was already written.
 
@@ -1312,6 +1852,7 @@ def apply(plan_, busy_ok=False, busy_within=BUSY_SECONDS):
     for e in edits:
         by_file.setdefault(e['file'], []).append(e)
     ops = []
+    making = set()          # folders a write makes: only the first file in one makes it
     for path in sorted(by_file):
         before = _read(path)
         if _sha(before) != plan_['fingerprints'].get(path):
@@ -1322,14 +1863,19 @@ def apply(plan_, busy_ok=False, busy_within=BUSY_SECONDS):
         if op['what'] == 'setting':
             op['after'] = _settings_after(es, before, path)
             op['mode'] = _mode(path, 0o600)
+            if op['after'] is not None and all(e['op'] == 'remove' for e in es):
+                copy = _copy_from_before(path, before, op['after'], _dir_state(st, cd)['history'])
+                if copy is not None:                    # an empty file's copy is b'': it counts
+                    op['after'] = copy
         else:
             e = es[0]
             folder = os.path.dirname(path)
-            text = PRESETS_BY_ID[plan_['preset']]['agents'].get(os.path.basename(path))
+            text = PRESETS_BY_ID[plan_['preset']][e.get('kind', 'agents')].get(os.path.basename(path))
             op['after'] = text.encode('utf-8') if e['op'] in ('create', 'replace') else None
             op['mode'] = _mode(path, 0o644)
-            if op['after'] is not None and not os.path.isdir(folder):
+            if op['after'] is not None and not os.path.isdir(folder) and folder not in making:
                 op['made'] = [folder]
+                making.add(folder)
             if op['after'] is None and e.get('made_dir'):
                 op['drop_dir'] = folder      # Switchboard made the folder; take it away if this empties it
         ops.append(op)
@@ -1342,19 +1888,24 @@ def apply(plan_, busy_ok=False, busy_within=BUSY_SECONDS):
     op = None
     try:
         for op in ops:
-            op['removed'] = []
+            op['removed'], op['copy'] = [], None
             path, before, after, mode = op['path'], op['before'], op['after'], op['mode']
+            # The last look comes first, so that a refusal leaves the copy beside the settings file as it was (the
+            # status line keeps its own copy in the same file).
+            _last_look(path, before, after is not None)
             backup = None
             if before is not None:
                 # Next to the file, except an agent file (the folder is scanned) or a settings file
                 # Switchboard created and now deletes (it holds nothing of the user's).
-                backup = (_backup_next_to(path, before, mode) if op['what'] == 'setting' and after is not None
-                          else _backup_in_state(sp, os.path.basename(path), before))
+                if op['what'] == 'setting' and after is not None:
+                    beside = '%s.switchboard-backup' % path
+                    op['copy'] = (beside, _read(beside), _mode(beside, 0o600))   # put back if this goes no further
+                    backup = _backup_next_to(path, before, mode)
+                else:
+                    backup = _backup_in_state(sp, os.path.basename(path), before)
             for d in op['made']:
                 os.makedirs(d)
-            if _sha(_read(path)) != _sha(before):          # last look before the swap
-                raise Refused('%s changed while Switchboard was writing. Nothing of it was changed; make a new '
-                              'plan.' % path)
+            _last_look(path, before, after is not None)     # and again just before the swap: written meanwhile?
             if after is None:
                 os.unlink(path)
                 if op['drop_dir']:
@@ -1374,7 +1925,7 @@ def apply(plan_, busy_ok=False, busy_within=BUSY_SECONDS):
             if f['key']:
                 owned['settings'].pop(f['key'], None)
             else:
-                owned['agents'].pop(os.path.basename(f['file']), None)
+                owned[f.get('kind', 'agents')].pop(os.path.basename(f['file']), None)
         for e in edits:
             if e['what'] == 'setting':
                 if e['op'] == 'remove':
@@ -1386,26 +1937,31 @@ def apply(plan_, busy_ok=False, busy_within=BUSY_SECONDS):
                         'made_env': bool(prev.get('made_env') or e.get('made_env')),
                         'made_file': bool(prev.get('made_file') or e.get('made_file'))}
             else:
-                name = os.path.basename(e['file'])
+                name, kind = os.path.basename(e['file']), e.get('kind', 'agents')
                 if e['op'] == 'delete':
-                    owned['agents'].pop(name, None)
+                    owned[kind].pop(name, None)
                 else:
-                    prev = owned['agents'].get(name) or {}
-                    owned['agents'][name] = {'sha256': _sha(_read(e['file'])),
-                                             'made_dir': bool(prev.get('made_dir') or e.get('made_dir'))}
+                    prev = owned[kind].get(name) or {}
+                    owned[kind][name] = {'sha256': _sha(_read(e['file'])),
+                                         'made_dir': bool(prev.get('made_dir') or e.get('made_dir'))}
         ds['preset'] = plan_['preset']
         ds['history'].append(record)
         st['dirs'][cd] = ds
         _save_state(sp, st)
     except BaseException:
-        if op is not None and op not in done:       # the step that failed: only its new folder goes
+        if op is not None and op not in done:       # the step that failed: its new folder goes, its copy comes back
             for d in reversed(op['made']):
                 try:
                     os.rmdir(d)
                 except OSError:
                     pass
+            try:
+                _put_copy_back(op)
+            except OSError:
+                pass
         for op in reversed(done):
             try:
+                _put_copy_back(op)
                 for d in op['removed']:
                     os.makedirs(d, exist_ok=True)
                 if op['before'] is None:
@@ -1439,8 +1995,14 @@ def undo(claude_dir=None, state_path=None, busy_ok=False, busy_within=BUSY_SECON
     if not ds['history']:
         raise Refused('Nothing to undo.')
     last = ds['history'][-1]
+    settings = os.path.join(cd, SETTINGS_NAME)
     now_bytes = []
     for f in last['files']:
+        # Putting old bytes back writes. A new file only goes: Switchboard's own helper files and note do, but a
+        # settings file set read-only stays, as the plan's way leaves it (both ways Off can take say the same).
+        why = _cant_write(f['path'], f['existed'] or f['path'] == settings)
+        if why:
+            raise Refused(why)
         cur = _read(f['path'])
         if _sha(cur) != f['sha_after']:
             raise Refused('%s changed since Switchboard\'s last change (by you or by Claude Code), so putting the old '
@@ -1460,15 +2022,19 @@ def undo(claude_dir=None, state_path=None, busy_ok=False, busy_within=BUSY_SECON
                           'running. Undo between tasks, or pass busy_ok=True.' % (n, busy_within // 60))
     done = []
     try:
-        for f, cur, before in now_bytes:
+        # Folders first, files next, then the folders that change made: several files can share one folder, and
+        # only one of them made it (or took it away).
+        for f in last['files']:
             for d in f.get('removed_dirs') or []:
                 os.makedirs(d, exist_ok=True)
+        for f, cur, before in now_bytes:
             if before is None:
                 if os.path.lexists(f['path']):
                     os.unlink(f['path'])
             else:
                 _atomic_write(f['path'], before, f['mode'])
             done.append((f, cur))
+        for f in reversed(last['files']):
             for d in reversed(f.get('made_dirs') or []):
                 try:
                     os.rmdir(d)
@@ -1504,7 +2070,12 @@ def undo(claude_dir=None, state_path=None, busy_ok=False, busy_within=BUSY_SECON
 PRESETS_BY_ID = dict((p['id'], p) for p in PRESETS)
 
 
-# ---------------------------------------------------------------- what "By the job" would have moved
+# ---------------------------------------------------------------- what "Sonnet for helpers" would have moved
+#
+# would_have_moved() is about Sonnet for helpers only. There is no such number for Models by the job, and none is
+# made up: history says which helper ran each request and on what model, but not which jobs Claude would have
+# handed to lookup, reader, reviewer or verifier had they been there (Claude picks by description and the task).
+# Once they have run, seen() shows each by its name (an agent's agentType is its `name`), with its models.
 #
 # Both functions read a summary from switchboard.usage.summarize. Today's summary says how much
 # ran on the chat's model with no model set ('inherited'), by family and by its five biggest
@@ -1704,16 +2275,20 @@ def main(argv=None, out=None):
         w('! %s\n' % line)
     for line in pic['notes']:
         w('- %s\n' % line)
-    pl = plan('by-the-job')
-    w('\n"By the job" would%s:\n' % (' be blocked' if pl['blocked'] else ''))
-    if pl['blocked']:
-        w('  %s\n' % pl['blocked'])
-    for e in pl['edits']:
-        w('  %s %s: %s\n' % (e['op'], e['key'] or e['file'], e['says']))
-    for sk in pl['skipped']:
-        w('  skip %s: %s\n' % (sk['what'], sk['why']))
-    if not pl['edits'] and not pl['blocked']:
-        w('  change nothing.\n')
+    on = set(part for part in PARTS if pic['parts'][part])
+    for part in PARTS:
+        now = part in on
+        pl = plan(preset_with((on - {part}) if now else (on | {part})), only=part)
+        w('\n%s is %s. Turning it %s would%s:\n' % (PART_NAMES[part], 'on' if now else 'off', 'off' if now else 'on',
+                                                    ' be blocked' if pl['blocked'] else ''))
+        if pl['blocked']:
+            w('  %s\n' % pl['blocked'])
+        for e in pl['edits']:
+            w('  %s %s: %s\n' % (e['op'], e['key'] or e['file'], e['says']))
+        for sk in pl['skipped']:
+            w('  skip %s: %s\n' % (sk['what'], sk['why']))
+        if not pl['edits'] and not pl['blocked']:
+            w('  change nothing.\n')
     w('\nWhat this cannot do: %d limits (models.limits()).\n' % len(LIMITS))
     return 0
 

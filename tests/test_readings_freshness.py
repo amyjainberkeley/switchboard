@@ -11,7 +11,8 @@ import _isolate  # noqa: F401  (first: it gives switchboard a throwaway data fol
 #     than they are.
 # Reading age: each account's own reading age, or "now" for the account in use on Claude Code's own numbers of the
 #     last minute, on the page, in the menu bar and in the terminal; never the server's tick.
-# Models: `switchboard models [on|off]`: the page's "Sonnet for helpers" switch from the terminal.
+# Models: `switchboard models [on|off]` and `switchboard models sonnet on|off`: the page's two Models switches
+#     ("Models by the job", "Sonnet for helpers") from the terminal.
 # Build: the build in the version: "switchboard 0.2.0 (d635e47)", from a `git archive` download (export-subst), from
 #     git in a checkout, and the version alone when neither is there.
 # Doctor: the status line row beside a line of the person's own names the --replace route.
@@ -276,6 +277,8 @@ class EveryMinuteAtSetup(test_keep.Sandbox):
             with open(path) as f:
                 got = json.load(f)
         self.assertNotIn('CLAUDE_CODE_SUBAGENT_MODEL', got.get('env') or {})
+        self.assertFalse(os.path.exists(os.path.join(self.home, '.claude', 'agents', 'switchboard-lookup.md')))
+        self.assertFalse(os.path.exists(os.path.join(self.home, '.claude', 'rules', 'switchboard-models.md')))
 
 
 class Stub(object):
@@ -357,33 +360,24 @@ class AgeWords(unittest.TestCase):
                           '10 min ago', '1 hour ago', '1 day ago'])
         self.assertEqual([term.age(None, now), term.age(now + 30, now), term.age(now + 3, now)], ['', '', 'just now'])
 
-    def test_now_only_for_the_account_in_use_on_claude_codes_own_numbers(self):
-        now = test_term.NOW
-        a = {'usage_at': now - 30, 'live': True, 'active': True}
-        self.assertEqual(term.age_words(a, now), 'now')
-        self.assertEqual(term.age_words(dict(a, active=False), now), 'checked just now')
-        self.assertEqual(term.age_words(dict(a, live=False), now), 'checked just now')
-        self.assertEqual(term.age_words({'usage_at': now - 480}, now), 'checked 8 min ago')
-        self.assertEqual(term.age_words({}, now), '')
-
 
 class AgeInTheTerminal(unittest.TestCase):
     def rows(self, view=test_term.VIEW):
         return [x for x in test_term.lines(view) if x[:1].isdigit()]
 
-    def test_switchboard_shows_every_accounts_own_age(self):
+    def test_no_row_says_how_old_its_numbers_are(self):
         self.assertEqual(self.rows(), [
-            '1  ana@northwind.example  Max 20x · Personal  checked 2 min ago',
-            '2  ana@fernhill.example   Max 20x · Personal  checked 10 min ago',
-            '3  ana@harbor.example     Team · Harbor       checked 5 min ago',
-            '4  ana@lab.example        Max 20x · Personal  next · checked 5 min ago',
-            '5  ana@mail.example       Max 20x · Personal  in use · checked 3 min ago'])
+            '1  ana@northwind.example  Max 20x · Personal',
+            '2  ana@fernhill.example   Max 20x · Personal',
+            '3  ana@harbor.example     Team · Harbor',
+            '4  ana@lab.example        Max 20x · Personal  next',
+            '5  ana@mail.example       Max 20x · Personal  in use'])
 
-    def test_the_account_in_use_says_now_on_claude_codes_own_numbers(self):
+    def test_the_account_in_use_on_claude_codes_own_numbers_says_in_use_only(self):
         view = json.loads(json.dumps(test_term.VIEW))
         mail = next(a for a in view['accounts'] if a['email'] == 'ana@mail.example')
         mail.update(live=True, usage_at=test_term.NOW - 20)
-        self.assertEqual(self.rows(view)[-1], '5  ana@mail.example       Max 20x · Personal  in use · now')
+        self.assertEqual(self.rows(view)[-1], '5  ana@mail.example       Max 20x · Personal  in use')
 
 
 class NoAgeInTheMenuBar(unittest.TestCase):
@@ -410,9 +404,10 @@ class NoAgeInTheMenuBar(unittest.TestCase):
     def test_voiceover_reads_what_the_row_shows(self):
         s = self.state()
         label = lambda e: menubar.row_label(test_menubar.row_of(s, e))      # noqa: E731
-        self.assertEqual(label('ana@fernhill.example'), 'Use ana@fernhill.example, weekly 94%')
-        self.assertEqual(label('ana@lab.example'), 'Use ana@lab.example, next, weekly 65%')
-        self.assertEqual(label('ana@mail.example'), 'ana@mail.example, in use, weekly 27%')
+        # (these plans have no 5-hour limit: each row says so)
+        self.assertEqual(label('ana@fernhill.example'), 'Use ana@fernhill.example, no 5-hour limit, weekly 94%')
+        self.assertEqual(label('ana@lab.example'), 'Use ana@lab.example, next, no 5-hour limit, weekly 65%')
+        self.assertEqual(label('ana@mail.example'), 'ana@mail.example, in use, no 5-hour limit, weekly 27%')
 
 
 @unittest.skipUnless(os.path.exists(test_app.CHROME), 'needs Google Chrome')
@@ -513,8 +508,11 @@ class AgeInThePage(test_app.ChromePage):
 
 # ---------- `switchboard models [on|off]` ----------
 
-MODELS_HELP = ("switchboard models [on|off] Sonnet for helpers: Claude Code's helpers that name no model run on Sonnet\n"
-               + ' ' * 28 + "instead of the chat's model (one setting in its settings file; off until you turn it on)\n")
+MODELS_HELP = ("switchboard models [on|off] Models by the job: four helpers for Claude Code, each on the model that "
+               "fits its job\n" + ' ' * 28 + "(four helper files and a short note in its user folder; off until you "
+               "turn it on)\nswitchboard models sonnet on|off\n" + ' ' * 28 + "Sonnet for helpers: Claude Code's "
+               "helpers that name no model run on Sonnet, at high\n" + ' ' * 28 + "effort where it reads that (its "
+               "settings file; off until you turn it on)\n")
 
 
 class ModelsCommandHelp(cli_help.Fresh):
@@ -529,13 +527,19 @@ class ModelsCommandHelp(cli_help.Fresh):
     def test_other_words_say_how_it_is_used(self):
         for args in (('models', 'bogus'), ('models', 'on', 'off'), ('models', 'ON')):
             with self.subTest(args=args):
-                self.assertEqual(self.cli(*args), (2, 'switchboard models [on|off]\n', ''))
+                self.assertEqual(self.cli(*args), (2, 'switchboard models [on|off]\nswitchboard models sonnet on|off\n',
+                                                   ''))
 
     def test_the_demo_changes_nothing(self):
         self.addCleanup(setattr, core, 'DEMO', core.DEMO)
         core.DEMO = True
         self.assertEqual(self.cli('models', 'on'),
+                         (1, '', 'The demo has made-up accounts; turn Models by the job on or off on its page.\n'))
+        self.assertEqual(self.cli('models', 'sonnet', 'on'),
                          (1, '', 'The demo has made-up accounts; turn Sonnet for helpers on or off on its page.\n'))
+
+
+OFF = 'Models by the job: off\n'          # `switchboard models` says both switches; these tests turn the second
 
 
 class ModelsCommand(test_app.ModelsBase):
@@ -553,27 +557,27 @@ class ModelsCommand(test_app.ModelsBase):
         return json.loads(self.read()).get('env') or {}
 
     def test_alone_it_says_whether_it_is_on(self):
-        self.assertEqual(self.cli('models'), (0, 'Sonnet for helpers: off\n', ''))
+        self.assertEqual(self.cli('models'), (0, OFF + 'Sonnet for helpers: off\n', ''))
         server.act('/api/models', {'enabled': True})
-        self.assertEqual(self.cli('models'), (0, 'Sonnet for helpers: on\n', ''))
+        self.assertEqual(self.cli('models'), (0, OFF + 'Sonnet for helpers: on\n', ''))
 
     def test_on_and_off_are_the_pages_switch(self):
         before = self.read()
-        self.assertEqual(self.cli('models', 'on'), (0, 'Sonnet for helpers: on\n', ''))
+        self.assertEqual(self.cli('models', 'sonnet', 'on'), (0, OFF + 'Sonnet for helpers: on\n', ''))
         self.assertEqual(self.env().get('CLAUDE_CODE_SUBAGENT_MODEL'), 'sonnet')
         last = history.read(1)[-1]
         self.assertEqual((last['kind'], last['text'], last.get('by')), ('setting', 'Sonnet for helpers: on', 'you'))
-        self.assertEqual(self.cli('models', 'off'), (0, 'Sonnet for helpers: off\n', ''))
+        self.assertEqual(self.cli('models', 'sonnet', 'off'), (0, OFF + 'Sonnet for helpers: off\n', ''))
         self.assertEqual(self.read(), before)                        # byte for byte, as the page's Off
         last = history.read(1)[-1]
         self.assertEqual((last['kind'], last['text'], last.get('by')), ('setting', 'Sonnet for helpers: off', 'you'))
 
     def test_open_chats_get_the_pages_note(self):
         self.transcript()                                           # a chat written seconds ago
-        self.assertEqual(self.cli('models', 'on'),
-                         (0, 'Sonnet for helpers: on\nOpen chats use it for their next helper.\n', ''))
-        self.assertEqual(self.cli('models', 'off'),
-                         (0, 'Sonnet for helpers: off\nOpen chats keep their model until they restart.\n', ''))
+        self.assertEqual(self.cli('models', 'sonnet', 'on'),
+                         (0, OFF + 'Sonnet for helpers: on\nOpen chats use it for their next helper.\n', ''))
+        self.assertEqual(self.cli('models', 'sonnet', 'off'),
+                         (0, OFF + 'Sonnet for helpers: off\nOpen chats keep their model until they restart.\n', ''))
 
     def test_the_notes_are_the_pages_words(self):
         with open(os.path.join(ROOT, 'switchboard', 'web', 'index.html'), encoding='utf-8') as f:
@@ -581,9 +585,9 @@ class ModelsCommand(test_app.ModelsBase):
         self.assertEqual(term.MODELS_NOTE, {'next': m.group(1), 'restart': m.group(2)})
 
     def test_again_changes_nothing_and_says_so(self):
-        self.cli('models', 'on')
+        self.cli('models', 'sonnet', 'on')
         on = self.read()
-        self.assertEqual(self.cli('models', 'on'), (0, 'Sonnet for helpers: on\n', ''))
+        self.assertEqual(self.cli('models', 'sonnet', 'on'), (0, OFF + 'Sonnet for helpers: on\n', ''))
         self.assertEqual(self.read(), on)
         self.assertEqual(len([r for r in history.read() if r['text'] == 'Sonnet for helpers: on']), 1)
 
@@ -591,23 +595,31 @@ class ModelsCommand(test_app.ModelsBase):
         mine = '{"env": {"CLAUDE_CODE_SUBAGENT_MODEL": "haiku"}}'
         with open(self.settings, 'w') as f:
             f.write(mine)
-        self.assertEqual(self.cli('models'), (0, 'Sonnet for helpers: off. Already set in your user settings.\n', ''))
-        self.assertEqual(self.cli('models', 'on'), (1, '', 'Already set in your user settings.\n'))
+        self.assertEqual(self.cli('models'),
+                         (0, OFF + 'Sonnet for helpers: off. Already set in your user settings.\n', ''))
+        self.assertEqual(self.cli('models', 'sonnet', 'on'), (1, '', 'Already set in your user settings.\n'))
         self.assertEqual(self.read(), mine.encode())
 
     def test_an_old_claude_code_is_named(self):
         self.patch(server, 'MODELS_KW', dict(server.MODELS_KW, versions=[{'where': '/x', 'version': '2.1.126',
                                                                            'primary': True}]))
-        self.assertEqual(self.cli('models'), (0, 'Sonnet for helpers: off. Needs Claude Code 2.1.251 or newer.\n', ''))
-        self.assertEqual(self.cli('models', 'on'), (1, '', 'Needs Claude Code 2.1.251 or newer.\n'))
+        self.assertEqual(self.cli('models'), (0, 'Models by the job: off. Needs Claude Code 2.1.271 or newer.\n'
+                                                 'Sonnet for helpers: off. Needs Claude Code 2.1.251 or newer.\n', ''))
+        self.assertEqual(self.cli('models', 'sonnet', 'on'), (1, '', 'Needs Claude Code 2.1.251 or newer.\n'))
+        self.assertEqual(self.cli('models', 'on'), (1, '', 'Needs Claude Code 2.1.271 or newer.\n'))   # its own
 
     def test_a_settings_file_that_cant_be_read_is_unknown_never_off(self):
         server.act('/api/models', {'enabled': True})
         with open(self.settings, 'w') as f:
             f.write('{not json')
+        why = ("Claude Code's settings file can't be read, so Switchboard can't tell whether you deny one of these "
+               'helpers.')
         self.assertEqual(self.cli('models'),
-                         (0, "Sonnet for helpers: unknown. Claude Code's settings file isn't valid JSON.\n", ''))
-        self.assertEqual(self.cli('models', 'off'), (1, '', "Claude Code's settings file isn't valid JSON.\n"))
+                         (0, 'Models by the job: off. ' + why + '\n'          # nothing was tried: nothing to say of it
+                             "Sonnet for helpers: unknown. Claude Code's settings file isn't valid JSON.\n", ''))
+        self.assertEqual(self.cli('models', 'on'), (1, '', why + ' Nothing was written.\n'))    # a press was tried
+        self.assertEqual(self.cli('models', 'sonnet', 'off'),
+                         (1, '', "Claude Code's settings file isn't valid JSON.\n"))
 
 
 # ---------- the build in the version ----------

@@ -25,6 +25,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, '..'))
 
 from switchboard import browser, core, engine, keep, linkapp, notify, server, statusline
+import pagekey_help  # noqa: E402  (the page key, as Switchboard's own programs send it)
 
 REAL_PAGES = (7798, 7799)
 DIRECT = urllib.request.build_opener(urllib.request.ProxyHandler({}))
@@ -100,15 +101,16 @@ class Sandbox(unittest.TestCase):
         return httpd
 
     def get(self, path='/api/state', timeout=10):
+        req = urllib.request.Request('http://127.0.0.1:%d%s' % (self.port, path), headers=pagekey_help.with_key())
         try:
-            with DIRECT.open('http://127.0.0.1:%d%s' % (self.port, path), timeout=timeout) as r:
+            with DIRECT.open(req, timeout=timeout) as r:
                 return r.status, json.load(r), dict(r.headers)
         except urllib.error.HTTPError as e:
             with e:
                 return e.code, json.load(e), dict(e.headers)
 
     def post(self, path, body=None, headers=None):
-        h = {'Content-Type': 'application/json', 'X-Switchboard': '1'}
+        h = pagekey_help.with_key({'Content-Type': 'application/json', 'X-Switchboard': '1'})
         h.update(headers or {})
         req = urllib.request.Request('http://127.0.0.1:%d%s' % (self.port, path), data=json.dumps(body or {}).encode(),
                                      headers=h)
@@ -339,7 +341,8 @@ def rst_after(port, path, wait, read=False):
     """A client that asks, waits, then goes away abruptly (an RST: a tab that gave up)."""
     s = socket.create_connection(('127.0.0.1', port), timeout=5)
     s.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack('ii', 1, 0))
-    s.sendall(('GET %s HTTP/1.1\r\nHost: 127.0.0.1:%d\r\n\r\n' % (path, port)).encode())
+    s.sendall(('GET %s HTTP/1.1\r\nHost: 127.0.0.1:%d\r\nX-Switchboard-Key: %s\r\n\r\n'
+               % (path, port, pagekey_help.with_key()['X-Switchboard-Key'])).encode())
     time.sleep(wait)
     if read:
         s.recv(10)
@@ -499,8 +502,8 @@ class TheServer(Sandbox):
         self.serve()
         s = socket.create_connection(('127.0.0.1', self.port), timeout=10)
         self.addCleanup(s.close)
-        s.sendall(('POST /api/refresh HTTP/1.1\r\nHost: 127.0.0.1:%d\r\nX-Switchboard: 1\r\nContent-Length: 99999999\r\n\r\n'
-                   % self.port).encode())
+        s.sendall(('POST /api/refresh HTTP/1.1\r\nHost: 127.0.0.1:%d\r\nX-Switchboard: 1\r\nX-Switchboard-Key: %s\r\n'
+                   'Content-Length: 99999999\r\n\r\n' % (self.port, pagekey_help.with_key()['X-Switchboard-Key'])).encode())
         got = b''
         while True:
             chunk = s.recv(4096)
@@ -689,6 +692,9 @@ class TheSlowWorld(LinkApp):
         httpd = self.serve(Counting)
         httpd.MAX_THREADS = 16
         httpd.slots = threading.BoundedSemaphore(16)
+        # The install's secret is there before the clients come, as in an install: the first page key a client takes
+        # makes it, and that write to settings.json is a change the state is rightly built again for at once.
+        pagekey_help.with_key()
         started = time.monotonic()
         until = started + 6.0
         codes = []

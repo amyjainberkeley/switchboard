@@ -145,6 +145,8 @@ def run(args, via):
             store[key] = {'value': value,
                           'mdat': time.strftime('%%Y%%m%%d%%H%%M%%SZ', time.gmtime()) + str(time.time())}
             save('store.json', store)
+            with open(os.path.join(STATE, 'landed.jsonl'), 'a') as f:
+                f.write(json.dumps({'service': svc, 'account': acct, 'pid': os.getpid(), 'at': time.time()}) + '\n')
             return 0, '', '', rule
         if kind == 'delete':
             if key not in store:
@@ -166,6 +168,8 @@ try:
             if not words:
                 continue
             status, out, err, rule = run(words, 'stdin')
+            if rule and rule.get('after'):
+                time.sleep(rule['after'])
             exit_zero = exit_zero or bool(rule and rule.get('exit_zero'))
             sys.stdout.write(out)
             sys.stderr.write(err)
@@ -173,6 +177,8 @@ try:
                 sys.stderr.write('%%s: returned %%d\n' %% (words[0], status))
         sys.exit(0 if exit_zero else status)
     status, out, err, rule = run(sys.argv[1:], 'argv')
+    if rule and rule.get('after'):
+        time.sleep(rule['after'])
     sys.stdout.write(out)
     sys.stderr.write(err)
     sys.exit(status)
@@ -226,8 +232,9 @@ class FakeSecurity:
 
     def rule(self, **r):
         """Add a scripted rule: verb ('find', 'exists', 'add', 'delete', 'list'), service, account, exit, stdout,
-        stderr, delay, times (-1 = always), exit_zero (under `security -i`: the call exits 0 although the command
-        failed, saying only "returned N" on its error stream)."""
+        stderr, delay (seconds before the command acts), after (seconds the call still runs once it has acted: a write
+        that landed and then hung), times (-1 = always), exit_zero (under `security -i`: the call exits 0 although the
+        command failed, saying only "returned N" on its error stream)."""
         rules = self._load('rules.json', [])
         rules.append(r)
         self._save('rules.json', rules)
@@ -253,6 +260,19 @@ class FakeSecurity:
     def max_concurrent(self):
         return self._load('conc.json', {'max': 0})['max']
 
+    def landed(self, service=None):
+        """Each write that changed the store: {'service', 'account', 'pid', 'at' (wall seconds)}, in order."""
+        out = []
+        try:
+            with open(self._path('landed.jsonl')) as f:
+                for line in f:
+                    c = json.loads(line)
+                    if service is None or c['service'] == service:
+                        out.append(c)
+        except OSError:
+            pass
+        return out
+
 
 class FakeKeychain:
     """In-process stand-in with keychain.Keychain's interface and answers, for the engine tests (a process start at
@@ -274,6 +294,7 @@ class FakeKeychain:
         self.max = 0
         self.on_call = None
         self.pending = set()
+        self.created = []           # (service, account) of each write made with create_only
 
     def rule(self, verb, service=None, account=None, why='locked', times=1, land=False):
         with self.lock:
@@ -316,7 +337,7 @@ class FakeKeychain:
         finally:
             self._leave()
 
-    def write(self, service, account, value, interactive=False):
+    def write(self, service, account, value, interactive=False, create_only=False):
         if self.on_call:
             self.on_call('write', service, account)
         self._enter()
@@ -330,6 +351,10 @@ class FakeKeychain:
                 if r['land']:
                     self.put(service, account, value)
                 return keychain.Done(False, r['why'])
+            if create_only:
+                self.created.append((service, account))
+            if create_only and self.get(service, account) is not None:
+                return keychain.Done(False, 'exists')       # as security without -U: exit 45, nothing changed
             self.put(service, account, value)
             return keychain.Done(True)
         finally:
@@ -454,13 +479,21 @@ class FakeAnthropic:
             # Every sign-in's end date is its own, as Anthropic's are: two made in the same millisecond (a fast run)
             # once got the same date, and the engine rightly took the second account's login for the first's.
             self.signins += 1
-            rx = int((self.wall() + rx_days * 86400) * 1000) + self.signins
+            rx = own = int((self.wall() + rx_days * 86400) * 1000) + self.signins
             # Different sign-ins of one account are made days apart, as real ones are: stamps within
             # facts.SAME_SIGN_IN_MS are one sign-in to the engine (a renewal can lower its stamp that much), so a
             # sign-in made again in the same moment of a test ends a day after the earlier one it would sit beside.
-            while any(facts.same_sign_in(rx, line['rx_ms']) for line in a['lineages'].values()):
+            # That day never puts an earlier sign-in after a later one: a real sign-in's end date is set fresh when it
+            # is made, a fixed span after that moment (facts 'refresh.expiry_rule'), so a sign-in whose own date is
+            # later ends later. Without this, a sign-in moved a day on ended after one made an hour later in the
+            # test's time, and the engine rightly took the newer sign-in for the older one (test_fresh_proof).
+            while any(facts.same_sign_in(rx, line['rx_ms']) or
+                      (line.get('moved_to') == line['rx_ms'] and line['moved_from'] < own and rx <= line['rx_ms'])
+                      for line in a['lineages'].values()):
                 rx += 86400 * 1000
             a['lineages'][n] = {'gen': 0, 'rx_ms': rx, 'org': org}
+            if rx != own:                           # moved on by the loop above: what its own moment gave, and where
+                a['lineages'][n].update(moved_from=own, moved_to=rx)
             a['latest'] = n
             return self._issue(uuid, n)
 
@@ -608,9 +641,15 @@ class Procs:
 
 
 class Rig:
-    """One made-up Mac: a home with Claude Code's files, a data folder, a fake Keychain, a fake Anthropic."""
+    """One made-up Mac: a home with Claude Code's files, a data folder, a fake Keychain, a fake Anthropic.
 
-    def __init__(self, extra_env=None, wall=None, mono=None, sleep=None, user='tester', real_keychain=False):
+    mirror: the standing copy of the sign-in in Claude Code's plain login file (putback.mirror_on, on in the program
+    unless the setting says false). Off unless a test asks for it: the tests written before it pin the behaviour that
+    stays with the setting off; the standing copy has tests of its own (test_mirror_*). load: the load per core the
+    engine sees (keychain.LOAD), so no test depends on how busy the Mac running it is."""
+
+    def __init__(self, extra_env=None, wall=None, mono=None, sleep=None, user='tester', real_keychain=False,
+                 mirror=False, load=0.0):
         self.root = tempfile.mkdtemp(prefix='sb-engine-')
         self.home = os.path.join(self.root, 'home')
         self.data = os.path.join(self.root, 'data')
@@ -635,7 +674,14 @@ class Rig:
                                    sleep=sleep or time.sleep, events=self._event, log=self.logs.append,
                                    disk_free=lambda p: self.free, proc_start=self.procs.start,
                                    pid_alive=self.procs.alive, claude=None)
-        from switchboard.accounts import capture, identity, roster, tokens
+        from switchboard.accounts import capture, identity, putback, roster, tokens
+        from unittest import mock
+        self._mirror_off = None
+        if not mirror:
+            self._mirror_off = mock.patch.object(putback, 'mirror_on', lambda ctx: False)
+            self._mirror_off.start()
+        self._load = mock.patch.object(keychain, 'LOAD', lambda: load)
+        self._load.start()
         capture.reset()
         roster.forget_live()
         tokens.WAKE.reset()
@@ -651,6 +697,12 @@ class Rig:
         self.events.append((text, kind, dict(facts_)))
 
     def close(self):
+        if self._mirror_off is not None:
+            self._mirror_off.stop()
+            self._mirror_off = None
+        if self._load is not None:
+            self._load.stop()
+            self._load = None
         shutil.rmtree(self.root, ignore_errors=True)
 
     # ---------- Claude Code's side ----------

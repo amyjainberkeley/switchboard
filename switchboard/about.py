@@ -36,7 +36,8 @@ Where each line comes from:
   without a password (menubar_wrap.place); checked here by the owner of every file the install added.
 - Installed: what is there now, from the paths the installer uses (linkapp, menubar_wrap, the command's links).
 - Running: the page answers on its port as this data folder's page (server.py listens on 127.0.0.1 only), the menu
-  bar item holds its lock (menubar.running_pid), and each background job's property list is there and starts at load.
+  bar item holds its lock (menubar.running_pid), the sign-in watch's heartbeat is fresh (server.watch_beat; only when
+  its job is installed), and each background job's property list is there and starts at load.
 - Program: SHA256SUMS, written by install.sh beside the program from the files it has just put in place
   (write_manifest), in the format of `shasum -a 256`, so `cd ~/.switchboard/app && shasum -a 256 -c SHA256SUMS` checks
   it without Switchboard. It tells a file changed, missing or added since install from one that is not; it is not a
@@ -570,8 +571,8 @@ def runs_as_words(r):
 # ---------- what runs ----------
 
 def _agents():
-    from . import menubar
-    return (menubar.PAGE_AGENT, menubar.AGENT)
+    from . import menubar, server
+    return (menubar.PAGE_AGENT, menubar.AGENT, server.WATCH_JOB)
 
 
 def job(label):
@@ -605,11 +606,15 @@ def page_fact(cli):
 
 
 def running(cli, wait=0.0, sleep=time.sleep, clock=time.monotonic):
-    """{'page': page_fact, 'port', 'page_job', 'menubar': None (not installed) or True/False, 'menubar_job'}. wait:
-    seconds to wait for a menu bar item whose job is in place to take its lock (it has just been started)."""
-    from . import menubar
+    """{'page': page_fact, 'port', 'page_job', 'menubar': None (not installed) or True/False, 'menubar_job', 'watch':
+    None (its job is not installed) or True/False, 'watch_job'}. wait: seconds to wait for a menu bar item whose job is
+    in place to take its lock (it has just been started)."""
+    from . import menubar, server
     out = {'port': core.port(), 'page': page_fact(cli), 'page_job': job(menubar.PAGE_AGENT),
-           'menubar': None, 'menubar_job': False}
+           'menubar': None, 'menubar_job': False, 'watch': None, 'watch_job': False}
+    if os.path.exists(server.watch_plist()):      # the sign-in watch: its job, and a heartbeat from the last 45 s
+        out['watch_job'] = job(server.WATCH_JOB)
+        out['watch'] = bool(server.watch_beat()['fresh'])
     if os.path.exists(menubar.launcher()):
         out['menubar_job'] = job(menubar.AGENT) and menubar.our_job() is not None
         up = menubar.running_pid() is not None
@@ -623,19 +628,25 @@ def running(cli, wait=0.0, sleep=time.sleep, clock=time.monotonic):
 
 def running_words(r):
     page = 'the page on 127.0.0.1:%d (this Mac only)' % r['port']      # server.py listens on 127.0.0.1 only
-    up = (['the menu bar item'] if r['menubar'] else []) + ([page] if r['page'] in ('running', 'busy') else [])
-    jobs = [r['page_job']] + ([r['menubar_job']] if r['menubar'] is not None else [])
+    watch = r.get('watch')                      # None: no job for the sign-in watch in this install
+    up = (['the menu bar item'] if r['menubar'] else []) + (['the sign-in watch'] if watch else []) + \
+        ([page] if r['page'] in ('running', 'busy') else [])
+    named = [('the page', r['page_job'])] + \
+        ([('the menu bar item', r['menubar_job'])] if r['menubar'] is not None else []) + \
+        ([('the sign-in watch', r.get('watch_job'))] if watch is not None else [])
+    jobs = [j for _, j in named]
     lines = []
     if up:
-        if all(jobs) and len(jobs) == 2:
-            login = 'both start at login'
-        elif all(jobs):
-            login = 'it starts at login'
+        if all(jobs):
+            login = 'it starts at login' if len(jobs) == 1 else 'both start at login' if len(jobs) == 2 else \
+                'all start at login'
         elif not any(jobs):
             login = 'no background job starts %s at login' % ('them' if len(up) > 1 else 'it')
         else:
-            login = ('the page starts at login' if r['page_job'] else 'the menu bar item starts at login')
-        lines.append('%s; %s' % (', and '.join(up), login))
+            starts = [n for n, j in named if j]
+            login = '%s start%s at login' % (' and '.join(starts), '' if len(starts) > 1 else 's')
+        said = ', and '.join(up) if len(up) < 3 else '%s, and %s' % (', '.join(up[:-1]), up[-1])
+        lines.append('%s; %s' % (said, login))
     if r['page'] == 'other':
         lines.append('another page answers on 127.0.0.1:%d, not this install\'s: switchboard doctor says more'
                      % r['port'])
@@ -644,6 +655,8 @@ def running_words(r):
                      if not r['page_job'] else 'the page is not running yet: switchboard doctor says why')
     if r['menubar'] is False:
         lines.append('the menu bar item is not running: start it with switchboard menubar')
+    if watch is False:
+        lines.append('the sign-in watch is not running: the page starts it again')
     return lines
 
 

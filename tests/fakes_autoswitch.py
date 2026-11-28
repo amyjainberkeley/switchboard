@@ -218,7 +218,7 @@ class FakeEngine(object):
     def upkeep_pass(self, budget_s=60.0):
         return []
 
-    def resolve_journal(self):
+    def resolve_journal(self, older_than=None):
         return None
 
 
@@ -259,8 +259,9 @@ class Home(unittest.TestCase):
 
 
 def make_loop(engine, clock, net=None, tokens=None, **deps):
-    """A Loop with every outside thing faked."""
+    """A Loop with every outside thing faked (the note of a move that keeps Claude Code signed in goes to loop.moves)."""
     notes = []
+    moves = []
     d = autoloop.Deps(accounts=engine.accounts, live=engine.live, switch=engine.switch, keep_pass=engine.keep_pass,
                       upkeep_pass=engine.upkeep_pass, resolve_journal=engine.resolve_journal,
                       access_token=tokens or FakeTokens(), net=net or FakeNet(clock),
@@ -269,9 +270,11 @@ def make_loop(engine, clock, net=None, tokens=None, **deps):
                       disk_free=deps.pop('disk_free', lambda: 10 ** 10),
                       history_note=deps.pop('history_note', lambda text, kind='info', **f: notes.append((text, kind))),
                       # the put-back reads Claude Code's login itself: with the live read faked, it is faked too
-                      put_back=deps.pop('put_back', lambda: None), notify=deps.pop('notify', lambda res: None))
+                      put_back=deps.pop('put_back', lambda: None), notify=deps.pop('notify', lambda res: None),
+                      notify_move=deps.pop('notify_move', moves.append))
     loop = autoloop.Loop(deps=d, clock=clock, rand=lambda: 0.5, **deps)
     loop.notes = notes
+    loop.moves = moves
     return loop
 
 

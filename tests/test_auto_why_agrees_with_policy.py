@@ -170,7 +170,9 @@ class ManySnapshots(unittest.TestCase):
                     self.assertNotEqual(rule, 'last', where)
                     mine, theirs = policy._rank_key(v), policy._rank_key(views[used.active])
                     if in_use_rule != 'last' and mine < theirs:     # ranked before: only too little room holds it
-                        self.assertTrue(not v.known or v.room < max(policy.OPTIONAL_ROOM, policy.LAND_MARGIN), where)
+                        fits = policy._fits(used, views[used.active], policy.deciding_families(used))
+                        self.assertTrue(not v.known or v.room < max(policy.OPTIONAL_ROOM, policy.LAND_MARGIN) or
+                                        not fits(v), where)         # (room for the models the chats ask for too)
                     elif in_use_rule != 'last':                     # off an account used last, ranks do not hold
                         self.assertEqual(mine, theirs, where)
                     self.assertNotEqual(d.target, aid, where)

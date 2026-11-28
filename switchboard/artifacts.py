@@ -40,6 +40,7 @@ import time
 from urllib.parse import parse_qs, quote, urlsplit
 
 from . import browser, linkapp
+from . import term
 from .core import (SwitchError, _in_tests, data_path, event, load, locked, log, name_of, owner_seg, parse_iso,
                    profile_unproven, projects, signed_in_here, update_setting)
 
@@ -920,6 +921,99 @@ class Busy(SwitchError):
     """Another open, or a check, has the browser right now."""
 
 
+# ---------- the record of opens: <data>/opens.jsonl ----------
+#
+# One line per link opened for a person (never for the quiet check): {'t', 'id' (the artifact's id cut to 8
+# characters), 'owner' (an email, or None), 'profile' (the browser profile folder last tried, or None), 'verdict',
+# 'tries', 'by'}. Never the whole id, a link, a title, or anything a page showed.
+
+OPENS = 'opens.jsonl'
+OPENS_MAX = 1 << 20         # past this size it becomes opens.jsonl.1 (the one before that goes), as History's does
+VERDICTS = ('ok', 'wrong', 'signin', 'trouble', 'unchecked')
+OPENS_BY = ('page', 'map', 'poster', 'explain')
+
+
+def opens_path():
+    return data_path(OPENS)
+
+
+def note_open(aid, owner, profile, verdict, tries, by):
+    """Append one line to the record of opens (owner-only, one whole write under a lock, moved aside past
+    OPENS_MAX). verdict: 'ok' (its page loaded), 'wrong' (every profile tried said "Page not found"), 'signin',
+    'trouble' (claude.ai's own error page) or 'unchecked' (opened without reading the tab). by: 'page' (the page
+    opened and read it), 'map' (opened from the owner map), 'poster' (the link app opened it from the map before
+    the page could) or 'explain' (Switchboard's own page about a missing profile). Never raises."""
+    import fcntl
+    from . import core
+    if core.DEMO:
+        return None
+    rec = {'t': round(time.time(), 3), 'id': str(aid or '')[:8], 'owner': owner if isinstance(owner, str) else None,
+           'profile': profile if isinstance(profile, str) else None,
+           'verdict': verdict if verdict in VERDICTS else 'unchecked',
+           'tries': tries if isinstance(tries, int) and not isinstance(tries, bool) and tries >= 0 else 0,
+           'by': by if by in OPENS_BY else 'page'}
+    p = opens_path()
+    try:
+        os.makedirs(os.path.dirname(p), mode=0o700, exist_ok=True)
+        lock = os.open(p + '.lock', os.O_WRONLY | os.O_CREAT, 0o600)
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX)        # the page's threads and a command in a terminal, one at a time
+            try:
+                if os.path.getsize(p) >= OPENS_MAX:
+                    os.replace(p, p + '.1')
+            except OSError:
+                pass
+            fd = os.open(p, os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o600)
+            try:
+                os.write(fd, (json.dumps(rec, sort_keys=True) + '\n').encode('utf-8'))
+            finally:
+                os.close(fd)
+        finally:
+            os.close(lock)                          # closing it lets the lock go
+    except OSError as e:
+        log('the record of opens was not written: %r' % e)
+        return None
+    return rec
+
+
+def _verdict(r):
+    """The record's verdict for what _go returned."""
+    if r.get('signin'):
+        return 'signin'
+    if r.get('trouble'):
+        return 'trouble'
+    return 'ok' if r.get('checked') else 'unchecked'
+
+
+def _state_free():
+    """True when nobody holds the saved state's lock this moment: a look, never a wait (core.locked waits up to
+    LOCK_DEADLINE for it)."""
+    import fcntl
+    try:
+        fd = os.open(data_path('.lock'), os.O_WRONLY | os.O_CREAT, 0o600)
+    except OSError:
+        return False
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        return False
+    finally:
+        os.close(fd)                                # closing it lets the lock go
+    return True
+
+
+def _take_new_pages():
+    """The session hooks' record taken in before an open (take_published_now), so a page published seconds ago
+    opens as its owner and owners.json names it for the link app at once. Never raises, and never waits for the saved
+    state: while another thread or process holds its lock, the record is left for the page's next pass
+    (published_tick) and the open goes on with what is known."""
+    try:
+        if _state_free():
+            take_published_now()
+    except Exception as e:  # noqa: BLE001 - the open goes on with what is known
+        log('the record of new pages was not read: %r' % e)
+
+
 def go(url, quiet=False, wait=None):
     """Open a claude.ai artifact in the browser profile whose account can open it.
 
@@ -931,18 +1025,37 @@ def go(url, quiet=False, wait=None):
     link = parse_link(url)
     if not link:
         raise SwitchError('That is not a claude.ai artifact link.')
+    if not quiet:
+        _take_new_pages()
     if not GO_LOCK.acquire(timeout=-1 if wait is None else max(0.0, float(wait))):
         raise Busy('Switchboard is opening or checking another link in the browser right now. Try again in a moment.')
     try:
+        trace = _TRACE
+        trace.clear()
         try:
-            return _go(link['url'], link['id'], quiet)
+            r = _go(link['url'], link['id'], quiet)
+        except SwitchError as e:
+            # Every profile tried said "Page not found". When its owner then has no profile, the click's one line is
+            # the explanation's (explain_no_profile), not this one.
+            if not quiet and trace.get('wrong') and not isinstance(e, NoProfile):
+                note_open(link['id'], trace.get('owner'), trace.get('profile'), 'wrong', trace['tries'], 'page')
+            raise
         finally:
             _map_soon()
+        if not quiet:
+            note_open(link['id'], r.get('email'), r.get('profile'), _verdict(r), trace.get('tries') or 1, 'page')
+        return r
     finally:
         GO_LOCK.release()
 
 
+_TRACE = {}     # what the open under way did, for its line in the record: written only while GO_LOCK is held
+
+
 def _go(url, aid, quiet):
+    """go's open, holding GO_LOCK. It tells _TRACE how many profiles it opened ('tries'), the last ('profile'), the
+    owner known before the open ('owner'), and whether every one it tried said "Page not found" ('wrong')."""
+    trace = _TRACE
     st = load()
     item = find(st, aid)
     if not item or RANK.get(item.get('src'), 0) < 2:
@@ -955,6 +1068,7 @@ def _go(url, aid, quiet):
         raise SwitchError('No browser profile is signed in to claude.ai yet. Open Switchboard to set one up.')
     trusted = bool(item and item.get('owner') and RANK.get(item.get('src'), 0) >= 2)
     owner = item.get('owner') if trusted else None
+    trace['owner'] = owner
     was_running = browser.running()
     first = browser.tabs() if was_running else []
     if first is None:                        # can't look: open the best guess and trust it
@@ -962,12 +1076,14 @@ def _go(url, aid, quiet):
             return {'email': tries[0][1], 'profile': tries[0][0], 'checked': False, 'why': browser.TABS.get('state')}
         if owner and opens_in(st['accounts'].get(owner) or {}, names) is None:
             raise NoProfile(owner, url)      # no profile is signed in as its owner: a guess would say "Page not found"
+        trace.update(tries=1, profile=tries[0][0])
         browser.open_url(tries[0][0], url)
         return {'email': tries[0][1], 'profile': tries[0][0], 'checked': False, 'why': browser.TABS.get('state')}
 
     signed_out = []
     for i, (profile, email) in enumerate(tries):
         before = {row[1] for row in (first if i == 0 else browser.tabs() or [])}
+        trace.update(tries=i + 1, profile=profile)
         browser.open_url(profile, url, background=quiet)
         # A browser that was not running takes a while to start (and may restore its windows first).
         verdict, tab = browser.watch_tab(aid, before, timeout=40 if (i == 0 and not was_running) else 15)
@@ -1001,8 +1117,10 @@ def _go(url, aid, quiet):
             mark_signed_out(s2, signed_out)
         profile, email = signed_out[0]
         if not quiet:
+            trace['profile'] = profile
             browser.open_url(profile, url)
         return {'email': email, 'profile': profile, 'checked': True, 'signin': True}
+    trace['wrong'] = True
     if owner and opens_in(load()['accounts'].get(owner) or {}, names) is None:
         raise NoProfile(owner, url)
     raise SwitchError('None of your browser profiles could open that link: none is signed in to claude.ai as the '
@@ -1020,6 +1138,10 @@ def go_quietly(url, sent_at=None, fallback_after=None):
     if isinstance(sent_at, (int, float)) and isinstance(fallback_after, (int, float)) and \
             0 <= fallback_after <= 60 and time.time() > sent_at + fallback_after + POSTER_SLACK:
         log('a link reached the page after its poster opened it from the owner map; not opened twice')
+        aid = (parse_link(url) or {}).get('id')
+        got = map_lookup(read_owner_map(), aid)          # what the link app went by (the map as written last)
+        note_open(aid, got.get('email'), got.get('profile'), 'unchecked', 1, 'poster')
+        _take_new_pages()                               # the next open of a page published just now finds it
         return {'by': 'poster', 'checked': False}
     try:
         return go(url, wait=GO_WAIT)        # never long: the link app was told the page has it
@@ -1044,6 +1166,7 @@ def explain_no_profile(email, url):
     inner = 'owner=%s&url=%s' % (quote(email, safe=''), quote(url, safe=''))      # each value whole, even with & in it
     page = 'http://127.0.0.1:%d/go#%s' % (linkapp.page_port(), quote(inner, safe=''))
     browser.open_url(None, page)
+    note_open((parse_link(url) or {}).get('id'), email, None, 'unchecked', 0, 'explain')
     return {'by': 'explain', 'email': email, 'no_profile': True, 'checked': False}
 
 
@@ -1067,6 +1190,7 @@ def open_from_map(url, m=None):
     if got['email'] and not got['profile']:
         return dict(got, by='map', checked=False, url=link['url'], no_profile=True)
     browser.open_url(got['profile'], link['url'])
+    note_open(link['id'], got['email'], got['profile'], 'unchecked', 1, 'map')
     return dict(got, by='map', checked=False, url=link['url'])
 
 
@@ -1320,11 +1444,19 @@ def _page_opens_in(x, st, names, proved_by, now):
     return loaded
 
 
+def _slot(a):
+    """An account's number in `switchboard`'s list, or None."""
+    s = a.get('slot')
+    return s if isinstance(s, int) and not isinstance(s, bool) and s > 0 else None
+
+
 def owner_map(st, names, now=None, extensions=None, host=None):
     """The owner map, as written to owners.json. Readable without the page:
       active      the account Claude Code is on (an email), timeline its last switches [[email, when], ...]
       accounts    {email: {id, profile, profile_name, link, at, why, opens (the profile its pages open in, or None),
-                   extension (the Claude extension is in its profile: true, false, or null when not known)}}
+                   extension (the Claude extension is in its profile: true, false, or null when not known),
+                   slot (its number in `switchboard`'s list) and plan (its plan's words, 'Max 20x'), each or null:
+                   the session hooks name an account by these at a chat's start, never by its email}}
       artifacts   {id: {o: owner, p: the profile it opens in or null, s: how sure: seen, listed, published, guess}}
       fallback    the profile for a link nobody knows yet: the account in use's, else the newest proof's; never the
                   "other links" profile unless that is one of these
@@ -1350,7 +1482,8 @@ def owner_map(st, names, now=None, extensions=None, host=None):
         opens = opens_in(a, names, now)
         accounts[email] = {'id': a.get('account_id') or a.get('id'), 'profile': p,
                            'profile_name': names.get(p, p) if p else None, 'link': state, 'at': at, 'why': why,
-                           'opens': opens, 'extension': extensions.get(p) if p and p in extensions else None}
+                           'opens': opens, 'extension': extensions.get(p) if p and p in extensions else None,
+                           'slot': _slot(a), 'plan': term.plan_words(dict(a, org='', plan_line='')) or None}
         if state in ('proved', 'old') and at and at > newest[0]:
             newest = (at, p)
     for e in [x.get('owner') for x in st.get('artifacts') or []]:
@@ -1566,7 +1699,8 @@ def link_rows(st, names, now=None, extensions=None, host=None):
             action = {'do': 'setup', 'label': 'Set up', 'profile_name': 'Claude ' + profile_label(
                 email, page_accounts(st, email))}
         out[email] = {'link': state, 'at': at, 'why': why, 'profile': p, 'profile_name': pn, 'line': line,
-                      'action': action, 'chrome': chrome_row(a, names, extensions, host, now)}
+                      'action': action, 'chrome': chrome_row(a, names, extensions, host, now),
+                      'checked': 'last checked %s' % _date(at) if state in ('proved', 'old') and at else None}
     return out
 
 

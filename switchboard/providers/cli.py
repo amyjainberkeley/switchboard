@@ -1,4 +1,5 @@
-"""The commands of Switchboard's other assistants: providers, add, continue, back, hand, allow, stay and order.
+"""The commands of Switchboard's other assistants: providers, add, continue, back, hand, allow, stay and order, and the
+front door: do, route and routes.
 
 `switchboard/__main__.py` hands these words here (`main(args)`). Every command works the same for every provider: the
 provider is a word after the command, never a command of its own. What a command reaches outside this process comes
@@ -24,10 +25,11 @@ import sys
 from dataclasses import asdict, dataclass
 from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence, Tuple
 
-from . import contract, words
+from . import contract, job, kinds, words
 from .contract import Found, Handoff, Hop, Limits, Provider, ProviderError, Reach, Room, Unsupported
 
-COMMANDS = ('providers', 'add', 'continue', 'back', 'hand', 'allow', 'stay', 'order')
+COMMANDS = ('providers', 'add', 'continue', 'back', 'hand', 'allow', 'stay', 'order', 'do', 'route', 'routes',
+            'remove')
 
 FRESH_ENGINE_S = 3600.0         # Claude's account code reads the account in use every 5 minutes (place: section 8.4)
 FRESH_FILE_S = 7 * 86400.0      # a provider's own saved numbers: its weekly window is the one that matters
@@ -61,7 +63,8 @@ class Kit:
     handoff, tasks, place, choices, run: the modules beside this one (or stand-ins with the same functions).
     say(text, kind, **facts): one History line (kinds info, setting, problem). ask(prompt) -> the person's answer
     (only ever called at a terminal). out: where lines are printed. cwd(): the folder the command was typed in.
-    headless: entrypoint prefixes of headless runs."""
+    headless: entrypoint prefixes of headless runs. routes, catalog: the person's routes and the list of models (the
+    modules beside this one when not given)."""
     reach: Reach
     load: Callable[[str], Optional[Provider]]
     load_errors: Mapping[str, str]
@@ -75,6 +78,8 @@ class Kit:
     out: Any
     cwd: Callable[[], str] = os.getcwd
     headless: Tuple[str, ...] = HEADLESS
+    routes: Any = None
+    catalog: Any = None
 
 
 def _history(text, kind='info', **facts):
@@ -99,7 +104,7 @@ def default_kit(reach=None) -> Kit:
     """The real Kit: the real Reach (or the one given), the registry's adapters and the modules beside this one,
     imported only now."""
     from . import LOAD_ERRORS, adapter_class
-    from . import choices, handoff, place, run, tasks
+    from . import catalog, choices, handoff, place, routes, run, tasks
     reach = reach or run.default_reach()
     try:
         from .chat_facts import HEADLESS_ENTRYPOINTS as headless
@@ -112,7 +117,7 @@ def default_kit(reach=None) -> Kit:
 
     return Kit(reach=reach, load=load, load_errors=LOAD_ERRORS, handoff=handoff, tasks=tasks, place=place,
                choices=choices, run=run, say=_history, ask=_ask_terminal, out=sys.stdout,
-               headless=tuple(headless))
+               headless=tuple(headless), routes=routes, catalog=catalog)
 
 
 def main(args: Sequence[str], kit: Optional[Kit] = None) -> int:
@@ -183,6 +188,7 @@ class _Ctx:
         self._limits: Dict[str, Tuple[Limits, ...]] = {}
         self._seats: Dict[str, tuple] = {}
         self._folder: Optional[str] = None
+        self.read_info = None           # what the reader saw of the last chat read for a note (_make_note)
         self.moved = False              # a move (hop) was recorded: old notes are pruned at the end
         self.pruned = False
 
@@ -231,6 +237,12 @@ class _Ctx:
         from . import ids
         return ids()
 
+    def first(self) -> str:
+        """The provider whose seats are Switchboard's own account list (its adapter's account_list): the one the list
+        shows first, one row per account, and whose chats are carried over from. The registry's first otherwise."""
+        ids = self.ids()
+        return next((p for p in ids if getattr(self.prov(p), 'account_list', False)), ids[0] if ids else '')
+
     def prov(self, pid) -> Optional[Provider]:
         if pid not in self._prov:
             self._prov[pid] = self.kit.load(pid) if self.known(pid) else None
@@ -238,7 +250,7 @@ class _Ctx:
 
     def name(self, pid) -> str:
         p = self.prov(pid)
-        return p.name if p is not None and p.name else pid.capitalize()
+        return p.name if p is not None and p.name else words.one_line(str(pid).capitalize(), 32)
 
     def vendor(self, pid) -> str:
         p = self.prov(pid)
@@ -665,6 +677,8 @@ def _add(ctx: _Ctx, pid) -> int:
     if pid in added:
         at = added.get(pid) or 0
         ctx.out(words.ADD_ALREADY.format(name=name, date=words.date(at, ctx.now) if at else 'from the start'))
+        if pid != ctx.first() and not ctx.kit.choices.notice_said(pid):
+            _notice(ctx, pid, words.NOTICE)         # added on an older build: said now, once
         return 0
     f = ctx.found(pid)
     if ctx.prov(pid) is None or f is None or not f.installed:
@@ -685,7 +699,162 @@ def _add(ctx: _Ctx, pid) -> int:
     if _older(f.program.version, f.newest_seen):
         ctx.out(words.ADD_TOO_OLD.format(name=name, version=words.one_line(f.program.version, 40),
                                          seen=words.one_line(f.newest_seen, 40)))
+    _notice(ctx, pid, words.NOTICE)
     return 0
+
+
+def _notice(ctx: _Ctx, pid, text: str, ask: Optional[str] = None) -> bool:
+    """The notice of what a press on pid's row sends, to whom and under whose terms: the one place it is said, and
+    kept as said (choices.notice_said), so a press asks it no more. text: the words it is said in (words.NOTICE after
+    an add, words.PRESS_NOTICE at a first press); ask: when given, the question after it, default no, and it is kept
+    only on a yes. It is kept only where a person reads it, at a terminal: said to a script or to an assistant's own
+    shell, the first press still asks. True when kept."""
+    names = dict(name=ctx.name(pid), vendor=ctx.vendor(pid),
+                 plan=getattr(ctx.prov(pid), 'plan_phrase', '') or 'plan')
+    ctx.out(text.format(**names))
+    if not ctx.tty() or (ask is not None and not ctx.yes(ask.format(**names))):
+        return False
+    ctx.kit.choices.set_notice_said(ctx.now, pid)
+    return True
+
+
+def notice_due(ctx: _Ctx, pid) -> bool:
+    """A press on pid's row in this folder says the notice first: it was never said (pid was added on an older build,
+    or by hand) and the folder has no yes of its own for pid (the yes `continue` asks counts as said there)."""
+    return not ctx.kit.choices.notice_said(pid) and ctx.consent(pid) != 'yes'
+
+
+OFFERED = ('added', 'no', 'not_asked', 'added_before', 'not_here')    # what offer() answers
+
+
+def offer(pid: str, kit: Optional[Kit] = None) -> str:
+    """Offer one provider, at a terminal only (standard input and output both a terminal, the same gate as a key
+    press): bare `switchboard add`, and a first run. When it is on this Mac with a copy that can be used, signed in by
+    its own app's say (Found.signed_in True) and not added yet, its notice is said and ONE question asked
+    (words.ADD_OFFER, default no). A yes adds it and keeps that the notice was said, then asks add's one question about
+    its account where it has one. What happened, one of OFFERED: 'added'; 'no' (asked, nothing added); 'not_asked' (no
+    terminal: nothing said or changed); 'added_before'; 'not_here' (not on this Mac, no copy that can be used, not
+    signed in, or the provider whose seats are the account list, which its own add adds). An adapter that can tell
+    from a file alone that it is not signed in (its signed_in()) is asked that first, so nothing runs for it. No login
+    is read. A failure is logged and answers 'not_here'."""
+    try:
+        return _offer(_Ctx(kit if kit is not None else default_kit()), pid)
+    except Exception as e:  # noqa: BLE001 - offering another provider never stops what offered it
+        _log_offer(e)
+        return 'not_here'
+
+
+def _log_offer(e):
+    try:
+        from switchboard import core
+        core.log('adding the providers signed in: %s' % type(e).__name__)
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def offerable(pid: str, kit: Optional[Kit] = None) -> bool:
+    """offer(pid) would say the notice and ask now: the same checks as offer, with nothing said, asked or changed. A
+    first run plans its steps with it, so a step is never shown with nothing in it. A failure is logged and answers
+    False."""
+    try:
+        return _offer_stops(_Ctx(kit if kit is not None else default_kit()), pid) is None
+    except Exception as e:  # noqa: BLE001 - planning an offer never stops what plans it
+        _log_offer(e)
+        return False
+
+
+def _offer_stops(ctx: _Ctx, pid) -> Optional[str]:
+    """What offer() answers without saying or asking anything (one of OFFERED), or None when it would ask."""
+    prov = ctx.prov(pid) if ctx.known(pid) else None
+    if prov is None or getattr(prov, 'account_list', False):
+        return 'not_here'
+    if pid in ctx.added():
+        return 'added_before'
+    if not ctx.tty():
+        return 'not_asked'
+    said = getattr(prov, 'signed_in', None)
+    if callable(said) and said() is not True:
+        return 'not_here'
+    f = ctx.found(pid)
+    if f is None or not f.installed or f.program is None or f.signed_in is not True:
+        return 'not_here'
+    return None
+
+
+def _offer(ctx: _Ctx, pid) -> str:
+    stops = _offer_stops(ctx, pid)
+    if stops is not None:
+        return stops
+    if not _notice(ctx, pid, words.NOTICE, words.ADD_OFFER):
+        return 'no'
+    ctx.kit.choices.add(pid, ctx.now)
+    ctx.say(words.H_ADDED.format(name=ctx.name(pid)), 'setting', to=ctx.name(pid))
+    if ctx.can(pid, contract.ASK):
+        _ask_after_add(ctx, pid)
+    return 'added'
+
+
+def add_signed_in(kit: Optional[Kit] = None) -> int:
+    """`switchboard add` with no other word: offer() each provider besides the one whose seats are the account list,
+    in the registry's order. How many were added; a failure is logged and never stops add."""
+    try:
+        ctx = _Ctx(kit if kit is not None else default_kit())
+        if not ctx.tty():
+            return 0
+        return sum(1 for pid in ctx.ids() if _offer(ctx, pid) == 'added')
+    except Exception as e:  # noqa: BLE001 - adding another provider never stops the Claude login's own add
+        _log_offer(e)
+        return 0
+
+
+def other_provider(word) -> bool:
+    """word is the id of a provider besides the registry's first (codex): `switchboard remove codex` takes it off the
+    list. An account with that same short name is then removed by its email: off the list can be undone, a removed
+    login cannot."""
+    from . import ids, known
+    return known(word) and word != ids()[0]
+
+
+def cmd_remove(ctx: _Ctx, args) -> int:
+    """`switchboard remove PROVIDER`: off the list (choices.remove). The provider whose seats are the account list
+    stays: `switchboard remove NAME` forgets one of its accounts."""
+    if len(args) != 1:
+        raise Usage()
+    pid = ctx.provider_word(args[0])
+    name = ctx.name(pid)
+    if pid == ctx.first():
+        raise Refused(words.REMOVE_FIRST.format(name=name))
+    if pid not in ctx.added():
+        ctx.out(words.REMOVE_NOT_ADDED.format(name=name))
+        return 0
+    ctx.kit.choices.remove(pid)
+    ctx.say(words.H_REMOVED.format(name=name), 'setting', to=name)
+    ctx.out(words.REMOVE_DONE.format(name=name, order=words.names([ctx.name(p) for p in ctx.order()])))
+    return 0
+
+
+def _ask_after_add(ctx: _Ctx, pid):
+    """Right after add has added a provider that can be asked for its numbers, at a terminal: ONE question, the same
+    yes as `switchboard providers --ask` (kept as ask_ok; the adapter's ask then keeps every rule it has: paced, one at
+    a time, never older than the program that wrote its chats). y is yes; Enter or anything else is no, and nothing
+    more is said. A yes given before is that same yes: the app is asked without the question. Asked only here, so
+    once: add adds a provider once."""
+    if not ctx.tty():
+        return
+    if not ctx.kit.choices.ask_ok(pid):
+        if not ctx.yes(words.ADD_ASK.format(name=ctx.name(pid))):
+            return
+        ctx.kit.choices.set_ask_ok(ctx.now, pid=pid)
+    lims = ctx.limits(pid, ask=True)
+    outcome = next((lim.ask for lim in lims if lim.ask), None) or contract.ASK_REFUSED
+    if outcome == contract.ASK_DONE:
+        return
+    why = next((lim.error for lim in lims if lim.error), '') or ''
+    if outcome == contract.ASK_REFUSED:
+        ctx.say(words.H_ASK_REFUSED.format(name=ctx.name(pid), why=words.one_line(why or 'no answer', 80)),
+                'problem', reason='ask refused')
+    ctx.out(words.ADD_ASK_NOT_DONE.format(name=ctx.name(pid),
+                                          why=words.ADD_ASK_WHY.format(why=words.one_line(why, 120)) if why else ''))
 
 
 # ---------- choosing a chat (continue, back, hand) ----------
@@ -1096,13 +1265,14 @@ def _too_wide(ctx: _Ctx, path) -> bool:
     return real == os.sep or real == home or home.startswith(real + os.sep)
 
 
-def _work(ctx: _Ctx, chat, to, starts=True) -> str:
+def _work(ctx: _Ctx, chat, to, starts=True, ask=True) -> str:
     """The folder where things stand is read (git runs there) and another assistant starts: the chat's own folder,
     or the folder its work moved into when that may be used. A folder inside the chat's own is covered by the yes for
     it. One outside is used only with a yes for that folder and that provider, asked here at a terminal before
-    anything runs there; without it the chat's own folder is used and one line says how to allow the other. /, the
-    home folder and a folder that holds it are never used. A stay or a never for the folder used ends the command.
-    The chat itself is opened again, and its content asked about, by its own folder."""
+    anything runs there (never with ask=False: a key press asks nothing); without it the chat's own folder is used and
+    one line says how to allow the other. /, the home folder and a folder that holds it are never used. A stay or a
+    never for the folder used ends the command. The chat itself is opened again, and its content asked about, by its
+    own folder."""
     own, work = chat.folder, _raw_work(chat)
     if work is None:
         return own
@@ -1113,7 +1283,7 @@ def _work(ctx: _Ctx, chat, to, starts=True) -> str:
     ctx.refuse_stay_and_never(to, work)
     if _within(work, own) or ctx.consent(to, work) == 'yes':
         return work
-    if not ctx.tty():
+    if not ctx.tty() or not ask:
         ctx.out(words.WORK_NOT_ALLOWED.format(work=shown, started=started, to_id=to))
         return own
     more = words.WORK_ASK_STARTS.format(to=ctx.name(to)) if starts else ''
@@ -1144,6 +1314,7 @@ def _make_note(ctx: _Ctx, chat, to, why, budget, where=None) -> Tuple[Handoff, s
     transcript = prov.read(chat, contract.ReadLimits())
     if isinstance(transcript, Unsupported):
         raise Refused(words.one_line(transcript.why, 300))
+    ctx.read_info = transcript.info
     if transcript.info.degraded:
         ctx.out(words.one_line(transcript.info.degraded, 300))
     where = where or ctx.folder
@@ -1253,6 +1424,327 @@ def _not_started(ctx: _Ctx, hop: Hop, handoff: Handoff, target, launch, error, w
         line = ctx.kit.run.shell_line(launch.argv, launch.cwd, ctx.reach.env)
     ctx.out('  ' + line if line else _open_line(ctx, target, handoff, where or ctx.folder))
     return 1
+
+
+# ---------- one key press: another provider's row in the list (switchboard N, the list's prompt, switch) ----------
+#
+# What `continue --to PROVIDER` does, with no question and one line: this folder's newest chat is carried over and
+# the provider's app starts on it here; with no chat to carry over (or when the newest chat here is already that
+# provider's own), its app opens as it is. At a terminal the press is the person's yes, for this move only: no yes
+# is kept for the folder, so `continue`, `hand` and `do` still ask theirs. Without a terminal the press is no yes
+# (R5): a yes given before for this folder is used, else it is refused, and nothing starts (the line to run is
+# printed). A stay or a never for the folder is refused in one line. What continue prints along the way is said only
+# with --why. The log gets one line of fixed words per press (words.LOG_*): never a chat's name, a folder or a path.
+
+
+class _Quiet(_Ctx):
+    """One key press: what a line of continue's would say is kept (and said as it comes with --why) until loud();
+    then lines are said. The kept lines never go to the log: log() writes lines made of fixed words only."""
+
+    def __init__(self, kit: Kit, why=False):
+        super().__init__(kit)
+        self.why, self.quiet, self.kept, self.logs, self.ended = why, True, [], [], 'refused'
+        self.part = False               # only part of the chat could be read (_read_in_part)
+
+    def out(self, line=''):
+        if not self.quiet:
+            return super().out(line)
+        self.kept.append(line)
+        if self.why:
+            super().out(line)
+
+    def loud(self):
+        self.quiet = False
+
+    def problem(self, line):
+        """A real problem, said now in one line whether or not the rest is (once: with --why it may be said already)."""
+        if self.why and line in self.kept:
+            return
+        quiet, self.quiet = self.quiet, False
+        self.out(line)
+        self.quiet = quiet
+
+    def log(self, text):
+        """One line into Switchboard's log. text is made from words.LOG_* with provider names, Switchboard's own
+        ids, sizes, counts and a program's version only. A line that cannot be written never stops the move."""
+        self.logs.append(text)
+        try:
+            from switchboard import core
+            core.log(text)
+        except Exception:  # noqa: BLE001
+            pass
+
+
+def _version(ctx: _Ctx, pid) -> str:
+    """The version of the program a start runs (the one detect chose), for the log; '?' when not known."""
+    f = ctx.found(pid)
+    v = f.program.version if f is not None and f.program is not None else None
+    return v if isinstance(v, str) and _version_ok(v) else '?'
+
+
+def _version_ok(v) -> bool:
+    """A version as a program prints it ('0.169.1'): short, plain, one word, one the version order can read."""
+    from .run import version_key
+    return len(v) <= 40 and bool(version_key(v)) and words.safe(v) == v and ' ' not in v
+
+
+def _log_move(ctx: _Quiet, what, handoff: Handoff, frm, to):
+    ctx.log(words.LOG_MOVED.format(to=ctx.name(to), what=words.LOG_MOVED_WHAT[what], frm=ctx.name(frm),
+                                   hop=handoff.hop, size=words.size(handoff.bytes),
+                                   places=words.places(_removed(handoff)), app=ctx.app(to),
+                                   version=_version(ctx, to)))
+
+
+def _log_plain(ctx: _Quiet, what, pid):
+    ctx.log(words.LOG_PLAIN.format(to=ctx.name(pid), what=words.LOG_PLAIN_WHAT[what], app=ctx.app(pid),
+                                   version=_version(ctx, pid)))
+
+
+def move(pid: str, why: bool = False, kit: Optional[Kit] = None) -> int:
+    """Another provider's row, pressed in the list: its exit code (0 started or printed; 1 refused, with one line;
+    130 stopped with Ctrl-C). See the lines above."""
+    if kit is None:
+        try:
+            kit = default_kit()
+        except ImportError as e:
+            sys.stdout.write('This Switchboard cannot open %s: a part of it is missing (%s).\n'
+                             % (words.one_line(str(pid), 32), type(e).__name__))
+            return 1
+    ctx = _Quiet(kit, why)
+    try:
+        return _move(ctx, pid)
+    except Refused as e:
+        ctx.loud()
+        ctx.out(str(e))
+        return 1
+    except ProviderError as e:
+        ctx.ended = 'problem'
+        ctx.loud()
+        ctx.out(words.DISK if e.kind == 'disk' else words.one_line(str(e), 400))
+        return 1
+    except KeyboardInterrupt:
+        ctx.ended = 'stopped'
+        ctx.loud()
+        ctx.out('')
+        return 130
+    finally:
+        _prune(ctx)
+        if not ctx.logs:
+            ctx.log(words.LOG_NOTHING.format(to=ctx.name(pid) if ctx.known(pid) else 'another provider',
+                                             why=words.LOG_WHY[ctx.ended]))
+
+
+def _move(ctx: _Quiet, pid) -> int:
+    if not ctx.known(pid) or ctx.prov(pid) is None:
+        raise Refused(words.UNKNOWN_PROVIDER.format(word=words.one_line(str(pid), 32), ids=', '.join(ctx.ids())))
+    ctx.must_be_added(pid)
+    ctx.refuse_stay_and_never(pid)
+    room = ctx.room(pid)
+    if room.state == contract.NOT_INSTALLED:
+        raise Refused(words.MOVE_NOT_INSTALLED.format(name=ctx.name(pid), vendor=ctx.vendor(pid)))
+    if room.state == contract.SIGNED_OUT:
+        raise Refused(words.SIGNED_OUT.format(name=ctx.name(pid), how=ctx.sign_in(pid)))
+    ctx.refuse_too_old(pid)
+    chat = _newest_chat(ctx)
+    if chat is None or chat.provider == pid:
+        _said_out(ctx, pid, room)
+        return _open_plain(ctx, pid)
+    if _too_wide(ctx, chat.folder):
+        raise Refused(words.PRESS_TOO_WIDE.format(folder=words.one_line(chat.folder, 200), name=ctx.name(pid)))
+    if not ctx.tty() and ctx.consent(pid) != 'yes':
+        raise Refused(words.NOT_ASKED.format(to=ctx.name(pid), vendor=ctx.vendor(pid), to_id=pid))
+    if notice_due(ctx, pid):                        # at a terminal (without one, a folder's yes is needed above)
+        ctx.loud()
+        said = _notice(ctx, pid, words.PRESS_NOTICE, words.PRESS_NOTICE_ASK)
+        ctx.quiet = True
+        if not said:                                # not now: nothing of the chat has been read
+            ctx.ended = 'not_now'
+            raise Refused(words.NOTHING_SENT)
+    ctx.out(words.LATEST.format(name=_chat_name(chat), app=ctx.app(chat.provider),
+                                ago=words.ago(ctx.now - (chat.last_at or ctx.now))))
+    for line in _room_line(ctx, pid, room):
+        ctx.out(line)
+    _said_out(ctx, pid, room)
+    work = _work(ctx, chat, pid, ask=False)
+    moved = _moved_line(ctx, chat, pid, work)
+    if moved:
+        ctx.out(moved)
+    if chat.working:
+        ctx.problem(words.STILL_WORKING)
+    elif chat.live and chat.stopped:
+        ctx.problem(words.MAY_CARRY_ON.format(source=ctx.name(chat.provider)))
+    handoff, task = _make_note(ctx, chat, pid, words.CONTINUE_WHY.format(to=ctx.name(pid)),
+                               ctx.kit.choices.handoff_budget(), where=work)
+    ctx.part = _read_in_part(ctx)
+    found = ctx.found(pid)
+    hop = ctx.kit.tasks.add_hop(Hop(id=handoff.hop, task=task, kind='continue', at=ctx.now, folder=ctx.folder,
+                                    from_provider=chat.provider, from_chat=chat.id, to_provider=pid,
+                                    handoff=handoff.path, sha256=handoff.sha256, bytes=handoff.bytes,
+                                    removed=_removed(handoff), state='made',
+                                    program_version=found.program.version if found and found.program else None))
+    ctx.moved = True
+    how = ctx.kit.choices.open_with(pid) if ctx.tty() else contract.PRINT
+    if how == contract.PRINT:                       # nothing starts without a person at a terminal
+        ctx.loud()
+        code = _launch(ctx, hop, chat, handoff, pid, how, start=True, where=work)
+        _log_move(ctx, 'printed', handoff, chat.provider, pid)
+        return code
+    return _move_launch(ctx, hop, chat, handoff, pid, how, work)
+
+
+def _read_in_part(ctx: _Quiet) -> bool:
+    """Only part of the chat could be read for its note: said now, in one line (the reader's own sentence, or
+    MOVE_PART_READ when it stopped at a cap of size or time); the one line then says part of it was carried over."""
+    info = ctx.read_info
+    if info is None:
+        return False
+    if info.degraded:
+        ctx.problem(words.one_line(info.degraded, 300))
+        return True
+    if info.stopped in ('bytes', 'time'):
+        ctx.problem(words.MOVE_PART_READ)
+        return True
+    return False
+
+
+def _newest_chat(ctx: _Ctx):
+    """This folder's newest chat among those continue offers (live, stopped at a limit, or of the last day; else any of
+    the last days), of any added provider; None when there is none."""
+    offered = _offered(ctx, _all_chats(ctx))
+    return max(offered, key=lambda c: c.last_at or 0) if offered else None
+
+
+def _said_out(ctx: _Quiet, pid, room: Room):
+    """The one line said before a start on a provider with no room by its numbers (it starts all the same)."""
+    if room.state != contract.OUT:
+        return
+    ctx.loud()
+    ctx.out(words.MOVE_OUT.format(to=ctx.name(pid), when=words.when(room.back_at, ctx.now)) if room.back_at
+            else words.MOVE_OUT_NOT_KNOWN.format(to=ctx.name(pid)))
+    ctx.quiet = True
+
+
+def _chat_words(ctx: _Ctx, chat) -> str:
+    return words.CHAT_NAMED.format(name=_chat_name(chat)) if chat.name else \
+        words.CHAT_UNNAMED.format(app=ctx.app(chat.provider))
+
+
+def _move_launch(ctx: _Quiet, hop: Hop, chat, handoff: Handoff, target, how, where) -> int:
+    """Start the target's app on the note, in this terminal (exec) or its desktop app's link, with the one line."""
+    prov = ctx.prov(target)
+    tasks = ctx.kit.tasks
+    try:
+        launch = prov.start(where, handoff, how)
+    except ProviderError:
+        tasks.update_hop(hop.id, state='failed')
+        raise
+    if isinstance(launch, Unsupported):
+        tasks.update_hop(hop.id, state='failed')
+        raise Refused(words.one_line(launch.why, 300))
+    to, there, said = ctx.name(target), _there(ctx, where), _chat_words(ctx, chat)
+    if how == contract.IN_APP:
+        ran = ctx.reach.open_url(launch.url, launch.app)
+        if ran.code != 0:
+            ctx.loud()
+            _log_move(ctx, 'failed', handoff, hop.from_provider, target)
+            return _not_started(ctx, hop, handoff, target, launch, 'the link did not open', where)
+        tasks.update_hop(hop.id, state='in_app')
+        _history_move(ctx, words.H_OPENED, handoff, target, hop.from_provider)
+        _log_move(ctx, 'in_app', handoff, hop.from_provider, target)
+        ctx.out(_note_line(ctx, handoff, chat))
+        ctx.loud()
+        part = ctx.part
+        ctx.out((words.MOVED_APP_PART_THERE if part else words.MOVED_APP_THERE).format(to=to, folder=there, chat=said)
+                if there else (words.MOVED_APP_PART if part else words.MOVED_APP).format(to=to, chat=said))
+        return 0
+    gone = _cannot_run(launch)
+    if gone:                                        # found before the one line is said: no "opening" for it
+        ctx.loud()
+        _log_move(ctx, 'failed', handoff, hop.from_provider, target)
+        return _not_started(ctx, hop, handoff, target, launch, gone, where)
+    tasks.update_hop(hop.id, state='started')
+    _history_move(ctx, words.H_STARTED, handoff, target, hop.from_provider)
+    key_line = ctx.billing_line(target)
+    if key_line:
+        ctx.out(key_line)
+    prog = launch.program
+    started = dict(to=ctx.app(target), version=words.one_line(prog.version or '?', 40) if prog else '?',
+                   where=words.one_line(prog.where, 60) if prog else '?')
+    ctx.out(words.STARTED_THERE.format(folder=there, **started) if there else words.STARTED.format(**started))
+    ctx.out(_note_line(ctx, handoff, chat))
+    part = ctx.part
+    one = (words.MOVED_PART_THERE if part else words.MOVED_THERE).format(to=to, folder=there, chat=said) if there \
+        else (words.MOVED_PART if part else words.MOVED).format(to=to, chat=said)
+
+    def before():                                   # an exec that works never comes back: log, then the one line
+        _log_move(ctx, 'started', handoff, hop.from_provider, target)
+        ctx.loud()
+        ctx.out(one)
+    code = _exec(ctx, hop, handoff, target, launch, where, before=before)
+    if code:                                        # the exec failed: it came back
+        _log_move(ctx, 'failed', handoff, hop.from_provider, target)
+    return code
+
+
+def _cannot_run(launch) -> Optional[str]:
+    """Why a start cannot be made, by a cheap look just before the one line is said (the line must come before the
+    program replaces this one): its program is gone or cannot be run, or its folder is gone. None when it looks fine;
+    an exec can still fail after this, and then says so on the next line."""
+    path = launch.argv[0] if launch.argv else ''
+    if not (path and os.path.isfile(path) and os.access(path, os.X_OK)):
+        return words.MOVE_NO_PROGRAM
+    if launch.cwd and not os.path.isdir(launch.cwd):
+        return words.MOVE_NO_FOLDER
+    return None
+
+
+def _open_plain(ctx: _Quiet, pid) -> int:
+    """The provider's app, opened here as it is: nothing of a chat goes with it, so no yes is needed. In this terminal
+    (exec); without a terminal, the line to run is printed."""
+    opener = getattr(ctx.prov(pid), 'open_here', None)
+    if not callable(opener):
+        raise Refused(words.MOVE_NO_PLAIN.format(name=ctx.name(pid)))
+    how = contract.IN_TERMINAL if ctx.tty() else contract.PRINT
+    launch = opener(ctx.folder, how)
+    prog = launch.program
+    ctx.out(words.DO_STARTING.format(app=ctx.app(pid), version=words.one_line(prog.version or '?', 40) if prog else '?',
+                                     where=words.one_line(prog.where, 60) if prog else '?'))
+    if how == contract.PRINT:
+        ctx.loud()
+        ctx.out(words.MOVED_PLAIN_RUN.format(to=ctx.name(pid)))
+        ctx.out('  ' + launch.line if launch.line else '  ' + ctx.kit.run.shell_line(launch.argv, launch.cwd,
+                                                                                     ctx.reach.env))
+        _log_plain(ctx, 'printed', pid)
+        return 0
+    gone = _cannot_run(launch)
+    if gone:
+        ctx.loud()
+        _log_plain(ctx, 'failed', pid)
+        ctx.out(words.CANNOT_START.format(to=ctx.name(pid), error=gone))
+        line = launch.line or ctx.kit.run.shell_line(launch.argv, launch.cwd, ctx.reach.env)
+        if line:
+            ctx.out('  ' + line)
+        return 1
+    key_line = ctx.billing_line(pid)
+    if key_line:
+        ctx.out(key_line)
+    _log_plain(ctx, 'started', pid)
+    ctx.loud()
+    ctx.out(words.MOVED_PLAIN.format(to=ctx.name(pid)))
+    try:
+        sys.stdout.flush()
+    except (AttributeError, ValueError, OSError):
+        pass
+    try:
+        ctx.reach.execve(launch.argv[0], list(launch.argv), dict(launch.env), launch.cwd)
+    except OSError as e:
+        _log_plain(ctx, 'failed', pid)
+        ctx.out(words.CANNOT_START.format(to=ctx.name(pid), error=words.one_line(e.strerror or type(e).__name__, 120)))
+        line = launch.line or ctx.kit.run.shell_line(launch.argv, launch.cwd, ctx.reach.env)
+        if line:
+            ctx.out('  ' + line)
+        return 1
+    return 0                                        # only a stand-in exec comes back
 
 
 # ---------- switchboard back ----------
@@ -1692,7 +2184,453 @@ def cmd_order(ctx: _Ctx, args) -> int:
     return 0
 
 
+# ---------- the front door: switchboard do, route, routes ----------
+#
+# The person types a task once. Its kind comes from its own words by fixed rules (kinds.py); the person's routes for
+# that kind (routes.py), their order and each provider's room give the pick (job.choose); the model and effort are
+# checked against the list of models (catalog.py). `do` then asks the yes for this folder as continue does, writes the
+# task's words into one private file, and starts the provider's own app on it with a fixed first message that names
+# only the file. The task's words never go into an argument list, the environment, a log line or the History.
+
+
+def _routes(ctx: _Ctx):
+    if ctx.kit.routes is not None:
+        return ctx.kit.routes
+    from . import routes
+    return routes
+
+
+def _catalog(ctx: _Ctx):
+    if ctx.kit.catalog is not None:
+        return ctx.kit.catalog
+    from . import catalog
+    return catalog
+
+
+@dataclass
+class _TaskArgs:
+    kind: Optional[str] = None      # --as
+    to: Optional[str] = None        # --on
+    model: Optional[str] = None
+    effort: Optional[str] = None
+    show: bool = False
+    json: bool = False
+    task: str = ''
+
+
+_TASK_VALUES = {'route': ('--as', '--on'), 'do': ('--as', '--on', '--model', '--effort')}
+_TASK_FLAGS = {'route': ('--json',), 'do': ('--show',)}
+
+
+def _parse_task(ctx: _Ctx, cmd, args) -> _TaskArgs:
+    """The options before the task, then the task: every word after them (or after --), joined by single spaces."""
+    a, rest, task = _TaskArgs(), list(args), []
+    while rest:
+        word = rest.pop(0)
+        if word == '--':
+            task = rest
+            break
+        if word in _TASK_VALUES[cmd]:
+            if not rest:
+                raise Usage()
+            value = rest.pop(0)
+            if word == '--as':
+                a.kind = value.lower()
+                if a.kind not in kinds.KINDS:
+                    raise Usage(words.UNKNOWN_KIND.format(word=words.one_line(value, 40), kinds=', '.join(kinds.KINDS)))
+            elif word == '--on':
+                a.to = ctx.provider_word(value)
+            elif word == '--model':
+                a.model = value
+            else:
+                a.effort = value
+        elif word in _TASK_FLAGS[cmd]:
+            setattr(a, word[2:], True)
+        elif word.startswith('-') and word != '-':
+            raise Usage()
+        else:
+            task = [word] + rest
+            break
+    a.task = ' '.join(task).strip()
+    if not a.task:
+        raise Usage()
+    try:                                            # before the pick and the yes: nothing is written, nothing kept
+        size = len(a.task.encode('utf-8'))
+    except UnicodeEncodeError:
+        raise Refused(words.TASK_NOT_TEXT)
+    from .handoff import PERSON_NEWEST              # what a task file keeps of the person's words whole
+    if size > sum(PERSON_NEWEST):
+        raise Refused(words.TASK_TOO_LONG.format(cap=words.size(sum(PERSON_NEWEST)), size=words.size(size)))
+    return a
+
+
+@dataclass
+class _Pick:
+    kind: str
+    word: Optional[str]
+    by: str                         # 'word' (a word of the task told it), 'named' (--as) or 'none'
+    route: tuple
+    rooms: Dict[str, Room]
+    stay: Optional[str]
+    choice: job.Choice
+    model: Optional[str]
+    effort: Optional[str]
+    named: Optional[str] = None     # the provider named with --on
+    version: Optional[str] = None   # of the program that would start
+    model_given: bool = False       # that version takes the model (or none was asked)
+    effort_given: bool = False      # and the effort
+
+
+def _pick_for(ctx: _Ctx, a: _TaskArgs) -> _Pick:
+    """The kind, the route for it, every provider's room, this folder's stay, and the pick; --model and --effort
+    replace the route's model and effort, each checked against the list for the provider picked."""
+    if a.kind:
+        kind, word, by = a.kind, None, 'named'
+    else:
+        kind, word = kinds.kind_of(a.task)
+        by = 'word' if word else 'none'
+    try:
+        route = _routes(ctx).load().route_for(kind, ctx.order())  # a preset's row in the person's order
+    except ValueError as e:                         # the table cannot be used: one sentence, nothing starts
+        raise Refused(words.one_line(str(e), 600))
+    rooms = {pid: ctx.room(pid) for pid in ctx.ids()}
+    stay = ctx.stays()
+    never = frozenset(pid for pid in ctx.ids() if ctx.consent(pid) == 'never')
+    choice = job.choose(kind, route, ctx.order(), rooms, stay=stay, to=a.to, never=never)
+    model, effort = choice.model, choice.effort
+    if choice.provider is not None and (a.model or a.effort):
+        try:
+            if a.model:
+                model = _catalog(ctx).find_model(choice.provider, a.model).id
+            if a.effort:
+                effort = _catalog(ctx).find_effort(choice.provider, a.effort)
+        except ValueError as e:                     # the list's own sentence, naming the known ones
+            raise Refused(words.one_line(str(e), 600))
+    version, model_given, effort_given = None, True, True
+    if choice.provider is not None:
+        found = ctx.found(choice.provider)
+        version = found.program.version if found is not None and found.program is not None else None
+        try:
+            model_given = not model or _catalog(ctx).takes(choice.provider, 'model', version)
+            effort_given = not effort or _catalog(ctx).takes(choice.provider, 'effort', version)
+        except ValueError as e:
+            raise Refused(words.one_line(str(e), 600))
+    return _Pick(kind, word, by, tuple(route), rooms, stay, choice, model, effort, a.to, version, model_given,
+                 effort_given)
+
+
+def _kind_line(p: _Pick) -> str:
+    a_kind = words.KIND_NAMES[p.kind][0]
+    if p.by == 'named':
+        return words.DO_KIND_NAMED.format(a_kind=a_kind)
+    if p.by == 'word':
+        said = words.DO_KIND_WORDS if ' ' in p.word else words.DO_KIND_WORD
+        return said.format(a_kind=a_kind, word=words.one_line(p.word, 40))
+    return words.DO_KIND_NONE.format(a_kind=a_kind)
+
+
+def _passed_why(ctx: _Ctx, pid, code, room: Room) -> str:
+    if code == 'out':
+        if room.back_at is None:
+            return words.DO_PASSED_WHY['out_unknown']
+        many = not ctx.one_login(pid) and len(ctx.seats(pid)) > 1
+        return words.DO_PASSED_WHY['out_all' if many else 'out'].format(when=words.when(room.back_at, ctx.now))
+    return words.DO_PASSED_WHY.get(code, words.DO_PASSED_WHY['not_added']).format(pid=pid)
+
+
+def _room_of(p: _Pick, pid) -> Room:
+    return p.rooms.get(pid) or Room(pid, contract.NOT_ADDED)
+
+
+def _model_name(ctx: _Ctx, pid, model) -> str:
+    try:
+        return words.one_line(_catalog(ctx).find_model(pid, model).name, 60)
+    except ValueError:
+        return words.one_line(model, 60)
+
+
+def _model_lines(ctx: _Ctx, p: _Pick) -> List[str]:
+    """What the app is asked for, as the version that would start takes it: the model and effort it is given, and a
+    line for each one asked for that is not passed (or one line when its version could not be read)."""
+    from .run import version_key
+    pid = p.choice.provider
+    to, app = ctx.name(pid), ctx.app(pid)
+    if not p.model and not p.effort:
+        return [words.DO_MODEL_OWN.format(to=to)]
+    if not version_key(p.version):
+        return [words.DO_VERSION_UNKNOWN.format(app=app)]
+    model = p.model if p.model_given else None
+    effort = words.one_line(p.effort, 20) if p.effort and p.effort_given else None
+    lines = []
+    if model and effort:
+        lines.append(words.DO_MODEL.format(to=to, what=words.DO_MODEL_BOTH.format(
+            model=_model_name(ctx, pid, model), effort=effort)))
+    elif model or effort:
+        what = words.DO_MODEL_ONLY.format(model=_model_name(ctx, pid, model)) if model else \
+            words.DO_EFFORT_ONLY.format(effort=effort)
+        lines.append(words.DO_MODEL.format(to=to, what=what))
+    shown = words.one_line(p.version, 40)
+    if p.model and not p.model_given:
+        lines.append(words.DO_NO_MODEL_PASSED.format(app=app, version=shown))
+    if p.effort and not p.effort_given:
+        lines.append(words.DO_NO_EFFORT_PASSED.format(app=app, version=shown))
+    return lines
+
+
+def _pick_lines(ctx: _Ctx, p: _Pick) -> List[str]:
+    """What the person reads first: the kind and the pick with its reason, the model, then each provider passed."""
+    c = p.choice
+    if c.provider is None:
+        return [_kind_line(p)] + _nobody_lines(ctx, p)
+    why = (words.DO_WHY_STAY.get(c.reason) if p.stay else None) or words.DO_WHY[c.reason]
+    lines = [_kind_line(p) + ' ' + why.format(to=ctx.name(c.provider), kinds=words.KIND_NAMES[p.kind][1])]
+    room = _room_of(p, c.provider)
+    if p.named is not None and room.state == contract.OUT and room.back_at is not None:
+        lines.append(words.DO_NAMED_OUT.format(to=ctx.name(c.provider), when=words.when(room.back_at, ctx.now)))
+    lines.extend(_model_lines(ctx, p))
+    for pid, code in c.passed:
+        lines.append(words.DO_PASSED.format(name=ctx.name(pid), why=_passed_why(ctx, pid, code, _room_of(p, pid))))
+    return lines
+
+
+def _nobody_lines(ctx: _Ctx, p: _Pick) -> List[str]:
+    """Why nobody can take it: a provider named that cannot run, a stay on another, or one sentence per provider
+    looked at and when the first is back."""
+    c, named = p.choice, p.named
+    if named is not None and p.stay is not None and p.stay != named:
+        return [words.STAYS.format(p=ctx.name(p.stay))]
+    one = {contract.NOT_ADDED: lambda: words.NOT_ADDED.format(name=ctx.name(named), pid=named),
+           contract.NOT_INSTALLED: lambda: words.NOT_ON_MAC.format(name=ctx.name(named)),
+           contract.SIGNED_OUT: lambda: words.SIGNED_OUT.format(name=ctx.name(named), how=ctx.sign_in(named)),
+           job.NEVER: lambda: words.NEVER.format(to=ctx.name(named), to_id=named)}
+    if named is not None and c.reason in one:
+        return [one[c.reason]()]
+    lines = [words.DO_NOBODY]
+    for pid, code in c.passed:
+        lines.append(words.DO_NOBODY_EACH.format(name=ctx.name(pid),
+                                                 why=_passed_why(ctx, pid, code, _room_of(p, pid))))
+    if c.back_at is not None:
+        lines.append(words.DO_BACK_AT.format(when=words.when(c.back_at, ctx.now)))
+    return lines
+
+
+def _pick_json(ctx: _Ctx, p: _Pick) -> dict:
+    c = p.choice
+    return {'v': 1, 'kind': p.kind, 'by': p.by, 'word': p.word, 'provider': c.provider, 'model': p.model,
+            'effort': p.effort, 'reason': c.reason, 'back_at': c.back_at, 'stay': p.stay,
+            'passed': [{'provider': pid, 'why': code, 'back_at': _room_of(p, pid).back_at} for pid, code in c.passed],
+            'route': [_routes(ctx).word_of(x) for x in p.route], 'says': _pick_lines(ctx, p)}
+
+
+def cmd_route(ctx: _Ctx, args) -> int:
+    a = _parse_task(ctx, 'route', args)
+    p = _pick_for(ctx, a)
+    if a.json:
+        ctx.out(json.dumps(_pick_json(ctx, p), sort_keys=True))
+    else:
+        for line in _pick_lines(ctx, p):
+            ctx.out(line)
+    return 0 if p.choice.provider is not None else 1
+
+
+def _order_names(ctx: _Ctx) -> str:
+    return words.names([ctx.name(p) for p in ctx.order()])
+
+
+def _route_words(ctx: _Ctx, choices) -> str:
+    return words.ROUTES_THEN.join(_routes(ctx).word_of(c) for c in choices)
+
+
+def _table(ctx: _Ctx):
+    try:
+        return _routes(ctx).load()
+    except ValueError as e:                         # the table cannot be used: one sentence that names the file
+        raise Refused(words.one_line(str(e), 600))
+
+
+def _table_lines(ctx: _Ctx) -> List[str]:
+    r = _routes(ctx)
+    table = _table(ctx)
+    lines = [words.ROUTES_HEAD.format(name=words.one_line(table.preset, 40)) if table.preset
+             else words.ROUTES_HEAD_NONE]
+    for kind in kinds.KINDS:
+        route = table.route_for(kind, ctx.order())
+        what = _route_words(ctx, route) if route else words.ROUTES_FOLLOWS.format(order=_order_names(ctx))
+        if kind in table.from_preset:
+            what = words.ROUTES_FROM_PRESET.format(what=what)
+        lines.append(words.ROUTES_ROW.format(kind=kind, what=what))
+    try:
+        names = ', '.join(r.presets())
+    except ValueError as e:                         # a preset that cannot be used says why
+        names = words.one_line(str(e), 300)
+    lines.append(words.ROUTES_PRESETS.format(names=names))
+    return lines
+
+
+def _table_json(ctx: _Ctx) -> dict:
+    r = _routes(ctx)
+    table = _table(ctx)
+    try:
+        names = list(r.presets())
+    except ValueError:
+        names = []
+    return {'v': 1, 'kinds': list(kinds.KINDS), 'order': ctx.order(), 'preset': table.preset, 'presets': names,
+            'from_preset': [k for k in kinds.KINDS if k in table.from_preset],
+            'routes': {k: [r.word_of(c) for c in table.route_for(k, ctx.order())] for k in kinds.KINDS if table.get(k)}}
+
+
+def cmd_routes(ctx: _Ctx, args) -> int:
+    r = _routes(ctx)
+    if not args or args == ['--json']:
+        if args:
+            ctx.out(json.dumps(_table_json(ctx), sort_keys=True))
+        else:
+            for line in _table_lines(ctx):
+                ctx.out(line)
+        return 0
+    sub, rest = args[0], list(args[1:])
+    if sub == 'set' and len(rest) < 2 or sub == 'reset' and len(rest) > 1 or sub == 'preset' and len(rest) != 1 or \
+            sub not in ('set', 'reset', 'preset'):
+        raise Usage(words.ROUTES_SET_USAGE if sub == 'set' else '')
+    kind = rest[0].lower() if rest and sub != 'preset' else None
+    if kind is not None and kind not in kinds.KINDS:
+        raise Usage(words.UNKNOWN_KIND.format(word=words.one_line(rest[0], 40), kinds=', '.join(kinds.KINDS)))
+    try:
+        if sub == 'set':
+            got = r.set_kind(kind, rest[1:], catalog=_catalog(ctx))
+            ctx.out(words.ROUTE_NOW.format(kind=kind, what=_route_words(ctx, got)))
+        elif sub == 'reset':
+            r.reset(kind)
+            ctx.out(words.ROUTE_GONE.format(kind=kind, order=_order_names(ctx)) if kind
+                    else words.ROUTES_ALL_GONE.format(order=_order_names(ctx)))
+        elif rest[0] == 'off':
+            was = _table(ctx).preset
+            r.preset(None)
+            ctx.out(words.PRESET_OFF if was else words.PRESET_NONE)
+        else:
+            filled, kept = r.preset(rest[0], catalog=_catalog(ctx))
+            name = words.one_line(rest[0], 40)
+            ctx.out(words.PRESET_ON.format(name=name, kinds=words.listed(filled), order=_order_names(ctx)) if filled
+                    else words.PRESET_ON_NONE.format(name=name))
+            if kept:
+                ctx.out((words.PRESET_KEPT if len(kept) == 1 else words.PRESET_KEPT_MANY).format(
+                    kinds=words.listed(kept)))
+    except ValueError as e:                         # the table's own sentence (a choice, a preset, an unreadable file)
+        raise Refused(words.one_line(str(e), 600))
+    return 0
+
+
+def _do_options(a: _TaskArgs) -> str:
+    return ''.join('%s %s ' % (flag, shlex.quote(words.one_line(v, 80)))
+                   for flag, v in (('--as', a.kind), ('--on', a.to), ('--model', a.model), ('--effort', a.effort)) if v)
+
+
+def _ask_do(ctx: _Ctx, pid) -> str:
+    """The yes for this folder and provider before a task leaves for it, at a terminal: 'yes', 'never' or 'no'."""
+    jobs = words.DO_QUESTION_JOBS if ctx.can(pid, contract.JOB) else ''
+    ctx.out(words.DO_QUESTION.format(to=ctx.name(pid), vendor=ctx.vendor(pid), jobs=jobs,
+                                     work=words.WORK_PLAN if ctx.work_plan(pid) else '',
+                                     basename=ctx.basename).rstrip('\n'))
+    answer = ctx.ask(words.PROMPT).lower()
+    return 'yes' if answer in ('y', 'yes') else 'never' if answer == 'never' else 'no'
+
+
+def _drop_task_file(ctx: _Ctx, handoff: Handoff):
+    root = ctx.kit.run.notes_root(ctx.reach)
+    if handoff.path and _within(handoff.path, root):
+        try:
+            os.remove(handoff.path)
+        except FileNotFoundError:
+            pass
+
+
+def cmd_do(ctx: _Ctx, args) -> int:
+    a = _parse_task(ctx, 'do', args)
+    if a.show:                                      # the same as route, with the same words
+        p = _pick_for(ctx, a)
+        for line in _pick_lines(ctx, p):
+            ctx.out(line)
+        return 0 if p.choice.provider is not None else 1
+    if _too_wide(ctx, ctx.folder):                  # an app started there could read everything under it
+        raise Refused(words.DO_TOO_WIDE.format(folder=words.one_line(ctx.folder, 200)))
+    if not ctx.tty():                               # nothing starts without a person at a terminal
+        ctx.out(words.DO_NOT_TTY)
+        ctx.out(words.DO_LINE.format(options=_do_options(a), task=shlex.quote(words.one_line(a.task, 4000))))
+        return 0
+    p = _pick_for(ctx, a)
+    pid = p.choice.provider
+    if pid is None:
+        raise Refused('\n'.join(_pick_lines(ctx, p)))
+    ctx.refuse_stay_and_never(pid)
+    ctx.refuse_too_old(pid)
+    starter = getattr(ctx.prov(pid), 'start_task', None)
+    if not callable(starter):
+        raise Refused(words.NO_START_TASK.format(name=ctx.name(pid)))
+    for line in _pick_lines(ctx, p):
+        ctx.out(line)
+    if ctx.consent(pid) is None:
+        answer = _ask_do(ctx, pid)
+        if answer != 'yes':
+            if answer == 'never':
+                _set_consent(ctx, pid, 'never')
+            raise Refused(words.NOTHING_SENT)
+        _set_consent(ctx, pid, 'yes')
+    version, effort_given = p.version, p.effort_given
+    try:
+        extra = _catalog(ctx).start_args(pid, p.model, p.effort, version)
+    except ValueError as e:
+        raise Refused(words.one_line(str(e), 600))
+    app = ctx.app(pid)
+    tasks = ctx.kit.tasks
+    task_id, hop_id = tasks.new_task_id(), tasks.new_hop_id()
+    handoff = ctx.kit.handoff.write_task(a.task, hop=hop_id, task=task_id, to_name=ctx.name(pid),
+                                         kind_line=_kind_line(p),
+                                         asked=() if effort_given else (words.ASKED_FOR.format(effort=p.effort),),
+                                         folder=ctx.folder, reach=ctx.reach)
+    try:
+        launch = starter(ctx.folder, hop_id, handoff.path, contract.IN_TERMINAL, tuple(extra))
+    except ProviderError:
+        _drop_task_file(ctx, handoff)
+        raise
+    if isinstance(launch, Unsupported):
+        _drop_task_file(ctx, handoff)
+        raise Refused(words.one_line(launch.why, 300))
+    tasks.add_task(task_id, ctx.folder, {
+        'kind': p.kind, 'by': p.by, 'provider': pid, 'model': p.model, 'effort': p.effort,
+        'reason': p.choice.reason, 'passed': [list(x) for x in p.choice.passed], 'file': handoff.path,
+        'bytes': handoff.bytes, 'removed': _removed(handoff), 'state': 'started', 'version': version}, ctx.now)
+    ctx.moved = True
+    ctx.say(words.H_DO.format(to=ctx.name(pid), basename=ctx.basename, why=words.KIND_NAMES[p.kind][0]), 'info',
+            to=ctx.name(pid), reason='new task')
+    key_line = ctx.billing_line(pid)
+    if key_line:
+        ctx.out(key_line)
+    prog = launch.program
+    ctx.out(words.DO_STARTING.format(app=app, version=words.one_line(prog.version or '?', 40) if prog else '?',
+                                     where=words.one_line(prog.where, 60) if prog else '?'))
+    ctx.out(words.DO_TASK_LINE.format(path=words.one_line(handoff.path, 400), size=words.size(handoff.bytes),
+                                      places=words.places(_removed(handoff))))
+    _prune(ctx)                                     # an exec that works never comes back to the end of the command
+    try:
+        sys.stdout.flush()
+    except (AttributeError, ValueError, OSError):
+        pass
+    try:
+        ctx.reach.execve(launch.argv[0], list(launch.argv), dict(launch.env), launch.cwd)
+    except OSError as e:
+        tasks.update_task(task_id, state='failed')
+        ctx.say(words.H_DO_NOT_STARTED.format(to=ctx.name(pid), basename=ctx.basename), 'problem', to=ctx.name(pid),
+                reason='could not start')
+        ctx.out(words.DO_CANNOT_START.format(to=ctx.name(pid), error=words.one_line(e.strerror or type(e).__name__,
+                                                                                    120)))
+        line = launch.line or ctx.kit.run.shell_line(launch.argv, launch.cwd, ctx.reach.env)
+        ctx.out('  ' + line if line else _open_line(ctx, pid, handoff, ctx.folder))
+        return 1
+    return 0                                        # only a stand-in exec comes back
+
+
 _RUN: Dict[str, Callable[[_Ctx, list], int]] = {
     'providers': cmd_providers, 'add': cmd_add, 'continue': cmd_continue, 'back': cmd_back, 'hand': cmd_hand,
-    'allow': cmd_allow, 'stay': cmd_stay, 'order': cmd_order,
+    'allow': cmd_allow, 'stay': cmd_stay, 'order': cmd_order, 'do': cmd_do, 'route': cmd_route, 'routes': cmd_routes,
+    'remove': cmd_remove,
 }
